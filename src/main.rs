@@ -337,3 +337,226 @@ mod tests {
         assert_eq!(node.children[0].children[0].children[0].name, "deep.rs");
     }
 }
+
+#[cfg(test)]
+mod iced_tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs::File;
+
+    // Helper function to create a test file tree
+    fn create_test_tree() -> FileNode {
+        let mut root = FileNode::new_directory(
+            "root".to_string(),
+            PathBuf::from("/test/root"),
+            vec![]
+        );
+        
+        let mut subdir = FileNode::new_directory(
+            "subdir".to_string(),
+            PathBuf::from("/test/root/subdir"),
+            vec![]
+        );
+        
+        subdir.children.push(FileNode::new_file(
+            "file1.txt".to_string(),
+            PathBuf::from("/test/root/subdir/file1.txt")
+        ));
+        
+        root.children.push(subdir);
+        root.children.push(FileNode::new_file(
+            "file2.rs".to_string(),
+            PathBuf::from("/test/root/file2.rs")
+        ));
+        
+        root
+    }
+
+    #[test]
+    fn test_file_tree_app_new() {
+        let root_node = create_test_tree();
+        let app = FileTreeApp::new(Some(root_node.clone()));
+        
+        assert!(app.root_node.is_some());
+        assert_eq!(app.root_node.as_ref().unwrap().name, "root");
+    }
+
+    #[test]
+    fn test_file_tree_app_new_empty() {
+        let app = FileTreeApp::new(None);
+        assert!(app.root_node.is_none());
+    }
+
+    #[test]
+    fn test_update_toggle_expansion() {
+        let root_node = create_test_tree();
+        let subdir_path = PathBuf::from("/test/root/subdir");
+        
+        // Initially not expanded
+        assert!(!root_node.children[0].is_expanded);
+        
+        let mut app = FileTreeApp::new(Some(root_node));
+        let message = Message::ToggleExpansion(subdir_path.clone());
+        
+        let _task = update(&mut app, message);
+        
+        // Should be expanded now
+        assert!(app.root_node.as_ref().unwrap().children[0].is_expanded);
+    }
+
+    #[test]
+    fn test_update_toggle_expansion_twice() {
+        let root_node = create_test_tree();
+        let subdir_path = PathBuf::from("/test/root/subdir");
+        let mut app = FileTreeApp::new(Some(root_node));
+        
+        // Toggle once - should expand
+        let message = Message::ToggleExpansion(subdir_path.clone());
+        let _ = update(&mut app, message);
+        assert!(app.root_node.as_ref().unwrap().children[0].is_expanded);
+        
+        // Toggle again - should collapse
+        let message = Message::ToggleExpansion(subdir_path);
+        let _ = update(&mut app, message);
+        assert!(!app.root_node.as_ref().unwrap().children[0].is_expanded);
+    }
+
+    #[test]
+    fn test_update_with_no_root_node() {
+        let mut app = FileTreeApp::new(None);
+        let message = Message::ToggleExpansion(PathBuf::from("/nonexistent"));
+        
+        let _task = update(&mut app, message);
+        
+        // Should not panic and app state should remain unchanged
+        assert!(app.root_node.is_none());
+    }
+
+    #[test]
+    fn test_toggle_expansion_recursive() {
+        let mut root_node = create_test_tree();
+        let subdir_path = PathBuf::from("/test/root/subdir");
+        
+        assert!(!root_node.children[0].is_expanded);
+        
+        toggle_expansion_recursive(&mut root_node, &subdir_path);
+        
+        assert!(root_node.children[0].is_expanded);
+    }
+
+    #[test]
+    fn test_toggle_expansion_recursive_nonexistent_path() {
+        let mut root_node = create_test_tree();
+        let nonexistent_path = PathBuf::from("/test/nonexistent");
+        
+        let original_state = root_node.children[0].is_expanded;
+        
+        toggle_expansion_recursive(&mut root_node, &nonexistent_path);
+        
+        // Should not change any expansion states
+        assert_eq!(root_node.children[0].is_expanded, original_state);
+    }
+
+    #[test]
+    fn test_view_with_root_node() {
+        let root_node = create_test_tree();
+        let app = FileTreeApp::new(Some(root_node));
+        
+        let _element = view(&app);
+        
+        // Test passes if view() doesn't panic
+        // We can't easily inspect Element content without custom renderer
+    }
+
+    #[test]
+    fn test_view_with_no_root_node() {
+        let app = FileTreeApp::new(None);
+        
+        let _element = view(&app);
+        
+        // Test passes if view() doesn't panic when rendering empty state
+    }
+
+    #[test]
+    fn test_render_node_file() {
+        let file_node = FileNode::new_file(
+            "test.txt".to_string(),
+            PathBuf::from("/test.txt")
+        );
+        
+        let _element = render_node(&file_node, 0);
+        
+        // Test passes if render_node() doesn't panic
+    }
+
+    #[test]
+    fn test_render_node_directory() {
+        let dir_node = FileNode::new_directory(
+            "testdir".to_string(),
+            PathBuf::from("/testdir"),
+            vec![]
+        );
+        
+        let _element = render_node(&dir_node, 1);
+        
+        // Test passes if render_node() doesn't panic
+    }
+
+    #[test]
+    fn test_integration_with_real_directory() {
+        // Create a temporary directory structure for testing
+        let temp_dir = tempdir().unwrap();
+        let root = temp_dir.path();
+        
+        // Create test files
+        File::create(root.join("test.txt")).unwrap();
+        File::create(root.join("test.rs")).unwrap();
+        File::create(root.join("ignored.doc")).unwrap();
+        
+        // Create subdirectory with files
+        let subdir = root.join("subdir");
+        std::fs::create_dir(&subdir).unwrap();
+        File::create(subdir.join("nested.txt")).unwrap();
+        
+        let allowed = ["txt", "rs"];
+        let root_node = scan_directory(root, &allowed);
+        
+        assert!(root_node.is_some());
+        let node = root_node.unwrap();
+        
+        // Test that the app can be created and updated
+        let mut app = FileTreeApp::new(Some(node));
+        
+        // Test expanding the subdirectory
+        let subdir_path = subdir.to_path_buf();
+        let message = Message::ToggleExpansion(subdir_path);
+        let _task = update(&mut app, message);
+        
+        // Test view rendering doesn't panic
+        let _element = view(&app);
+        
+        // Test passes if all operations complete without panicking
+    }
+
+    #[test]
+    fn test_deeply_nested_expansion() {
+        let mut root = FileNode::new_directory("root".to_string(), PathBuf::from("/root"), vec![]);
+        let mut level1 = FileNode::new_directory("level1".to_string(), PathBuf::from("/root/level1"), vec![]);
+        let mut level2 = FileNode::new_directory("level2".to_string(), PathBuf::from("/root/level1/level2"), vec![]);
+        
+        level2.children.push(FileNode::new_file("deep.txt".to_string(), PathBuf::from("/root/level1/level2/deep.txt")));
+        level1.children.push(level2);
+        root.children.push(level1);
+        
+        let mut app = FileTreeApp::new(Some(root));
+        
+        // Test expanding deeply nested directory
+        let deep_path = PathBuf::from("/root/level1/level2");
+        let message = Message::ToggleExpansion(deep_path);
+        let _task = update(&mut app, message);
+        
+        // Verify the deep directory was expanded
+        let level2_node = &app.root_node.as_ref().unwrap().children[0].children[0];
+        assert!(level2_node.is_expanded);
+    }
+}
