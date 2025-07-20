@@ -6,6 +6,15 @@ use gui::{FileTreeApp, update, view};
 use std::path::Path;
 
 fn main() -> iced::Result {
+    // TODO:
+    //      - select/delete top-level directories from gui
+    //      - persist top-level directories 
+    //      - select/delete file extensions from gui
+    //      - persist file extensions directories 
+    //      - divide gui vertically 
+    //      - add right-click to add directories/files selected on left to right
+    //      - sort/shuffle right-hand list
+
     let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
     let dir = Path::new(&home_dir).join("Documents").join("ma_timing");
     let allowed = ["txt", "rs", "md"];
