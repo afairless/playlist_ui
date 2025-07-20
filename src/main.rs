@@ -38,10 +38,53 @@ impl FileNode {
     }
 }
 
+//pub fn scan_directory(
+//    dir: &Path,
+//    allowed_extensions: &[&str],
+//) -> Option<FileNode> {
+//    let mut children = Vec::new();
+//
+//    if let Ok(entries) = fs::read_dir(dir) {
+//        for entry in entries.flatten() {
+//            let path = entry.path();
+//            let name = entry.file_name().to_string_lossy().to_string();
+//
+//            if path.is_file() {
+//                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+//                    if allowed_extensions.contains(&ext) {
+//                        children.push(FileNode::new_file(name, path));
+//                    }
+//                }
+//            } else if path.is_dir() {
+//                if let Some(child_node) = scan_directory(&path, allowed_extensions) {
+//                    // Only add directory if it has matching children
+//                    if !child_node.children.is_empty() {
+//                        children.push(child_node);
+//                    }
+//                }
+//            }
+//        }
+//    }
+//
+//    if !children.is_empty() {
+//        Some(FileNode::new_directory(
+//            dir.file_name()
+//                .map(|n| n.to_string_lossy().to_string())
+//                .unwrap_or_else(|| dir.display().to_string()),
+//            dir.to_path_buf(),
+//            children,
+//        ))
+//    } else {
+//        None
+//    }
+//}
+
+
 pub fn scan_directory(
     dir: &Path,
     allowed_extensions: &[&str],
 ) -> Option<FileNode> {
+    let allowed: Vec<String> = allowed_extensions.iter().map(|e| e.to_lowercase()).collect();
     let mut children = Vec::new();
 
     if let Ok(entries) = fs::read_dir(dir) {
@@ -51,13 +94,12 @@ pub fn scan_directory(
 
             if path.is_file() {
                 if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if allowed_extensions.contains(&ext) {
+                    if allowed.contains(&ext.to_lowercase()) {
                         children.push(FileNode::new_file(name, path));
                     }
                 }
             } else if path.is_dir() {
                 if let Some(child_node) = scan_directory(&path, allowed_extensions) {
-                    // Only add directory if it has matching children
                     if !child_node.children.is_empty() {
                         children.push(child_node);
                     }
@@ -79,7 +121,6 @@ pub fn scan_directory(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,6 +129,57 @@ mod tests {
 
     #[test]
     fn test_scan_directory_01() {
+        // scan empty directory
+        let dir = tempfile::tempdir().unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed);
+        assert!(node.is_none());
+    }
+
+    #[test]
+    fn test_scan_directory_02() {
+        // directory has not matching files
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::File::create(dir.path().join("a.md")).unwrap();
+        std::fs::File::create(dir.path().join("b.doc")).unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed);
+        assert!(node.is_none());
+    }
+
+    #[test]
+    fn test_scan_directory_03() {
+        // nested matching
+        let dir = tempfile::tempdir().unwrap();
+        let subdir = dir.path().join("sub");
+        std::fs::create_dir(&subdir).unwrap();
+        std::fs::File::create(subdir.join("a.rs")).unwrap();
+        std::fs::File::create(subdir.join("b.md")).unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed).unwrap();
+        assert_eq!(node.children.len(), 1);
+        assert_eq!(node.children[0].name, "sub");
+        assert_eq!(node.children[0].children.len(), 1);
+        assert_eq!(node.children[0].children[0].name, "a.rs");
+    }
+
+    #[test]
+    fn test_scan_directory_04() {
+        // match multiple file extensions
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::File::create(dir.path().join("a.rs")).unwrap();
+        std::fs::File::create(dir.path().join("b.txt")).unwrap();
+        std::fs::File::create(dir.path().join("c.md")).unwrap();
+        let allowed = ["rs", "txt"];
+        let node = scan_directory(dir.path(), &allowed).unwrap();
+        let names: Vec<_> = node.children.iter().map(|n| &n.name).collect();
+        assert!(names.contains(&&"a.rs".to_string()));
+        assert!(names.contains(&&"b.txt".to_string()));
+        assert!(!names.contains(&&"c.md".to_string()));
+    }
+
+    #[test]
+    fn test_scan_directory_05() {
         let dir = tempdir().unwrap();
         let root = dir.path();
 
@@ -115,5 +207,72 @@ mod tests {
         let sub_node = node.children.iter().find(|n| n.name == "sub").unwrap();
         assert_eq!(sub_node.children.len(), 1);
         assert_eq!(sub_node.children[0].name, "d.rs");
+    }
+
+    #[test]
+    fn test_scan_directory_06() {
+        // subdirectories with no matches
+        let dir = tempfile::tempdir().unwrap();
+        let subdir1 = dir.path().join("sub1");
+        let subdir2 = dir.path().join("sub2");
+        std::fs::create_dir(&subdir1).unwrap();
+        std::fs::create_dir(&subdir2).unwrap();
+        std::fs::File::create(subdir1.join("a.md")).unwrap();
+        std::fs::File::create(subdir2.join("b.doc")).unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed);
+        assert!(node.is_none());
+    }
+
+    #[test]
+    fn test_scan_directory_07() {
+        // nested empty subdirectory
+        let dir = tempfile::tempdir().unwrap();
+        let subdir = dir.path().join("empty_sub");
+        std::fs::create_dir(&subdir).unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed);
+        assert!(node.is_none());
+    }
+
+    #[test]
+    fn test_scan_directory_08() {
+        // file with no extension
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::File::create(dir.path().join("README")).unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed);
+        assert!(node.is_none());
+    }
+
+    #[test]
+    fn test_scan_directory_09() {
+        // file extension match based on string case
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::File::create(dir.path().join("A.RS")).unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed).unwrap();
+        // Should not match, as extension comparison is case-sensitive
+        let names: Vec<_> = node.children.iter().map(|n| &n.name).collect();
+        assert!(names.contains(&&"A.RS".to_string()));
+    }
+
+    #[test]
+    fn test_scan_directory_10() {
+        // deeply nested matches
+        let dir = tempfile::tempdir().unwrap();
+        let subdir1 = dir.path().join("sub1");
+        let subdir2 = subdir1.join("sub2");
+        std::fs::create_dir(&subdir1).unwrap();
+        std::fs::create_dir(&subdir2).unwrap();
+        std::fs::File::create(subdir2.join("deep.rs")).unwrap();
+        let allowed = ["rs"];
+        let node = scan_directory(dir.path(), &allowed).unwrap();
+        assert_eq!(node.children.len(), 1);
+        assert_eq!(node.children[0].name, "sub1");
+        assert_eq!(node.children[0].children.len(), 1);
+        assert_eq!(node.children[0].children[0].name, "sub2");
+        assert_eq!(node.children[0].children[0].children.len(), 1);
+        assert_eq!(node.children[0].children[0].children[0].name, "deep.rs");
     }
 }
