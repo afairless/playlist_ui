@@ -38,48 +38,6 @@ impl FileNode {
     }
 }
 
-//pub fn scan_directory(
-//    dir: &Path,
-//    allowed_extensions: &[&str],
-//) -> Option<FileNode> {
-//    let mut children = Vec::new();
-//
-//    if let Ok(entries) = fs::read_dir(dir) {
-//        for entry in entries.flatten() {
-//            let path = entry.path();
-//            let name = entry.file_name().to_string_lossy().to_string();
-//
-//            if path.is_file() {
-//                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-//                    if allowed_extensions.contains(&ext) {
-//                        children.push(FileNode::new_file(name, path));
-//                    }
-//                }
-//            } else if path.is_dir() {
-//                if let Some(child_node) = scan_directory(&path, allowed_extensions) {
-//                    // Only add directory if it has matching children
-//                    if !child_node.children.is_empty() {
-//                        children.push(child_node);
-//                    }
-//                }
-//            }
-//        }
-//    }
-//
-//    if !children.is_empty() {
-//        Some(FileNode::new_directory(
-//            dir.file_name()
-//                .map(|n| n.to_string_lossy().to_string())
-//                .unwrap_or_else(|| dir.display().to_string()),
-//            dir.to_path_buf(),
-//            children,
-//        ))
-//    } else {
-//        None
-//    }
-//}
-
-
 pub fn scan_directory(
     dir: &Path,
     allowed_extensions: &[&str],
@@ -138,7 +96,7 @@ mod tests {
 
     #[test]
     fn test_scan_directory_02() {
-        // directory has not matching files
+        // directory has no matching files
         let dir = tempfile::tempdir().unwrap();
         std::fs::File::create(dir.path().join("a.md")).unwrap();
         std::fs::File::create(dir.path().join("b.doc")).unwrap();
