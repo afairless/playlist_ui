@@ -89,6 +89,7 @@ pub enum Message {
     ToggleExpansion(PathBuf),
 }
 
+#[derive(Debug, Clone)]
 pub struct FileTreeApp {
     root_node: Option<FileNode>,
 }
@@ -97,35 +98,31 @@ impl FileTreeApp {
     fn new(root_node: Option<FileNode>) -> Self {
         FileTreeApp { root_node }
     }
+}
 
-    fn title(&self) -> String {
-        "File Tree Viewer".to_string()
-    }
-
-    fn update(&mut self, message: Message) -> Task<Message> {
-        match message {
-            Message::ToggleExpansion(path) => {
-                if let Some(ref mut root) = self.root_node {
-                    toggle_expansion_recursive(root, &path);
-                }
-                Task::none()
+fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
+    match message {
+        Message::ToggleExpansion(path) => {
+            if let Some(ref mut root) = app.root_node {
+                toggle_expansion_recursive(root, &path);
             }
+            Task::none()
         }
     }
+}
 
-    fn view(&self) -> Element<Message> {
-        let content = if let Some(ref root) = self.root_node {
-            render_node(root, 0)
-        } else {
-            column![text("No files found")].into()
-        };
+fn view(app: &FileTreeApp) -> Element<Message> {
+    let content = if let Some(ref root) = app.root_node {
+        render_node(root, 0)
+    } else {
+        column![text("No files found")].into()
+    };
 
-        container(scrollable(content))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(10)
-            .into()
-    }
+    container(scrollable(content))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(10)
+        .into()
 }
 
 fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
@@ -180,9 +177,10 @@ fn main() -> iced::Result {
     
     let root_node = scan_directory(&dir, &allowed);
     
-    iced::application("File Tree Viewer", FileTreeApp::update, FileTreeApp::view)
+    iced::application("File Tree Viewer", update, view)
         .run_with(|| (FileTreeApp::new(root_node), Task::none()))
 }
+
 
 #[cfg(test)]
 mod tests {
