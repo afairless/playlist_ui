@@ -79,6 +79,111 @@ pub fn scan_directory(
     }
 }
 
+use iced::{
+    widget::{button, column, container, row, scrollable, text},
+    Element, Length, Task,
+};
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    ToggleExpansion(PathBuf),
+}
+
+pub struct FileTreeApp {
+    root_node: Option<FileNode>,
+}
+
+impl FileTreeApp {
+    fn new(root_node: Option<FileNode>) -> Self {
+        FileTreeApp { root_node }
+    }
+
+    fn title(&self) -> String {
+        "File Tree Viewer".to_string()
+    }
+
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::ToggleExpansion(path) => {
+                if let Some(ref mut root) = self.root_node {
+                    toggle_expansion_recursive(root, &path);
+                }
+                Task::none()
+            }
+        }
+    }
+
+    fn view(&self) -> Element<Message> {
+        let content = if let Some(ref root) = self.root_node {
+            render_node(root, 0)
+        } else {
+            column![text("No files found")].into()
+        };
+
+        container(scrollable(content))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(10)
+            .into()
+    }
+}
+
+fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
+    let indent = "  ".repeat(depth);
+    
+    let mut content = column![];
+    
+    match node.node_type {
+        NodeType::Directory => {
+            let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+            let dir_row = row![
+                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
+                    .size(14)
+            ];
+            
+            let dir_button = button(dir_row)
+                .on_press(Message::ToggleExpansion(node.path.clone()));
+            
+            content = content.push(dir_button);
+            
+            if node.is_expanded {
+                for child in &node.children {
+                    content = content.push(render_node(child, depth + 1));
+                }
+            }
+        }
+        NodeType::File => {
+            let file_row = text(format!("{} 📄 {}", indent, node.name))
+                .size(14);
+            content = content.push(file_row);
+        }
+    }
+    
+    content.into()
+}
+
+fn toggle_expansion_recursive(node: &mut FileNode, target_path: &Path) {
+    if node.path == target_path {
+        node.is_expanded = !node.is_expanded;
+        return;
+    }
+    
+    for child in &mut node.children {
+        toggle_expansion_recursive(child, target_path);
+    }
+}
+
+fn main() -> iced::Result {
+    let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+    let dir = Path::new(&home_dir).join("Documents").join("ma_timing");
+    let allowed = ["txt", "rs", "md"];
+    
+    let root_node = scan_directory(&dir, &allowed);
+    
+    iced::application("File Tree Viewer", FileTreeApp::update, FileTreeApp::view)
+        .run_with(|| (FileTreeApp::new(root_node), Task::none()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
