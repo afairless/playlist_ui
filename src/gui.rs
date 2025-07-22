@@ -9,6 +9,7 @@ use iced::{
 pub enum Message {
     ToggleExpansion(PathBuf),
     ToggleExtension(String),
+    ToggleExtensionsMenu,
 }
 
 #[derive(Debug, Clone)]
@@ -17,6 +18,7 @@ pub struct FileTreeApp {
     selected_extensions: Vec<String>,
     all_extensions: Vec<String>,
     dir: PathBuf,
+    extensions_menu_expanded: bool,
 }
 
 impl FileTreeApp {
@@ -27,6 +29,7 @@ impl FileTreeApp {
             selected_extensions: all_extensions.clone(),
             all_extensions,
             dir,
+            extensions_menu_expanded: false, // collapsed by default
         }
     }
 }
@@ -51,20 +54,33 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             );
             Task::none()
         }
+        Message::ToggleExtensionsMenu => {
+            app.extensions_menu_expanded = !app.extensions_menu_expanded;
+            Task::none()
+        }
     }
 }
 
 fn extension_menu(app: &FileTreeApp) -> Element<Message> {
-    let mut menu = column![];
-    for ext in &app.all_extensions {
-        let checked = app.selected_extensions.contains(ext);
-        let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
-        menu = menu.push(
-            button(text(label))
-                .on_press(Message::ToggleExtension(ext.clone()))
-        );
+    let header = button(
+        text(if app.extensions_menu_expanded { "▼ File Extensions" } else { "▶ File Extensions" }).size(16)
+    )
+    .on_press(Message::ToggleExtensionsMenu);
+
+    if app.extensions_menu_expanded {
+        let mut menu = column![];
+        for ext in &app.all_extensions {
+            let checked = app.selected_extensions.contains(ext);
+            let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+            menu = menu.push(
+                button(text(label))
+                    .on_press(Message::ToggleExtension(ext.clone()))
+            );
+        }
+        column![header, menu].into()
+    } else {
+        column![header].into()
     }
-    menu.into()
 }
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
