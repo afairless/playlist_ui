@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 use crate::file_tree::{FileNode, NodeType, scan_directory};
 use iced::{
     widget::{button, column, container, row, scrollable, text},
@@ -19,26 +20,44 @@ pub struct FileTreeApp {
     all_extensions: Vec<String>,
     dir: PathBuf,
     extensions_menu_expanded: bool,
+    expanded_dirs: HashSet<PathBuf>,
 }
 
 impl FileTreeApp {
     pub fn new(dir: PathBuf, all_extensions: Vec<String>) -> Self {
         let root_node = scan_directory(&dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        let mut expanded_dirs = HashSet::new();
+        if let Some(ref node) = root_node {
+            expanded_dirs.insert(node.path.clone()); // root expanded by default
+        }
         FileTreeApp {
             root_node,
             selected_extensions: all_extensions.clone(),
             all_extensions,
             dir,
-            extensions_menu_expanded: false, // collapsed by default
+            extensions_menu_expanded: false,
+            expanded_dirs,
         }
+    }
+}
+
+fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>) {
+    node.is_expanded = expanded_dirs.contains(&node.path);
+    for child in &mut node.children {
+        restore_expansion_state(child, expanded_dirs);
     }
 }
 
 pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
     match message {
         Message::ToggleExpansion(path) => {
+            if app.expanded_dirs.contains(&path) {
+                app.expanded_dirs.remove(&path);
+            } else {
+                app.expanded_dirs.insert(path.clone());
+            }
             if let Some(ref mut root) = app.root_node {
-                toggle_expansion_recursive(root, &path);
+                restore_expansion_state(root, &app.expanded_dirs);
             }
             Task::none()
         }
@@ -52,6 +71,9 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 &app.dir,
                 &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
             );
+            if let Some(ref mut root) = app.root_node {
+                restore_expansion_state(root, &app.expanded_dirs);
+            }
             Task::none()
         }
         Message::ToggleExtensionsMenu => {
