@@ -33,16 +33,42 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
 }
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
-    let content = if let Some(ref root) = app.root_node {
+    let left_content = if let Some(ref root) = app.root_node {
         render_node(root, 0)
     } else {
         column![text("No files found")].into()
     };
 
-    container(scrollable(content))
+    let right_content = if let Some(ref root) = app.root_node {
+        render_node(root, 0)
+    } else {
+        column![text("No files found")].into()
+    };
+
+    let left_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
+            scrollable(left_content)
+        )
+        .width(Length::FillPortion(1))
+        .padding(10)
+        .into();
+
+    let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
+            scrollable(right_content)
+        )
+        .width(Length::FillPortion(1))
+        .padding(10)
+        .into();
+
+    let split_row = row![
+        left_panel,
+        right_panel
+    ]
+    .width(Length::Fill)
+    .height(Length::Fill);
+
+    container::<Message, iced::Theme, iced::Renderer>(split_row)
         .width(Length::Fill)
         .height(Length::Fill)
-        .padding(10)
         .into()
 }
 
