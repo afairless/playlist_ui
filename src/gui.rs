@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::collections::HashSet;
 use crate::file_tree::{FileNode, NodeType, scan_directory};
 use iced::{
@@ -11,30 +11,34 @@ pub enum Message {
     ToggleExpansion(PathBuf),
     ToggleExtension(String),
     ToggleExtensionsMenu,
+    AddTopDir(PathBuf),
+    RemoveTopDir(PathBuf),
 }
 
 #[derive(Debug, Clone)]
 pub struct FileTreeApp {
-    root_node: Option<FileNode>,
+    root_nodes: Vec<Option<FileNode>>, // Multiple trees
+    top_dirs: Vec<PathBuf>,            // Multiple top-level dirs
     selected_extensions: Vec<String>,
     all_extensions: Vec<String>,
-    dir: PathBuf,
     extensions_menu_expanded: bool,
     expanded_dirs: HashSet<PathBuf>,
 }
 
 impl FileTreeApp {
-    pub fn new(dir: PathBuf, all_extensions: Vec<String>) -> Self {
-        let root_node = scan_directory(&dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+    pub fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>) -> Self {
+        let root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
+            .map(|dir| scan_directory(dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
+            .collect();
         let mut expanded_dirs = HashSet::new();
-        if let Some(ref node) = root_node {
-            expanded_dirs.insert(node.path.clone()); // root expanded by default
+        for n in root_nodes.iter().flatten() {
+            expanded_dirs.insert(n.path.clone());
         }
         FileTreeApp {
-            root_node,
+            root_nodes,
+            top_dirs,
             selected_extensions: all_extensions.clone(),
             all_extensions,
-            dir,
             extensions_menu_expanded: false,
             expanded_dirs,
         }
@@ -56,7 +60,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             } else {
                 app.expanded_dirs.insert(path.clone());
             }
-            if let Some(ref mut root) = app.root_node {
+            for root in app.root_nodes.iter_mut().flatten() {
                 restore_expansion_state(root, &app.expanded_dirs);
             }
             Task::none()
@@ -67,17 +71,37 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             } else {
                 app.selected_extensions.push(ext.clone());
             }
-            app.root_node = scan_directory(
-                &app.dir,
-                &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
-            );
-            if let Some(ref mut root) = app.root_node {
+            app.root_nodes = app.top_dirs.iter()
+                .map(|dir| scan_directory(
+                    dir,
+                    &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
+                ))
+                .collect();
+
+            for root in app.root_nodes.iter_mut().flatten() {
                 restore_expansion_state(root, &app.expanded_dirs);
             }
             Task::none()
         }
         Message::ToggleExtensionsMenu => {
             app.extensions_menu_expanded = !app.extensions_menu_expanded;
+            Task::none()
+        }
+        Message::AddTopDir(dir) => {
+            if !app.top_dirs.contains(&dir) {
+                app.top_dirs.push(dir.clone());
+                app.root_nodes.push(scan_directory(
+                    &dir,
+                    &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
+                ));
+            }
+            Task::none()
+        }
+        Message::RemoveTopDir(dir) => {
+            if let Some(idx) = app.top_dirs.iter().position(|d| d == &dir) {
+                app.top_dirs.remove(idx);
+                app.root_nodes.remove(idx);
+            }
             Task::none()
         }
     }
@@ -108,24 +132,47 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 pub fn view(app: &FileTreeApp) -> Element<Message> {
     let ext_menu = extension_menu(app);
 
-    let left_content: Element<Message> = if let Some(ref root) = app.root_node {
-        column![
-            // text("File Extensions:").size(16),
-            ext_menu,
-            Space::with_height(10), // 10 pixels of vertical space
-            render_node(root, 0)
-        ].into()
-    } else {
-        column![
-            // text("File Extensions:").size(16),
-            ext_menu,
-            Space::with_height(10), // 10 pixels of vertical space
-            text("No files found")
-        ].into()
-    };
+    let mut trees = column![];
+    for (i, node_opt) in app.root_nodes.iter().enumerate() {
+        let dir_label = text(format!(
+            "Top-level directory: {}",
+            app.top_dirs.get(i).map(|p| p.display().to_string()).unwrap_or_default()
+        ))
+        .size(16);
 
-    let right_content = if let Some(ref root) = app.root_node {
-        render_node(root, 0)
+        let remove_btn = button(text("Remove"))
+            .on_press(Message::RemoveTopDir(app.top_dirs[i].clone()));
+
+        let header_row = row![dir_label, remove_btn];
+
+        if let Some(node) = node_opt {
+            trees = trees.push(column![header_row, render_node(node, 0)]);
+        } else {
+            trees = trees.push(column![header_row, text("No files found")]);
+        }
+        trees = trees.push(Space::with_height(10));
+    }
+
+    let add_dir_btn = button(text("Add Directory"))
+        .on_press(Message::AddTopDir(PathBuf::from("/some/path"))); // Replace with actual input logic
+
+    let left_content = column![
+        ext_menu,
+        Space::with_height(10),
+        add_dir_btn,
+        Space::with_height(10),
+        trees
+    ];
+
+    let mut right_trees = column![];
+    let mut has_nodes = false;
+    for root in app.root_nodes.iter().flatten() {
+        right_trees = right_trees.push(render_node(root, 0));
+        right_trees = right_trees.push(Space::with_height(10));
+        has_nodes = true;
+    }
+    let right_content: Element<Message> = if has_nodes {
+        right_trees.into()
     } else {
         column![text("No files found")].into()
     };
@@ -189,17 +236,6 @@ fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
     }
     
     content.into()
-}
-
-fn toggle_expansion_recursive(node: &mut FileNode, target_path: &Path) {
-    if node.path == target_path {
-        node.is_expanded = !node.is_expanded;
-        return;
-    }
-    
-    for child in &mut node.children {
-        toggle_expansion_recursive(child, target_path);
-    }
 }
 
 #[cfg(test)]
@@ -397,11 +433,11 @@ mod iced_tests {
         let root_node = create_test_tree();
         let dir = root_node.path.clone();
         let all_extensions: Vec<String> = vec!["txt", "md"].into_iter().map(|s| s.to_string()).collect();
-        let mut app = FileTreeApp::new(dir, all_extensions);
-        app.root_node = Some(root_node); // manually set the test tree
+        let mut app = FileTreeApp::new(vec![dir], all_extensions);
+        app.root_nodes[0] = Some(root_node); // manually set the test tree
 
-        assert!(app.root_node.is_some());
-        assert_eq!(app.root_node.as_ref().unwrap().name, "root");
+        assert!(app.root_nodes[0].is_some());
+        assert_eq!(app.root_nodes[0].as_ref().unwrap().name, "root");
     }
 
     #[test]
@@ -410,8 +446,8 @@ mod iced_tests {
         let all_extensions = vec![
             "txt", "md"
         ].into_iter().map(|s| s.to_string()).collect();
-        let app = FileTreeApp::new(dir, all_extensions);
-        assert!(app.root_node.is_none());
+        let app = FileTreeApp::new(vec![dir], all_extensions);
+        assert!(app.root_nodes[0].is_none());
     }
 
     #[test]
@@ -423,8 +459,8 @@ mod iced_tests {
         // Initially not expanded
         assert!(!root_node.children[0].is_expanded);
 
-        let mut app = FileTreeApp::new(dir, all_extensions);
-        app.root_node = Some(root_node); // manually set the test tree
+        let mut app = FileTreeApp::new(vec![dir], all_extensions);
+        app.root_nodes[0] = Some(root_node); // manually set the test tree
 
         let subdir_path = PathBuf::from("/test/root/subdir");
         let message = Message::ToggleExpansion(subdir_path.clone());
@@ -432,7 +468,7 @@ mod iced_tests {
         let _task = update(&mut app, message);
 
         // Should be expanded now
-        assert!(app.root_node.as_ref().unwrap().children[0].is_expanded);
+        assert!(app.root_nodes[0].as_ref().unwrap().children[0].is_expanded);
     }
 
     #[test]
@@ -441,65 +477,40 @@ mod iced_tests {
         let dir = root_node.path.clone(); // Use the root node's path
         let all_extensions: Vec<String> = vec!["txt", "md"].into_iter().map(|s| s.to_string()).collect();
 
-        let mut app = FileTreeApp::new(dir, all_extensions);
-        app.root_node = Some(root_node); // manually set the test tree
+        let mut app = FileTreeApp::new(vec![dir], all_extensions);
+        app.root_nodes[0] = Some(root_node); // manually set the test tree
 
         let subdir_path = PathBuf::from("/test/root/subdir");
 
         // Toggle once - should expand
         let message = Message::ToggleExpansion(subdir_path.clone());
         let _ = update(&mut app, message);
-        assert!(app.root_node.as_ref().unwrap().children[0].is_expanded);
+        assert!(app.root_nodes[0].as_ref().unwrap().children[0].is_expanded);
 
         // Toggle again - should collapse
         let message = Message::ToggleExpansion(subdir_path);
         let _ = update(&mut app, message);
-        assert!(!app.root_node.as_ref().unwrap().children[0].is_expanded);
+        assert!(!app.root_nodes[0].as_ref().unwrap().children[0].is_expanded);
     }
 
     #[test]
     fn test_update_with_no_root_node() {
         let dir = PathBuf::from("/dummy");
         let all_extensions = vec!["txt", "md"].into_iter().map(|s| s.to_string()).collect();
-        let mut app = FileTreeApp::new(dir, all_extensions);
+        let mut app = FileTreeApp::new(vec![dir], all_extensions);
         let message = Message::ToggleExpansion(PathBuf::from("/nonexistent"));
         
         let _task = update(&mut app, message);
         
         // Should not panic and app state should remain unchanged
-        assert!(app.root_node.is_none());
-    }
-
-    #[test]
-    fn test_toggle_expansion_recursive() {
-        let mut root_node = create_test_tree();
-        let subdir_path = PathBuf::from("/test/root/subdir");
-        
-        assert!(!root_node.children[0].is_expanded);
-        
-        toggle_expansion_recursive(&mut root_node, &subdir_path);
-        
-        assert!(root_node.children[0].is_expanded);
-    }
-
-    #[test]
-    fn test_toggle_expansion_recursive_nonexistent_path() {
-        let mut root_node = create_test_tree();
-        let nonexistent_path = PathBuf::from("/test/nonexistent");
-        
-        let original_state = root_node.children[0].is_expanded;
-        
-        toggle_expansion_recursive(&mut root_node, &nonexistent_path);
-        
-        // Should not change any expansion states
-        assert_eq!(root_node.children[0].is_expanded, original_state);
+        assert!(app.root_nodes[0].is_none());
     }
 
     #[test]
     fn test_view_with_root_node() {
         let dir = PathBuf::from("/dummy");
         let all_extensions = vec!["txt", "md"].into_iter().map(|s| s.to_string()).collect();
-        let app = FileTreeApp::new(dir, all_extensions);
+        let app = FileTreeApp::new(vec![dir], all_extensions);
         
         let _element = view(&app);
         
@@ -511,7 +522,7 @@ mod iced_tests {
     fn test_view_with_no_root_node() {
         let dir = PathBuf::from("/dummy");
         let all_extensions = vec!["txt", "md"].into_iter().map(|s| s.to_string()).collect();
-        let app = FileTreeApp::new(dir, all_extensions);
+        let app = FileTreeApp::new(vec![dir], all_extensions);
         
         let _element = view(&app);
         
@@ -567,7 +578,7 @@ mod iced_tests {
         assert!(root_node.is_some());
         
         // Test that the app can be created and updated
-        let mut app = FileTreeApp::new(dir, all_extensions);
+        let mut app = FileTreeApp::new(vec![dir], all_extensions);
         
         // Test expanding the subdirectory
         let subdir_path = subdir.to_path_buf();
@@ -592,8 +603,8 @@ mod iced_tests {
         level1.children.push(level2);
         root.children.push(level1);
 
-        let mut app = FileTreeApp::new(dir, all_extensions);
-        app.root_node = Some(root); // manually set the test tree
+        let mut app = FileTreeApp::new(vec![dir], all_extensions);
+        app.root_nodes[0] = Some(root); // manually set the test tree
 
         // Test expanding deeply nested directory
         let deep_path = PathBuf::from("/root/level1/level2");
@@ -601,7 +612,7 @@ mod iced_tests {
         let _task = update(&mut app, message);
 
         // Verify the deep directory was expanded
-        let level2_node = &app.root_node.as_ref().unwrap().children[0].children[0];
+        let level2_node = &app.root_nodes[0].as_ref().unwrap().children[0].children[0];
         assert!(level2_node.is_expanded);
     }
 }
