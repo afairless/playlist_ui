@@ -58,7 +58,7 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     let mut menu = column![];
     for ext in &app.all_extensions {
         let checked = app.selected_extensions.contains(ext);
-        let label = if checked { format!("[x] .{}", ext) } else { format!("[ ] .{}", ext) };
+        let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
         menu = menu.push(
             button(text(label))
                 .on_press(Message::ToggleExtension(ext.clone()))
