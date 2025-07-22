@@ -110,13 +110,13 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
 
     let left_content: Element<Message> = if let Some(ref root) = app.root_node {
         column![
-            text("File Extensions:").size(16),
+            // text("File Extensions:").size(16),
             ext_menu,
             render_node(root, 0)
         ].into()
     } else {
         column![
-            text("File Extensions:").size(16),
+            // text("File Extensions:").size(16),
             ext_menu,
             text("No files found")
         ].into()
