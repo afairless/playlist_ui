@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::collections::HashSet;
 use crate::file_tree::{FileNode, NodeType, scan_directory};
 use iced::{
-    widget::{button, column, container, row, scrollable, text},
+    widget::{button, column, container, row, scrollable, text, Space},
     Element, Length, Task,
 };
 
@@ -112,12 +112,14 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         column![
             // text("File Extensions:").size(16),
             ext_menu,
+            Space::with_height(10), // 10 pixels of vertical space
             render_node(root, 0)
         ].into()
     } else {
         column![
             // text("File Extensions:").size(16),
             ext_menu,
+            Space::with_height(10), // 10 pixels of vertical space
             text("No files found")
         ].into()
     };
