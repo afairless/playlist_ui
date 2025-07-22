@@ -93,7 +93,7 @@ fn scan_directory_with_expansion(
 }
 
 #[cfg(test)]
-mod tests {
+mod file_tree_tests {
     use super::*;
     use tempfile::tempdir;
     use std::fs::{File, create_dir};
