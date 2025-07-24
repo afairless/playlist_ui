@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 use std::collections::HashSet;
 use crate::file_tree::{FileNode, NodeType, scan_directory};
@@ -6,6 +7,8 @@ use iced::{
     Element, Length, Task,
 };
 use rfd::FileDialog;
+
+const TOP_DIRS_FILE: &str = ".playlist_ui_top_dirs.json";
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -27,6 +30,10 @@ pub struct FileTreeApp {
     expanded_dirs: HashSet<PathBuf>,
 }
 
+fn get_persist_path() -> PathBuf {
+    dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(TOP_DIRS_FILE)
+}
+
 impl FileTreeApp {
     pub fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>) -> Self {
         let root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
@@ -43,6 +50,25 @@ impl FileTreeApp {
             all_extensions,
             extensions_menu_expanded: false,
             expanded_dirs,
+        }
+    }
+    pub fn load(all_extensions: Vec<String>) -> Self {
+        let persist_path = get_persist_path();
+        let top_dirs = if persist_path.exists() {
+            fs::read_to_string(&persist_path)
+                .ok()
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        FileTreeApp::new(top_dirs, all_extensions)
+    }
+
+    fn persist_top_dirs(&self) {
+        let persist_path = get_persist_path();
+        if let Ok(json) = serde_json::to_string(&self.top_dirs) {
+            let _ = fs::write(persist_path, json);
         }
     }
 }
@@ -93,6 +119,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             if let Some(idx) = app.top_dirs.iter().position(|d| d == &dir) {
                 app.top_dirs.remove(idx);
                 app.root_nodes.remove(idx);
+                app.persist_top_dirs();
             }
             Task::none()
         }
@@ -115,6 +142,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     &path,
                     &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
                 ));
+                app.persist_top_dirs();
             }
             Task::none()
         }
