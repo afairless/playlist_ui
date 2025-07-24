@@ -21,8 +21,8 @@ pub enum Message {
     ToggleExtension(String),
     ToggleExtensionsMenu,
     RemoveTopDir(PathBuf),
-    PickDirectory,
-    DirectoryPicked(Option<std::path::PathBuf>),
+    AddDirectory,
+    DirectoryAdded(Option<std::path::PathBuf>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,14 +134,14 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         }
-        Message::PickDirectory => {
+        Message::AddDirectory => {
             Task::perform(
                 async move { FileDialog::new().pick_folder() },
-                Message::DirectoryPicked,
+                Message::DirectoryAdded,
             )
         }
-        Message::DirectoryPicked(Some(mut path)) => {
-            // If the picked path is a file, use its parent directory
+        Message::DirectoryAdded(Some(mut path)) => {
+            // If the added path is a file, use its parent directory
             if path.is_file() {
                 if let Some(parent) = path.parent() {
                     path = parent.to_path_buf();
@@ -157,7 +157,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         }
-        Message::DirectoryPicked(None) => Task::none(),
+        Message::DirectoryAdded(None) => Task::none(),
     }
 }
 
@@ -185,22 +185,27 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
 
-    let pick_dir_btn = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-        iced::widget::text("Pick Directory")
+    let add_dir_btn = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+        iced::widget::text("Add Directory")
     )
-    .on_press(Message::PickDirectory);
+    .on_press(Message::AddDirectory);
 
-    let add_dir_row = iced::widget::row![pick_dir_btn];
+    let add_dir_row = iced::widget::row![add_dir_btn];
 
     let ext_menu = extension_menu(app);
 
     let mut trees = column![];
     for (i, node_opt) in app.root_nodes.iter().enumerate() {
-        let dir_label = text(format!(
-            "Top-level directory: {}",
-            app.top_dirs.get(i).map(|p| p.display().to_string()).unwrap_or_default()
-        ))
-        .size(16);
+        let dir_name = if let Some(p) = app.top_dirs.get(i) {
+            if let Some(name) = p.file_name().and_then(|os_str| os_str.to_str()) {
+                name.to_string()
+            } else {
+                p.display().to_string()
+            }
+        } else {
+            String::new()
+        };
+        let dir_label = text(format!("Top-level directory: {dir_name}")).size(16);
 
         let remove_btn = button(text("Remove"))
             .on_press(Message::RemoveTopDir(app.top_dirs[i].clone()));
@@ -541,7 +546,7 @@ mod iced_tests {
     }
 
     #[test]
-    fn test_directory_picked_with_file_path() {
+    fn test_directory_added_with_file_path() {
         use std::fs::File;
         use tempfile::tempdir;
 
@@ -554,8 +559,8 @@ mod iced_tests {
         let persist_path = temp_file.path().to_path_buf();
         let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
 
-        // Simulate picking a file path
-        let message = Message::DirectoryPicked(Some(file_path.clone()));
+        // Simulate adding a file path
+        let message = Message::DirectoryAdded(Some(file_path.clone()));
         let _ = update(&mut app, message);
 
         // The parent directory should be added, not the file itself
