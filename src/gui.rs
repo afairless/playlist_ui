@@ -7,6 +7,7 @@ use iced::{
     widget::{button, column, container, row, scrollable, text, Space},
     Element, Length, Task,
 };
+use iced_aw::widgets::ContextMenu;
 use rfd::FileDialog;
 
 const TOP_DIRS_FILE: &str = ".playlist_ui_top_dirs.json";
@@ -23,6 +24,7 @@ pub enum Message {
     RemoveTopDir(PathBuf),
     AddDirectory,
     DirectoryAdded(Option<std::path::PathBuf>),
+    AddToRightPanel(PathBuf),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +42,8 @@ pub struct FileTreeApp {
     extensions_menu_expanded: bool,
     #[serde(skip)]
     expanded_dirs: HashSet<PathBuf>,
+    #[serde(skip)]
+    right_panel_files: Vec<PathBuf>,
 }
 
 impl FileTreeApp {
@@ -59,6 +63,7 @@ impl FileTreeApp {
             all_extensions,
             extensions_menu_expanded: false,
             expanded_dirs,
+            right_panel_files: Vec::new(),
         }
     }
     pub fn load(all_extensions: Vec<String>) -> Self {
@@ -158,6 +163,12 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::DirectoryAdded(None) => Task::none(),
+        Message::AddToRightPanel(path) => {
+            if !app.right_panel_files.contains(&path) {
+                app.right_panel_files.push(path);
+            }
+            Task::none()
+        }
     }
 }
 
@@ -181,6 +192,16 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     } else {
         column![header].into()
     }
+}
+
+fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
+    let mut col = iced::widget::Column::new();
+    for file in &app.right_panel_files {
+        col = col.push(
+            iced::widget::text(file.file_name().unwrap_or_default().to_string_lossy())
+        );
+    }
+    col.into()
 }
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
@@ -228,19 +249,6 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         trees
     ];
 
-    let mut right_trees = column![];
-    let mut has_nodes = false;
-    for root in app.root_nodes.iter().flatten() {
-        right_trees = right_trees.push(render_node(root, 0));
-        right_trees = right_trees.push(Space::with_height(10));
-        has_nodes = true;
-    }
-    let right_content: Element<Message> = if has_nodes {
-        right_trees.into()
-    } else {
-        column![text("No files found")].into()
-    };
-
     let left_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
             scrollable(left_content)
         )
@@ -248,12 +256,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .padding(10)
         .into();
 
-    let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
-            scrollable(right_content)
-        )
-        .width(Length::FillPortion(1))
-        .padding(10)
-        .into();
+    let right_panel = right_panel(app);
 
     let split_row = row![
         left_panel,
@@ -270,9 +273,9 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
 
 fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
     let indent = "  ".repeat(depth);
-    
+
     let mut content = column![];
-    
+
     match node.node_type {
         NodeType::Directory => {
             let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
@@ -280,12 +283,12 @@ fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
                 text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
                     .size(14)
             ];
-            
+
             let dir_button = button(dir_row)
                 .on_press(Message::ToggleExpansion(node.path.clone()));
-            
+
             content = content.push(dir_button);
-            
+
             if node.is_expanded {
                 for child in &node.children {
                     content = content.push(render_node(child, depth + 1));
@@ -293,12 +296,25 @@ fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
             }
         }
         NodeType::File => {
-            let file_row = text(format!("{} 📄 {}", indent, node.name))
-                .size(14);
-            content = content.push(file_row);
+            let file_row = text(format!("{} 📄 {}", indent, node.name)).size(14);
+
+            // Wrap the file row in a context menu for right-click
+            let file_path = node.path.clone();
+            let context_menu = ContextMenu::new(
+                button(file_row),
+                move || {
+                    column![
+                        button("Add to right panel")
+                            .on_press(Message::AddToRightPanel(file_path.clone()))
+                    ]
+                    .into()
+                },
+            );
+
+            content = content.push(context_menu);
         }
     }
-    
+
     content.into()
 }
 
