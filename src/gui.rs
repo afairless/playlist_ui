@@ -119,8 +119,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::DirectoryPicked(None) => Task::none(),
-        // ...other arms...
-        _ => Task::none(),
     }
 }
 
