@@ -5,14 +5,16 @@ use iced::{
     widget::{button, column, container, row, scrollable, text, Space},
     Element, Length, Task,
 };
+use rfd::FileDialog;
 
 #[derive(Debug, Clone)]
 pub enum Message {
     ToggleExpansion(PathBuf),
     ToggleExtension(String),
     ToggleExtensionsMenu,
-    AddTopDir(PathBuf),
     RemoveTopDir(PathBuf),
+    PickDirectory,
+    DirectoryPicked(Option<std::path::PathBuf>),
 }
 
 #[derive(Debug, Clone)]
@@ -87,16 +89,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             app.extensions_menu_expanded = !app.extensions_menu_expanded;
             Task::none()
         }
-        Message::AddTopDir(dir) => {
-            if !app.top_dirs.contains(&dir) {
-                app.top_dirs.push(dir.clone());
-                app.root_nodes.push(scan_directory(
-                    &dir,
-                    &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
-                ));
-            }
-            Task::none()
-        }
         Message::RemoveTopDir(dir) => {
             if let Some(idx) = app.top_dirs.iter().position(|d| d == &dir) {
                 app.top_dirs.remove(idx);
@@ -104,6 +96,31 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         }
+        Message::PickDirectory => {
+            Task::perform(
+                async move { FileDialog::new().pick_folder() },
+                Message::DirectoryPicked,
+            )
+        }
+        Message::DirectoryPicked(Some(mut path)) => {
+            // If the picked path is a file, use its parent directory
+            if path.is_file() {
+                if let Some(parent) = path.parent() {
+                    path = parent.to_path_buf();
+                }
+            }
+            if !app.top_dirs.contains(&path) && path.exists() && path.is_dir() {
+                app.top_dirs.push(path.clone());
+                app.root_nodes.push(scan_directory(
+                    &path,
+                    &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
+                ));
+            }
+            Task::none()
+        }
+        Message::DirectoryPicked(None) => Task::none(),
+        // ...other arms...
+        _ => Task::none(),
     }
 }
 
@@ -130,6 +147,14 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 }
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
+
+    let pick_dir_btn = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+        iced::widget::text("Pick Directory")
+    )
+    .on_press(Message::PickDirectory);
+
+    let add_dir_row = iced::widget::row![pick_dir_btn];
+
     let ext_menu = extension_menu(app);
 
     let mut trees = column![];
@@ -153,13 +178,10 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         trees = trees.push(Space::with_height(10));
     }
 
-    let add_dir_btn = button(text("Add Directory"))
-        .on_press(Message::AddTopDir(PathBuf::from("/some/path"))); // Replace with actual input logic
-
     let left_content = column![
-        ext_menu,
+        add_dir_row,
         Space::with_height(10),
-        add_dir_btn,
+        ext_menu,
         Space::with_height(10),
         trees
     ];
@@ -458,5 +480,26 @@ mod iced_tests {
         // Verify the deep directory was expanded
         let level2_node = &app.root_nodes[0].as_ref().unwrap().children[0].children[0];
         assert!(level2_node.is_expanded);
+    }
+
+    #[test]
+    fn test_directory_picked_with_file_path() {
+        use std::fs::File;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let file_path = temp_dir.path().join("testfile.txt");
+        File::create(&file_path).unwrap();
+
+        let all_extensions = vec!["txt".to_string()];
+        let mut app = FileTreeApp::new(vec![], all_extensions);
+
+        // Simulate picking a file path
+        let message = Message::DirectoryPicked(Some(file_path.clone()));
+        let _ = update(&mut app, message);
+
+        // The parent directory should be added, not the file itself
+        assert!(app.top_dirs.contains(&temp_dir.path().to_path_buf()));
+        assert!(!app.top_dirs.contains(&file_path));
     }
 }
