@@ -7,7 +7,10 @@ fn main() -> iced::Result {
     // TODO:
     //      - select/delete file extensions from gui
     //      - persist file extensions
-    //      - add right-click to add directories/files selected on left to right
+    //      - make sure entire path is in right-hand list, but not displayed
+    //          - make path relative to home directory, if possible
+    //      - DONE:  add right-click to add files selected on left to right
+    //      - add right-click to add directories selected on left to right
     //      - sort/shuffle right-hand list
 
     let all_extensions = vec![

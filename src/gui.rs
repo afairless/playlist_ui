@@ -197,9 +197,17 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let mut col = iced::widget::Column::new();
     for file in &app.right_panel_files {
-        col = col.push(
-            iced::widget::text(file.file_name().unwrap_or_default().to_string_lossy())
-        );
+        let filename = file.file_name().unwrap_or_default().to_string_lossy();
+        let dirname = file.parent()
+            .and_then(|p| p.file_name())
+            .map(|d| d.to_string_lossy())
+            .unwrap_or_default();
+        let label = if !dirname.is_empty() {
+            format!("{dirname}   {filename}")
+        } else {
+            filename.to_string()
+        };
+        col = col.push(iced::widget::text(label));
     }
     col.into()
 }
