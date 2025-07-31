@@ -25,6 +25,7 @@ pub enum Message {
     AddDirectory,
     DirectoryAdded(Option<std::path::PathBuf>),
     AddToRightPanel(PathBuf),
+    AddDirectoryToRightPanel(PathBuf),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,6 +95,29 @@ fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>
     for child in &mut node.children {
         restore_expansion_state(child, expanded_dirs);
     }
+}
+
+fn collect_files_recursively(node: &FileNode, files: &mut Vec<PathBuf>) {
+    match node.node_type {
+        NodeType::File => files.push(node.path.clone()),
+        NodeType::Directory => {
+            for child in &node.children {
+                collect_files_recursively(child, files);
+            }
+        }
+    }
+}
+
+fn find_node_by_path<'a>(node: &'a FileNode, path: &PathBuf) -> Option<&'a FileNode> {
+    if &node.path == path {
+        return Some(node);
+    }
+    for child in &node.children {
+        if let Some(found) = find_node_by_path(child, path) {
+            return Some(found);
+        }
+    }
+    None
 }
 
 pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
@@ -166,6 +190,20 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::AddToRightPanel(path) => {
             if !app.right_panel_files.contains(&path) {
                 app.right_panel_files.push(path);
+            }
+            Task::none()
+        }
+        Message::AddDirectoryToRightPanel(dir_path) => {
+            for root in app.root_nodes.iter().flatten() {
+                if let Some(node) = find_node_by_path(root, &dir_path) {
+                    let mut files = Vec::new();
+                    collect_files_recursively(node, &mut files);
+                    for file in files {
+                        if !app.right_panel_files.contains(&file) {
+                            app.right_panel_files.push(file);
+                        }
+                    }
+                }
             }
             Task::none()
         }
@@ -287,15 +325,25 @@ fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
     match node.node_type {
         NodeType::Directory => {
             let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+            let dir_path = node.path.clone();
+
             let dir_row = row![
                 text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
                     .size(14)
             ];
 
-            let dir_button = button(dir_row)
-                .on_press(Message::ToggleExpansion(node.path.clone()));
-
-            content = content.push(dir_button);
+            let context_menu = ContextMenu::new(
+                button(dir_row)
+                    .on_press(Message::ToggleExpansion(node.path.clone())),
+                move || {
+                    column![
+                        button("Add all files to right panel")
+                            .on_press(Message::AddDirectoryToRightPanel(dir_path.clone()))
+                    ]
+                    .into()
+                },
+            );
+            content = content.push(context_menu);
 
             if node.is_expanded {
                 for child in &node.children {
