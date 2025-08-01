@@ -27,6 +27,7 @@ pub enum Message {
     AddToRightPanel(PathBuf),
     AddDirectoryToRightPanel(PathBuf),
     RemoveFromRightPanel(PathBuf),
+    RemoveDirectoryFromRightPanel(PathBuf),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -212,6 +213,13 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             app.right_panel_files.retain(|p| p != &path);
             Task::none()
         }
+        Message::RemoveDirectoryFromRightPanel(dir_path) => {
+            app.right_panel_files.retain(|file| {
+                // Remove if file is not in dir_path or its subdirectories
+                !file.starts_with(&dir_path)
+            });
+            Task::none()
+        }
     }
 }
 
@@ -242,16 +250,34 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     for file in &app.right_panel_files {
         let dirname = file.parent()
             .and_then(|p| p.file_name())
-            .map(|d| d.to_string_lossy())
+            .map(|d| d.to_string_lossy().to_string())
             .unwrap_or_default();
         let filename = file.file_name()
-            .map(|f| f.to_string_lossy())
+            .map(|f| f.to_string_lossy().to_string())
             .unwrap_or_default();
 
-        let context_menu = iced_aw::widgets::ContextMenu::new(
-            iced::widget::Row::new()
-                .push(iced::widget::text(dirname).width(Length::FillPortion(1)))
-                .push(iced::widget::text(filename).width(Length::FillPortion(1))),
+        let dir_path = file.parent().map(|p| p.to_path_buf());
+
+        let dir_widget = if let Some(path) = dir_path {
+            let dir_path = path.clone();
+            iced_aw::widgets::ContextMenu::new(
+                iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
+                Box::new(move || {
+                    iced::widget::column![
+                        iced::widget::button("Delete All in Directory")
+                            .on_press(Message::RemoveDirectoryFromRightPanel(dir_path.clone()))
+                    ].into()
+                }) as Box<dyn Fn() -> iced::Element<'static, Message>>
+            )
+        } else {
+            iced_aw::widgets::ContextMenu::new(
+                iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
+                Box::new(|| iced::widget::column![].into()) as Box<dyn Fn() -> iced::Element<'static, Message>>
+            )
+        };
+
+        let file_context_menu = iced_aw::widgets::ContextMenu::new(
+            iced::widget::text(filename.clone()).width(Length::FillPortion(1)),
             {
                 let file_path = file.clone();
                 move || {
@@ -263,7 +289,11 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             }
         );
 
-        col = col.push(context_menu);
+        let row = iced::widget::Row::new()
+            .push(dir_widget)
+            .push(file_context_menu);
+
+        col = col.push(row);
     }
     col.into()
 }
