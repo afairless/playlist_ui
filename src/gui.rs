@@ -26,6 +26,7 @@ pub enum Message {
     DirectoryAdded(Option<std::path::PathBuf>),
     AddToRightPanel(PathBuf),
     AddDirectoryToRightPanel(PathBuf),
+    RemoveFromRightPanel(PathBuf),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,6 +208,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         }
+        Message::RemoveFromRightPanel(path) => {
+            app.right_panel_files.retain(|p| p != &path);
+            Task::none()
+        }
     }
 }
 
@@ -243,11 +248,22 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             .map(|f| f.to_string_lossy())
             .unwrap_or_default();
 
-        let row = iced::widget::Row::new()
-            .push(iced::widget::text(dirname).width(Length::FillPortion(1)))
-            .push(iced::widget::text(filename).width(Length::FillPortion(1)));
+        let context_menu = iced_aw::widgets::ContextMenu::new(
+            iced::widget::Row::new()
+                .push(iced::widget::text(dirname).width(Length::FillPortion(1)))
+                .push(iced::widget::text(filename).width(Length::FillPortion(1))),
+            {
+                let file_path = file.clone();
+                move || {
+                    iced::widget::column![
+                        iced::widget::button("Delete")
+                            .on_press(Message::RemoveFromRightPanel(file_path.clone()))
+                    ].into()
+                }
+            }
+        );
 
-        col = col.push(row);
+        col = col.push(context_menu);
     }
     col.into()
 }

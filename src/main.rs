@@ -9,7 +9,6 @@ fn main() -> iced::Result {
     //      - persist file extensions
     //      - make sure entire path is in right-hand list, but not displayed
     //          - make path relative to home directory, if possible
-    //      - add right-click to right-hand panel items to delete
     //      - sort/shuffle right-hand list
 
     let all_extensions = vec![
