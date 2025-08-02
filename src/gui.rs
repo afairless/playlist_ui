@@ -247,6 +247,27 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 
 fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let mut col = iced::widget::Column::new();
+
+    // Header row
+    let header_row = iced::widget::Row::new()
+        .push(
+            iced::widget::text("Directory")
+                .width(Length::FillPortion(1))
+                .size(24)
+                .style(|_theme| iced::widget::text::Style {
+                    color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                })
+        )
+        .push(
+            iced::widget::text("File")
+                .width(Length::FillPortion(1))
+                .size(24)
+                .style(|_theme| iced::widget::text::Style {
+                    color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                })
+        );
+    col = col.push(header_row);
+
     for file in &app.right_panel_files {
         let dirname = file.parent()
             .and_then(|p| p.file_name())
@@ -280,12 +301,12 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             iced::widget::text(filename.clone()).width(Length::FillPortion(1)),
             {
                 let file_path = file.clone();
-                move || {
+                Box::new(move || {
                     iced::widget::column![
                         iced::widget::button("Delete")
                             .on_press(Message::RemoveFromRightPanel(file_path.clone()))
                     ].into()
-                }
+                }) as Box<dyn Fn() -> iced::Element<'static, Message>>
             }
         );
 
