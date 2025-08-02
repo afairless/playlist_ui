@@ -292,16 +292,16 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
 
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
         match app.right_panel_sort_order {
-            SortOrder::Asc => " ↑",
-            SortOrder::Desc => " ↓",
+            SortOrder::Desc => " ↑",
+            SortOrder::Asc => " ↓",
         }
     } else {
         ""
     };
     let file_arrow = if app.right_panel_sort_column == SortColumn::File {
         match app.right_panel_sort_order {
-            SortOrder::Asc => " ↑",
-            SortOrder::Desc => " ↓",
+            SortOrder::Desc => " ↑",
+            SortOrder::Asc => " ↓",
         }
     } else {
         ""
