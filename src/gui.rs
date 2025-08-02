@@ -28,6 +28,20 @@ pub enum Message {
     AddDirectoryToRightPanel(PathBuf),
     RemoveFromRightPanel(PathBuf),
     RemoveDirectoryFromRightPanel(PathBuf),
+    SortRightPanelByDirectory,
+    SortRightPanelByFile,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortColumn {
+    Directory,
+    File,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortOrder {
+    Asc,
+    Desc,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +61,8 @@ pub struct FileTreeApp {
     expanded_dirs: HashSet<PathBuf>,
     #[serde(skip)]
     right_panel_files: Vec<PathBuf>,
+    right_panel_sort_column: SortColumn,
+    right_panel_sort_order: SortOrder,
 }
 
 impl FileTreeApp {
@@ -67,6 +83,8 @@ impl FileTreeApp {
             extensions_menu_expanded: false,
             expanded_dirs,
             right_panel_files: Vec::new(),
+            right_panel_sort_column: SortColumn::Directory,
+            right_panel_sort_order: SortOrder::Asc,
         }
     }
     pub fn load(all_extensions: Vec<String>) -> Self {
@@ -220,6 +238,30 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             });
             Task::none()
         }
+        Message::SortRightPanelByDirectory => {
+            if app.right_panel_sort_column == SortColumn::Directory {
+                app.right_panel_sort_order = match app.right_panel_sort_order {
+                    SortOrder::Asc => SortOrder::Desc,
+                    SortOrder::Desc => SortOrder::Asc,
+                };
+            } else {
+                app.right_panel_sort_column = SortColumn::Directory;
+                app.right_panel_sort_order = SortOrder::Asc;
+            }
+            Task::none()
+        }
+        Message::SortRightPanelByFile => {
+            if app.right_panel_sort_column == SortColumn::File {
+                app.right_panel_sort_order = match app.right_panel_sort_order {
+                    SortOrder::Asc => SortOrder::Desc,
+                    SortOrder::Desc => SortOrder::Asc,
+                };
+            } else {
+                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_order = SortOrder::Asc;
+            }
+            Task::none()
+        }
     }
 }
 
@@ -248,27 +290,58 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let mut col = iced::widget::Column::new();
 
-    // Header row
     let header_row = iced::widget::Row::new()
         .push(
-            iced::widget::text("Directory")
-                .width(Length::FillPortion(1))
-                .size(24)
-                .style(|_theme| iced::widget::text::Style {
-                    color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                })
+            iced::widget::button(
+                iced::widget::text("Directory")
+                    .width(Length::FillPortion(1))
+                    .size(24)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                    })
+            )
+            .on_press(Message::SortRightPanelByDirectory)
+            .width(Length::FillPortion(1))
         )
         .push(
-            iced::widget::text("File")
-                .width(Length::FillPortion(1))
-                .size(24)
-                .style(|_theme| iced::widget::text::Style {
-                    color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                })
+            iced::widget::button(
+                iced::widget::text("File")
+                    .width(Length::FillPortion(1))
+                    .size(24)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                    })
+            )
+            .on_press(Message::SortRightPanelByFile)
+            .width(Length::FillPortion(1))
         );
     col = col.push(header_row);
 
-    for file in &app.right_panel_files {
+    let mut sorted_files = app.right_panel_files.clone();
+    sorted_files.sort_by(|a, b| {
+        match app.right_panel_sort_column {
+            SortColumn::Directory => {
+                let a_dir = a.parent().and_then(|p| p.file_name()).unwrap_or_default();
+                let b_dir = b.parent().and_then(|p| p.file_name()).unwrap_or_default();
+                if app.right_panel_sort_order == SortOrder::Asc {
+                    a_dir.cmp(b_dir)
+                } else {
+                    b_dir.cmp(a_dir)
+                }
+            }
+            SortColumn::File => {
+                let a_file = a.file_name().unwrap_or_default();
+                let b_file = b.file_name().unwrap_or_default();
+                if app.right_panel_sort_order == SortOrder::Asc {
+                    a_file.cmp(b_file)
+                } else {
+                    b_file.cmp(a_file)
+                }
+            }
+        }
+    });
+
+    for file in &sorted_files {
         let dirname = file.parent()
             .and_then(|p| p.file_name())
             .map(|d| d.to_string_lossy().to_string())
