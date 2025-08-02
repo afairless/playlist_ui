@@ -290,10 +290,27 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let mut col = iced::widget::Column::new();
 
+    let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
+        match app.right_panel_sort_order {
+            SortOrder::Asc => " ↑",
+            SortOrder::Desc => " ↓",
+        }
+    } else {
+        ""
+    };
+    let file_arrow = if app.right_panel_sort_column == SortColumn::File {
+        match app.right_panel_sort_order {
+            SortOrder::Asc => " ↑",
+            SortOrder::Desc => " ↓",
+        }
+    } else {
+        ""
+    };
+
     let header_row = iced::widget::Row::new()
         .push(
             iced::widget::button(
-                iced::widget::text("Directory")
+                iced::widget::text(format!("Directory{dir_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
                     .style(|_theme| iced::widget::text::Style {
@@ -305,7 +322,7 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         )
         .push(
             iced::widget::button(
-                iced::widget::text("File")
+                iced::widget::text(format!("File{file_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
                     .style(|_theme| iced::widget::text::Style {
@@ -321,21 +338,21 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     sorted_files.sort_by(|a, b| {
         match app.right_panel_sort_column {
             SortColumn::Directory => {
-                let a_dir = a.parent().and_then(|p| p.file_name()).unwrap_or_default();
-                let b_dir = b.parent().and_then(|p| p.file_name()).unwrap_or_default();
+                let a_dir = a.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                let b_dir = b.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
                 if app.right_panel_sort_order == SortOrder::Asc {
-                    a_dir.cmp(b_dir)
+                    a_dir.cmp(&b_dir)
                 } else {
-                    b_dir.cmp(a_dir)
+                    b_dir.cmp(&a_dir)
                 }
             }
             SortColumn::File => {
-                let a_file = a.file_name().unwrap_or_default();
-                let b_file = b.file_name().unwrap_or_default();
+                let a_file = a.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                let b_file = b.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
                 if app.right_panel_sort_order == SortOrder::Asc {
-                    a_file.cmp(b_file)
+                    a_file.cmp(&b_file)
                 } else {
-                    b_file.cmp(a_file)
+                    b_file.cmp(&a_file)
                 }
             }
         }
