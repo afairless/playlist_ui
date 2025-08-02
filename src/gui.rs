@@ -30,6 +30,7 @@ pub enum Message {
     RemoveDirectoryFromRightPanel(PathBuf),
     SortRightPanelByDirectory,
     SortRightPanelByFile,
+    ShuffleRightPanel,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -63,6 +64,8 @@ pub struct FileTreeApp {
     right_panel_files: Vec<PathBuf>,
     right_panel_sort_column: SortColumn,
     right_panel_sort_order: SortOrder,
+    #[serde(skip)]
+    right_panel_shuffled: bool,
 }
 
 impl FileTreeApp {
@@ -85,6 +88,7 @@ impl FileTreeApp {
             right_panel_files: Vec::new(),
             right_panel_sort_column: SortColumn::Directory,
             right_panel_sort_order: SortOrder::Asc,
+            right_panel_shuffled: false,
         }
     }
     pub fn load(all_extensions: Vec<String>) -> Self {
@@ -248,6 +252,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 app.right_panel_sort_column = SortColumn::Directory;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
+            app.right_panel_shuffled = false;
             Task::none()
         }
         Message::SortRightPanelByFile => {
@@ -260,6 +265,13 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 app.right_panel_sort_column = SortColumn::File;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
+            Task::none()
+        }
+        Message::ShuffleRightPanel => {
+            use rand::seq::SliceRandom;
+            let mut rng = rand::rng();
+            app.right_panel_files.shuffle(&mut rng);
+            app.right_panel_shuffled = true;
             Task::none()
         }
     }
@@ -306,6 +318,13 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     } else {
         ""
     };
+    let shuffle_btn = iced::widget::button(
+        iced::widget::text("Shuffle")
+            .width(Length::Shrink)
+            .size(20)
+    )
+    .on_press(Message::ShuffleRightPanel)
+    .width(Length::Shrink);
 
     let header_row = iced::widget::Row::new()
         .push(
@@ -331,34 +350,37 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             )
             .on_press(Message::SortRightPanelByFile)
             .width(Length::FillPortion(1))
-        );
+        )
+        .push(shuffle_btn);
     col = col.push(header_row);
 
-    let mut sorted_files = app.right_panel_files.clone();
-    sorted_files.sort_by(|a, b| {
-        match app.right_panel_sort_column {
-            SortColumn::Directory => {
-                let a_dir = a.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                let b_dir = b.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                if app.right_panel_sort_order == SortOrder::Asc {
-                    a_dir.cmp(&b_dir)
-                } else {
-                    b_dir.cmp(&a_dir)
+    let mut displayed_files = app.right_panel_files.clone();
+    if !app.right_panel_shuffled {
+        displayed_files.sort_by(|a, b| {
+            match app.right_panel_sort_column {
+                SortColumn::Directory => {
+                    let a_dir = a.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    let b_dir = b.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    if app.right_panel_sort_order == SortOrder::Asc {
+                        a_dir.cmp(&b_dir)
+                    } else {
+                        b_dir.cmp(&a_dir)
+                    }
+                }
+                SortColumn::File => {
+                    let a_file = a.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    let b_file = b.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    if app.right_panel_sort_order == SortOrder::Asc {
+                        a_file.cmp(&b_file)
+                    } else {
+                        b_file.cmp(&a_file)
+                    }
                 }
             }
-            SortColumn::File => {
-                let a_file = a.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                let b_file = b.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                if app.right_panel_sort_order == SortOrder::Asc {
-                    a_file.cmp(&b_file)
-                } else {
-                    b_file.cmp(&a_file)
-                }
-            }
-        }
-    });
+        });
+    }
 
-    for file in &sorted_files {
+    for file in &displayed_files {
         let dirname = file.parent()
             .and_then(|p| p.file_name())
             .map(|d| d.to_string_lossy().to_string())
