@@ -550,4 +550,121 @@ mod iced_tests {
         assert!(app.top_dirs.contains(&temp_dir.path().to_path_buf()));
         assert!(!app.top_dirs.contains(&file_path));
     }
+
+    #[test]
+    fn test_toggle_extension() {
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string(), "md".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        let msg = Message::ToggleExtension("md".to_string());
+        let _ = update(&mut app, msg);
+        assert!(!app.selected_extensions.contains(&"md".to_string()));
+
+        let msg = Message::ToggleExtension("md".to_string());
+        let _ = update(&mut app, msg);
+        assert!(app.selected_extensions.contains(&"md".to_string()));
+    }
+
+    #[test]
+    fn test_toggle_extensions_menu() {
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions, persist_path);
+
+        let msg = Message::ToggleExtensionsMenu;
+        let _ = update(&mut app, msg);
+        assert!(app.extensions_menu_expanded);
+
+        let _ = update(&mut app, Message::ToggleExtensionsMenu);
+        assert!(!app.extensions_menu_expanded);
+    }
+
+    #[test]
+    fn test_add_to_right_panel() {
+        let file_path = PathBuf::from("/file.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        let msg = Message::AddToRightPanel(file_path.clone());
+        let _ = update(&mut app, msg);
+        assert!(app.right_panel_files.contains(&file_path));
+    }
+
+    #[test]
+    fn test_add_directory_to_right_panel() {
+        let dir_path = PathBuf::from("/dir");
+        let file1 = PathBuf::from("/dir/file1.txt");
+        let file2 = PathBuf::from("/dir/file2.txt");
+        let mut dir_node = FileNode::new_directory("dir".to_string(), dir_path.clone(), vec![]);
+        dir_node.children.push(FileNode::new_file("file1.txt".to_string(), file1.clone()));
+        dir_node.children.push(FileNode::new_file("file2.txt".to_string(), file2.clone()));
+
+        let mut app = FileTreeApp::new(vec![dir_path.clone()], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.root_nodes[0] = Some(dir_node);
+
+        let msg = Message::AddDirectoryToRightPanel(dir_path.clone());
+        let _ = update(&mut app, msg);
+        assert!(app.right_panel_files.contains(&file1));
+        assert!(app.right_panel_files.contains(&file2));
+    }
+
+    #[test]
+    fn test_remove_from_right_panel() {
+        let file_path = PathBuf::from("/file.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.right_panel_files.push(file_path.clone());
+        let msg = Message::RemoveFromRightPanel(file_path.clone());
+        let _ = update(&mut app, msg);
+        assert!(!app.right_panel_files.contains(&file_path));
+    }
+
+    #[test]
+    fn test_remove_directory_from_right_panel() {
+        let dir_path = PathBuf::from("/dir");
+        let file1 = PathBuf::from("/dir/file1.txt");
+        let file2 = PathBuf::from("/dir/file2.txt");
+        let file3 = PathBuf::from("/other/file3.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.right_panel_files = vec![file1.clone(), file2.clone(), file3.clone()];
+        let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
+        let _ = update(&mut app, msg);
+        assert!(!app.right_panel_files.contains(&file1));
+        assert!(!app.right_panel_files.contains(&file2));
+        assert!(app.right_panel_files.contains(&file3));
+    }
+
+    #[test]
+    fn test_sort_right_panel_by_directory_and_file() {
+        let file_a = PathBuf::from("/dir_a/file.txt");
+        let file_b = PathBuf::from("/dir_b/file.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.right_panel_files = vec![file_b.clone(), file_a.clone()];
+
+        let msg = Message::SortRightPanelByDirectory;
+        let _ = update(&mut app, msg);
+        assert_eq!(app.right_panel_sort_column, SortColumn::Directory);
+        assert_eq!(app.right_panel_sort_order, SortOrder::Desc);
+
+        let _ = update(&mut app, Message::SortRightPanelByDirectory);
+        assert_eq!(app.right_panel_sort_order, SortOrder::Asc);
+
+        let msg = Message::SortRightPanelByFile;
+        let _ = update(&mut app, msg);
+        assert_eq!(app.right_panel_sort_column, SortColumn::File);
+        assert_eq!(app.right_panel_sort_order, SortOrder::Asc);
+    }
+
+    #[test]
+    fn test_shuffle_right_panel() {
+        let file1 = PathBuf::from("/dir/file1.txt");
+        let file2 = PathBuf::from("/dir/file2.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.right_panel_files = vec![file1.clone(), file2.clone()];
+        let msg = Message::ShuffleRightPanel;
+        let _ = update(&mut app, msg);
+        assert!(app.right_panel_shuffled);
+    }
 }
