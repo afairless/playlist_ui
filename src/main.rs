@@ -4,11 +4,6 @@ mod gui;
 use gui::{FileTreeApp, update, view};
 
 fn main() -> iced::Result {
-    // TODO:
-    //      - select/delete file extensions from gui
-    //      - persist file extensions
-    //      - make sure entire path is in right-hand list, but not displayed
-    //          - make path relative to home directory, if possible
 
     let all_extensions = vec![
         "sh", "rs", "txt", "md", "py", "json", "toml",

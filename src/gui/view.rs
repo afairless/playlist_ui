@@ -289,7 +289,7 @@ mod iced_tests {
     use tempfile::{tempdir, NamedTempFile};
     use std::fs::File;
     use crate::file_tree::scan_directory;
-    use crate::update;
+    use crate::{update, FileTreeApp};
 
     // Helper function to create a test file tree
     fn create_test_tree() -> FileNode {
@@ -888,5 +888,80 @@ mod iced_tests {
         let msg = Message::ToggleExtension("💥".to_string());
         let _ = update(&mut app, msg);
         assert!(!app.selected_extensions.contains(&"💥".to_string()));
+    }
+
+    #[test]
+    fn test_toggle_extension_duplicate_handling() {
+        use crate::gui::{update, FileTreeApp, Message};
+        use std::path::PathBuf;
+        use tempfile::NamedTempFile;
+
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        // Initially, "txt" is selected
+        assert_eq!(app.selected_extensions, vec!["txt".to_string()]);
+
+        // Toggle "txt" extension once (should remove)
+        let msg = Message::ToggleExtension("txt".to_string());
+        let _ = update(&mut app, msg.clone());
+        assert_eq!(app.selected_extensions.len(), 0);
+
+        // Toggle "txt" again (should add)
+        let _ = update(&mut app, msg.clone());
+        assert_eq!(app.selected_extensions.len(), 1);
+
+        // Toggle "txt" twice in a row (should remove then add, no duplicates)
+        let _ = update(&mut app, msg.clone());
+        let _ = update(&mut app, msg.clone());
+        assert_eq!(app.selected_extensions.len(), 1);
+
+        // Toggle "txt" three times (should remove, add, remove)
+        let _ = update(&mut app, msg.clone());
+        let _ = update(&mut app, msg.clone());
+        let _ = update(&mut app, msg.clone());
+        assert_eq!(app.selected_extensions.len(), 0);
+    }
+
+    #[test]
+    fn test_update_performance_with_large_number_of_extensions() {
+
+        let dir = PathBuf::from("/dummy");
+        let num_ext = 1000;
+        let all_extensions: Vec<String> = (0..num_ext).map(|i| format!("ext{i}")).collect();
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        // Toggle all extensions off
+        for ext in &all_extensions {
+            let msg = Message::ToggleExtension(ext.clone());
+            let _ = update(&mut app, msg);
+        }
+        assert!(app.selected_extensions.is_empty());
+
+        // Toggle all extensions on
+        for ext in &all_extensions {
+            let msg = Message::ToggleExtension(ext.clone());
+            let _ = update(&mut app, msg);
+        }
+        assert_eq!(app.selected_extensions.len(), num_ext);
+
+        // Ensure no duplicates
+        let unique: std::collections::HashSet<_> = app.selected_extensions.iter().collect();
+        assert_eq!(unique.len(), num_ext);
+    }
+
+    #[test]
+    fn test_view_renders_with_empty_state() {
+        use crate::gui::{view, FileTreeApp};
+        use std::path::PathBuf;
+
+        let app = FileTreeApp::new(vec![], vec![], PathBuf::from("/tmp"));
+        let _element = view(&app);
+        // Test passes if view() does not panic
     }
 }
