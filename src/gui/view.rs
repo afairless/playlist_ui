@@ -814,4 +814,79 @@ mod iced_tests {
         assert!(!app.selected_extensions.contains(&"md".to_string()));
         assert!(!app.all_extensions.contains(&"md".to_string()));
     }
+
+    #[test]
+    fn test_update_with_invalid_message() {
+        use crate::gui::{update, FileTreeApp, Message};
+        use std::path::PathBuf;
+        use tempfile::NamedTempFile;
+
+        // Setup app with minimal state
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        // Clone state before update
+        let prev_state = app.clone();
+
+        // Call update with a message that should have no effect
+        let _ = update(&mut app, Message::ToggleExtension("invalid_ext".to_string()));
+
+        // Assert that state is unchanged
+        assert_eq!(app.selected_extensions, prev_state.selected_extensions);
+        assert_eq!(app.right_panel_shuffled, prev_state.right_panel_shuffled);
+    }
+
+    #[test]
+    fn test_toggle_extension_with_empty_string() {
+        use crate::gui::{update, FileTreeApp, Message};
+        use std::path::PathBuf;
+        use tempfile::NamedTempFile;
+
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        let msg = Message::ToggleExtension("".to_string());
+        let _ = update(&mut app, msg);
+        assert!(!app.selected_extensions.contains(&"".to_string()));
+    }
+
+    #[test]
+    fn test_toggle_extension_with_nonexistent_extension() {
+        use crate::gui::{update, FileTreeApp, Message};
+        use std::path::PathBuf;
+        use tempfile::NamedTempFile;
+
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        let msg = Message::ToggleExtension("nonexistent".to_string());
+        let _ = update(&mut app, msg);
+        assert!(!app.selected_extensions.contains(&"nonexistent".to_string()));
+    }
+
+    #[test]
+    fn test_toggle_extension_with_special_characters() {
+        use crate::gui::{update, FileTreeApp, Message};
+        use std::path::PathBuf;
+        use tempfile::NamedTempFile;
+
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        let msg = Message::ToggleExtension("💥".to_string());
+        let _ = update(&mut app, msg);
+        assert!(!app.selected_extensions.contains(&"💥".to_string()));
+    }
 }
