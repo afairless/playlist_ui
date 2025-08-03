@@ -184,52 +184,52 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::SortRightPanelByMusician => {
-            if app.right_panel_sort_column == SortColumn::File {
+            if app.right_panel_sort_column == SortColumn::Musician {
                 app.right_panel_sort_order = match app.right_panel_sort_order {
                     SortOrder::Asc => SortOrder::Desc,
                     SortOrder::Desc => SortOrder::Asc,
                 };
             } else {
-                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_column = SortColumn::Musician;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
             app.right_panel_shuffled = false;
             Task::none()
         }
         Message::SortRightPanelByAlbum => {
-            if app.right_panel_sort_column == SortColumn::File {
+            if app.right_panel_sort_column == SortColumn::Album {
                 app.right_panel_sort_order = match app.right_panel_sort_order {
                     SortOrder::Asc => SortOrder::Desc,
                     SortOrder::Desc => SortOrder::Asc,
                 };
             } else {
-                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_column = SortColumn::Album;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
             app.right_panel_shuffled = false;
             Task::none()
         }
         Message::SortRightPanelByTitle => {
-            if app.right_panel_sort_column == SortColumn::File {
+            if app.right_panel_sort_column == SortColumn::Title {
                 app.right_panel_sort_order = match app.right_panel_sort_order {
                     SortOrder::Asc => SortOrder::Desc,
                     SortOrder::Desc => SortOrder::Asc,
                 };
             } else {
-                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_column = SortColumn::Title;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
             app.right_panel_shuffled = false;
             Task::none()
         }
         Message::SortRightPanelByGenre => {
-            if app.right_panel_sort_column == SortColumn::File {
+            if app.right_panel_sort_column == SortColumn::Genre {
                 app.right_panel_sort_order = match app.right_panel_sort_order {
                     SortOrder::Asc => SortOrder::Desc,
                     SortOrder::Desc => SortOrder::Asc,
                 };
             } else {
-                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_column = SortColumn::Genre;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
             app.right_panel_shuffled = false;
