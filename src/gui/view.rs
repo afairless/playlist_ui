@@ -1,283 +1,9 @@
-use std::fs;
-use std::path::PathBuf;
-use std::collections::HashSet;
-use serde::{Serialize, Deserialize};
-use crate::file_tree::{FileNode, NodeType, scan_directory};
-use iced::{
-    widget::{button, column, container, row, scrollable, text, Space},
-    Element, Length, Task,
-};
+use iced::{Element, widget::{button, column, container, row, scrollable, text, Space}, Length};
 use iced_aw::widgets::ContextMenu;
-use rfd::FileDialog;
+use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder};
+use crate::file_tree::{FileNode, NodeType};
 
-const TOP_DIRS_FILE: &str = ".playlist_ui_top_dirs.json";
-
-pub fn get_persist_path() -> PathBuf {
-    dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(TOP_DIRS_FILE)
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    ToggleExpansion(PathBuf),
-    ToggleExtension(String),
-    ToggleExtensionsMenu,
-    RemoveTopDir(PathBuf),
-    AddDirectory,
-    DirectoryAdded(Option<std::path::PathBuf>),
-    AddToRightPanel(PathBuf),
-    AddDirectoryToRightPanel(PathBuf),
-    RemoveFromRightPanel(PathBuf),
-    RemoveDirectoryFromRightPanel(PathBuf),
-    SortRightPanelByDirectory,
-    SortRightPanelByFile,
-    ShuffleRightPanel,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SortColumn {
-    Directory,
-    File,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SortOrder {
-    Asc,
-    Desc,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileTreeApp {
-    #[serde(skip)]
-    root_nodes: Vec<Option<FileNode>>,
-    top_dirs: Vec<PathBuf>,
-    #[serde(skip)]
-    persist_path: PathBuf,
-    #[serde(skip)]
-    selected_extensions: Vec<String>,
-    #[serde(skip)]
-    all_extensions: Vec<String>,
-    #[serde(skip)]
-    extensions_menu_expanded: bool,
-    #[serde(skip)]
-    expanded_dirs: HashSet<PathBuf>,
-    #[serde(skip)]
-    right_panel_files: Vec<PathBuf>,
-    right_panel_sort_column: SortColumn,
-    right_panel_sort_order: SortOrder,
-    #[serde(skip)]
-    right_panel_shuffled: bool,
-}
-
-impl FileTreeApp {
-    pub fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>, persist_path: PathBuf) -> Self {
-        let root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
-            .map(|dir| scan_directory(dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
-            .collect();
-        let mut expanded_dirs = HashSet::new();
-        for n in root_nodes.iter().flatten() {
-            expanded_dirs.insert(n.path.clone());
-        }
-        FileTreeApp {
-            root_nodes,
-            top_dirs,
-            persist_path,
-            selected_extensions: all_extensions.clone(),
-            all_extensions,
-            extensions_menu_expanded: false,
-            expanded_dirs,
-            right_panel_files: Vec::new(),
-            right_panel_sort_column: SortColumn::Directory,
-            right_panel_sort_order: SortOrder::Asc,
-            right_panel_shuffled: false,
-        }
-    }
-    pub fn load(all_extensions: Vec<String>) -> Self {
-        let persist_path = get_persist_path();
-        let top_dirs = if persist_path.exists() {
-            fs::read_to_string(&persist_path)
-                .ok()
-                .and_then(|s| serde_json::from_str::<Vec<PathBuf>>(&s).ok())
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|p| p.exists() && p.is_dir())
-                .collect()
-        } else {
-            Vec::new()
-        };
-        FileTreeApp::new(top_dirs, all_extensions, persist_path)
-    }
-
-    fn persist_top_dirs(&self) {
-        if let Ok(json) = serde_json::to_string(&self.top_dirs) {
-            let _ = fs::write(&self.persist_path, json);
-        }
-    }
-}
-
-fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>) {
-    node.is_expanded = expanded_dirs.contains(&node.path);
-    for child in &mut node.children {
-        restore_expansion_state(child, expanded_dirs);
-    }
-}
-
-fn collect_files_recursively(node: &FileNode, files: &mut Vec<PathBuf>) {
-    match node.node_type {
-        NodeType::File => files.push(node.path.clone()),
-        NodeType::Directory => {
-            for child in &node.children {
-                collect_files_recursively(child, files);
-            }
-        }
-    }
-}
-
-fn find_node_by_path<'a>(node: &'a FileNode, path: &PathBuf) -> Option<&'a FileNode> {
-    if &node.path == path {
-        return Some(node);
-    }
-    for child in &node.children {
-        if let Some(found) = find_node_by_path(child, path) {
-            return Some(found);
-        }
-    }
-    None
-}
-
-pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
-    match message {
-        Message::ToggleExpansion(path) => {
-            if app.expanded_dirs.contains(&path) {
-                app.expanded_dirs.remove(&path);
-            } else {
-                app.expanded_dirs.insert(path.clone());
-            }
-            for root in app.root_nodes.iter_mut().flatten() {
-                restore_expansion_state(root, &app.expanded_dirs);
-            }
-            Task::none()
-        }
-        Message::ToggleExtension(ext) => {
-            if app.selected_extensions.contains(&ext) {
-                app.selected_extensions.retain(|e| e != &ext);
-            } else {
-                app.selected_extensions.push(ext.clone());
-            }
-            app.root_nodes = app.top_dirs.iter()
-                .map(|dir| scan_directory(
-                    dir,
-                    &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
-                ))
-                .collect();
-
-            for root in app.root_nodes.iter_mut().flatten() {
-                restore_expansion_state(root, &app.expanded_dirs);
-            }
-            Task::none()
-        }
-        Message::ToggleExtensionsMenu => {
-            app.extensions_menu_expanded = !app.extensions_menu_expanded;
-            Task::none()
-        }
-        Message::RemoveTopDir(dir) => {
-            if let Some(idx) = app.top_dirs.iter().position(|d| d == &dir) {
-                app.top_dirs.remove(idx);
-                app.root_nodes.remove(idx);
-                app.persist_top_dirs();
-            }
-            Task::none()
-        }
-        Message::AddDirectory => {
-            Task::perform(
-                async move { FileDialog::new().pick_folder() },
-                Message::DirectoryAdded,
-            )
-        }
-        Message::DirectoryAdded(Some(mut path)) => {
-            // If the added path is a file, use its parent directory
-            if path.is_file() {
-                if let Some(parent) = path.parent() {
-                    path = parent.to_path_buf();
-                }
-            }
-            if !app.top_dirs.contains(&path) && path.exists() && path.is_dir() {
-                app.top_dirs.push(path.clone());
-                app.root_nodes.push(scan_directory(
-                    &path,
-                    &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
-                ));
-                app.persist_top_dirs();
-            }
-            Task::none()
-        }
-        Message::DirectoryAdded(None) => Task::none(),
-        Message::AddToRightPanel(path) => {
-            if !app.right_panel_files.contains(&path) {
-                app.right_panel_files.push(path);
-            }
-            Task::none()
-        }
-        Message::AddDirectoryToRightPanel(dir_path) => {
-            for root in app.root_nodes.iter().flatten() {
-                if let Some(node) = find_node_by_path(root, &dir_path) {
-                    let mut files = Vec::new();
-                    collect_files_recursively(node, &mut files);
-                    for file in files {
-                        if !app.right_panel_files.contains(&file) {
-                            app.right_panel_files.push(file);
-                        }
-                    }
-                }
-            }
-            Task::none()
-        }
-        Message::RemoveFromRightPanel(path) => {
-            app.right_panel_files.retain(|p| p != &path);
-            Task::none()
-        }
-        Message::RemoveDirectoryFromRightPanel(dir_path) => {
-            app.right_panel_files.retain(|file| {
-                // Remove if file is not in dir_path or its subdirectories
-                !file.starts_with(&dir_path)
-            });
-            Task::none()
-        }
-        Message::SortRightPanelByDirectory => {
-            if app.right_panel_sort_column == SortColumn::Directory {
-                app.right_panel_sort_order = match app.right_panel_sort_order {
-                    SortOrder::Asc => SortOrder::Desc,
-                    SortOrder::Desc => SortOrder::Asc,
-                };
-            } else {
-                app.right_panel_sort_column = SortColumn::Directory;
-                app.right_panel_sort_order = SortOrder::Asc;
-            }
-            app.right_panel_shuffled = false;
-            Task::none()
-        }
-        Message::SortRightPanelByFile => {
-            if app.right_panel_sort_column == SortColumn::File {
-                app.right_panel_sort_order = match app.right_panel_sort_order {
-                    SortOrder::Asc => SortOrder::Desc,
-                    SortOrder::Desc => SortOrder::Asc,
-                };
-            } else {
-                app.right_panel_sort_column = SortColumn::File;
-                app.right_panel_sort_order = SortOrder::Asc;
-            }
-            Task::none()
-        }
-        Message::ShuffleRightPanel => {
-            use rand::seq::SliceRandom;
-            let mut rng = rand::rng();
-            app.right_panel_files.shuffle(&mut rng);
-            app.right_panel_shuffled = true;
-            Task::none()
-        }
-    }
-}
-
-fn extension_menu(app: &FileTreeApp) -> Element<Message> {
+pub fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     let header = button(
         text(if app.extensions_menu_expanded { "▼ File Extensions" } else { "▶ File Extensions" }).size(16)
     )
@@ -299,7 +25,7 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     }
 }
 
-fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
+pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let mut col = iced::widget::Column::new();
 
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
@@ -498,7 +224,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .into()
 }
 
-fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
+pub fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
     let indent = "  ".repeat(depth);
 
     let mut content = column![];
@@ -555,11 +281,15 @@ fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
     content.into()
 }
 
+ 
 #[cfg(test)]
 mod iced_tests {
     use super::*;
+    use std::path::PathBuf;
     use tempfile::{tempdir, NamedTempFile};
     use std::fs::File;
+    use crate::file_tree::scan_directory;
+    use crate::update;
 
     // Helper function to create a test file tree
     fn create_test_tree() -> FileNode {
