@@ -667,4 +667,88 @@ mod iced_tests {
         let _ = update(&mut app, msg);
         assert!(app.right_panel_shuffled);
     }
+
+    #[test]
+    fn test_add_duplicate_to_right_panel() {
+        let file_path = PathBuf::from("/file.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.right_panel_files.push(file_path.clone());
+        let msg = Message::AddToRightPanel(file_path.clone());
+        let _ = update(&mut app, msg);
+        // Should not add duplicate
+        assert_eq!(app.right_panel_files.iter().filter(|p| **p == file_path).count(), 1);
+    }
+
+    #[test]
+    fn test_remove_nonexistent_from_right_panel() {
+        let file_path = PathBuf::from("/file.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        // Try to remove a file that's not present
+        let msg = Message::RemoveFromRightPanel(file_path.clone());
+        let _ = update(&mut app, msg);
+        // Should not panic and list remains empty
+        assert!(app.right_panel_files.is_empty());
+    }
+
+    #[test]
+    fn test_remove_nonexistent_directory_from_right_panel() {
+        let dir_path = PathBuf::from("/dir");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.right_panel_files = vec![PathBuf::from("/other/file.txt")];
+        let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
+        let _ = update(&mut app, msg);
+        // Should not remove unrelated files
+        assert_eq!(app.right_panel_files.len(), 1);
+    }
+
+    #[test]
+    fn test_sort_right_panel_empty_and_single() {
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        // Empty list
+        let _ = update(&mut app, Message::SortRightPanelByDirectory);
+        assert!(app.right_panel_files.is_empty());
+
+        // Single item
+        let file_path = PathBuf::from("/dir/file.txt");
+        app.right_panel_files.push(file_path.clone());
+        let _ = update(&mut app, Message::SortRightPanelByFile);
+        assert_eq!(app.right_panel_files.len(), 1);
+        assert_eq!(app.right_panel_files[0], file_path);
+    }
+
+    #[test]
+    fn test_shuffle_right_panel_empty_and_single() {
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        // Empty list
+        let _ = update(&mut app, Message::ShuffleRightPanel);
+        assert!(app.right_panel_shuffled);
+
+        // Single item
+        let file_path = PathBuf::from("/dir/file.txt");
+        app.right_panel_files.push(file_path.clone());
+        let _ = update(&mut app, Message::ShuffleRightPanel);
+        assert!(app.right_panel_shuffled);
+        assert_eq!(app.right_panel_files.len(), 1);
+        assert_eq!(app.right_panel_files[0], file_path);
+    }
+
+    #[test]
+    fn test_sort_then_shuffle_then_sort_right_panel() {
+        let file1 = PathBuf::from("/dir_a/file1.txt");
+        let file2 = PathBuf::from("/dir_b/file2.txt");
+        let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
+        app.right_panel_files = vec![file1.clone(), file2.clone()];
+
+        // Sort
+        let _ = update(&mut app, Message::SortRightPanelByDirectory);
+        assert!(!app.right_panel_shuffled);
+
+        // Shuffle
+        let _ = update(&mut app, Message::ShuffleRightPanel);
+        assert!(app.right_panel_shuffled);
+
+        // Sort again
+        let _ = update(&mut app, Message::SortRightPanelByFile);
+        assert!(!app.right_panel_shuffled);
+    }
 }

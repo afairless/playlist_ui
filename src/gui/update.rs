@@ -156,6 +156,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 app.right_panel_sort_column = SortColumn::File;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
+            app.right_panel_shuffled = false;
             Task::none()
         }
         Message::ShuffleRightPanel => {
