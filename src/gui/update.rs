@@ -49,10 +49,17 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::ToggleExtension(ext) => {
-            if app.selected_extensions.contains(&ext) {
-                app.selected_extensions.retain(|e| e != &ext);
-            } else {
-                app.selected_extensions.push(ext.clone());
+            //if app.selected_extensions.contains(&ext) {
+            //    app.selected_extensions.retain(|e| e != &ext);
+            //} else {
+            //    app.selected_extensions.push(ext.clone());
+            //}
+            if app.all_extensions.contains(&ext) {
+                if app.selected_extensions.contains(&ext) {
+                    app.selected_extensions.retain(|e| e != &ext);
+                } else {
+                    app.selected_extensions.push(ext.clone());
+                }
             }
             app.root_nodes = app.top_dirs.iter()
                 .map(|dir| scan_directory(

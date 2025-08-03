@@ -751,4 +751,67 @@ mod iced_tests {
         let _ = update(&mut app, Message::SortRightPanelByFile);
         assert!(!app.right_panel_shuffled);
     }
+
+    #[test]
+    fn test_toggle_extension_with_empty_all_extensions() {
+        let dir = PathBuf::from("/dummy");
+        let all_extensions: Vec<String> = vec![];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions, persist_path);
+
+        // Try toggling a non-existent extension
+        let msg = Message::ToggleExtension("md".to_string());
+        let _ = update(&mut app, msg);
+        // Should not add "md" to selected_extensions
+        assert!(!app.selected_extensions.contains(&"md".to_string()));
+    }
+
+    #[test]
+    fn test_toggle_extensions_menu_with_empty_extensions() {
+        let dir = PathBuf::from("/dummy");
+        let all_extensions: Vec<String> = vec![];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions, persist_path);
+
+        // Toggle menu open and closed
+        let msg = Message::ToggleExtensionsMenu;
+        let _ = update(&mut app, msg);
+        assert!(app.extensions_menu_expanded);
+
+        let _ = update(&mut app, Message::ToggleExtensionsMenu);
+        assert!(!app.extensions_menu_expanded);
+    }
+
+    #[test]
+    fn test_toggle_extension_with_empty_selected_extensions() {
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        // Remove all selected extensions
+        app.selected_extensions.clear();
+        // Toggle "txt" on
+        let msg = Message::ToggleExtension("txt".to_string());
+        let _ = update(&mut app, msg);
+        assert!(app.selected_extensions.contains(&"txt".to_string()));
+    }
+
+    #[test]
+    fn test_toggle_extension_not_in_all_extensions() {
+        let dir = PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir], all_extensions.clone(), persist_path);
+
+        // Try toggling an extension not in all_extensions
+        let msg = Message::ToggleExtension("md".to_string());
+        let _ = update(&mut app, msg);
+        assert!(!app.selected_extensions.contains(&"md".to_string()));
+        assert!(!app.all_extensions.contains(&"md".to_string()));
+    }
 }
