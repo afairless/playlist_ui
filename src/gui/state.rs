@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::collections::HashSet;
 use serde::{Serialize, Deserialize};
-use crate::file_tree::{FileNode, scan_directory};
+use crate::fs::file_tree::{FileNode, scan_directory};
 
 const TOP_DIRS_FILE: &str = ".playlist_ui_top_dirs.json";
 
@@ -25,18 +25,35 @@ pub enum Message {
     SortRightPanelByDirectory,
     SortRightPanelByFile,
     ShuffleRightPanel,
+    SortRightPanelByMusician,
+    SortRightPanelByAlbum,
+    SortRightPanelByTitle,
+    SortRightPanelByGenre,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SortColumn {
     Directory,
     File,
+    Musician,
+    Album,
+    Title,
+    Genre,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SortOrder {
     Asc,
     Desc,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RightPanelFile {
+    pub path: PathBuf,
+    pub musician: Option<String>,
+    pub album: Option<String>,
+    pub title: Option<String>,
+    pub genre: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,7 +72,7 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub expanded_dirs: HashSet<PathBuf>,
     #[serde(skip)]
-    pub right_panel_files: Vec<PathBuf>,
+    pub right_panel_files: Vec<RightPanelFile>,
     pub right_panel_sort_column: SortColumn,
     pub right_panel_sort_order: SortOrder,
     #[serde(skip)]

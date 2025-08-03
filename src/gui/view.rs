@@ -1,7 +1,7 @@
 use iced::{Element, widget::{button, column, container, row, scrollable, text, Space}, Length};
 use iced_aw::widgets::ContextMenu;
+use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder};
-use crate::file_tree::{FileNode, NodeType};
 
 pub fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     let header = button(
@@ -44,6 +44,38 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     } else {
         ""
     };
+    let musician_arrow = if app.right_panel_sort_column == SortColumn::Musician {
+        match app.right_panel_sort_order {
+            SortOrder::Desc => " ↑",
+            SortOrder::Asc => " ↓",
+        }
+    } else {
+        ""
+    };
+    let album_arrow = if app.right_panel_sort_column == SortColumn::Album {
+        match app.right_panel_sort_order {
+            SortOrder::Desc => " ↑",
+            SortOrder::Asc => " ↓",
+        }
+    } else {
+        ""
+    };
+    let title_arrow = if app.right_panel_sort_column == SortColumn::Title {
+        match app.right_panel_sort_order {
+            SortOrder::Desc => " ↑",
+            SortOrder::Asc => " ↓",
+        }
+    } else {
+        ""
+    };
+    let genre_arrow = if app.right_panel_sort_column == SortColumn::Genre {
+        match app.right_panel_sort_order {
+            SortOrder::Desc => " ↑",
+            SortOrder::Asc => " ↓",
+        }
+    } else {
+        ""
+    };
     let shuffle_btn = iced::widget::button(
         iced::widget::text("Shuffle")
             .width(Length::Shrink)
@@ -77,6 +109,54 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             .on_press(Message::SortRightPanelByFile)
             .width(Length::FillPortion(1))
         )
+        .push(
+            iced::widget::button(
+                iced::widget::text(format!("Musician{musician_arrow}"))
+                    .width(Length::FillPortion(1))
+                    .size(24)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                    })
+            )
+            .on_press(Message::SortRightPanelByMusician)
+            .width(Length::FillPortion(1))
+        )
+        .push(
+            iced::widget::button(
+                iced::widget::text(format!("Album{album_arrow}"))
+                    .width(Length::FillPortion(1))
+                    .size(24)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                    })
+            )
+            .on_press(Message::SortRightPanelByAlbum)
+            .width(Length::FillPortion(1))
+        )
+        .push(
+            iced::widget::button(
+                iced::widget::text(format!("Title{title_arrow}"))
+                    .width(Length::FillPortion(1))
+                    .size(24)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                    })
+            )
+            .on_press(Message::SortRightPanelByTitle)
+            .width(Length::FillPortion(1))
+        )
+        .push(
+            iced::widget::button(
+                iced::widget::text(format!("Genre{genre_arrow}"))
+                    .width(Length::FillPortion(1))
+                    .size(24)
+                    .style(|_theme| iced::widget::text::Style {
+                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
+                    })
+            )
+            .on_press(Message::SortRightPanelByGenre)
+            .width(Length::FillPortion(1))
+        )
         .push(shuffle_btn);
     col = col.push(header_row);
 
@@ -85,8 +165,8 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         displayed_files.sort_by(|a, b| {
             match app.right_panel_sort_column {
                 SortColumn::Directory => {
-                    let a_dir = a.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                    let b_dir = b.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    let a_dir = a.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    let b_dir = b.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
                     if app.right_panel_sort_order == SortOrder::Asc {
                         a_dir.cmp(&b_dir)
                     } else {
@@ -94,28 +174,72 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
                     }
                 }
                 SortColumn::File => {
-                    let a_file = a.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                    let b_file = b.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    let a_file = a.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                    let b_file = b.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
                     if app.right_panel_sort_order == SortOrder::Asc {
                         a_file.cmp(&b_file)
                     } else {
                         b_file.cmp(&a_file)
                     }
                 }
+                SortColumn::Musician => {
+                    let a_musician = a.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    let b_musician = b.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    if app.right_panel_sort_order == SortOrder::Asc {
+                        a_musician.cmp(&b_musician)
+                    } else {
+                        b_musician.cmp(&a_musician)
+                    }
+                }
+                SortColumn::Album => {
+                    let a_album = a.album.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    let b_album = b.album.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    if app.right_panel_sort_order == SortOrder::Asc {
+                        a_album.cmp(&b_album)
+                    } else {
+                        b_album.cmp(&a_album)
+                    }
+                }
+                SortColumn::Title => {
+                    let a_title = a.title.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    let b_title = b.title.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    if app.right_panel_sort_order == SortOrder::Asc {
+                        a_title.cmp(&b_title)
+                    } else {
+                        b_title.cmp(&a_title)
+                    }
+                }
+                SortColumn::Genre => {
+                    let a_genre = a.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    let b_genre = b.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
+                    if app.right_panel_sort_order == SortOrder::Asc {
+                        a_genre.cmp(&b_genre)
+                    } else {
+                        b_genre.cmp(&a_genre)
+                    }
+                }
             }
         });
     }
 
-    for file in &displayed_files {
-        let dirname = file.parent()
+    let mut rows = Vec::new();
+    for file_ref in &displayed_files {
+        let file = file_ref.clone(); // Clone to own the data
+
+        let dirname = file.path.parent()
             .and_then(|p| p.file_name())
             .map(|d| d.to_string_lossy().to_string())
             .unwrap_or_default();
-        let filename = file.file_name()
+        let filename = file.path.file_name()
             .map(|f| f.to_string_lossy().to_string())
             .unwrap_or_default();
 
-        let dir_path = file.parent().map(|p| p.to_path_buf());
+        let musician = file.musician.clone().unwrap_or_default();
+        let album = file.album.clone().unwrap_or_default();
+        let title = file.title.clone().unwrap_or_default();
+        let genre = file.genre.clone().unwrap_or_default();
+
+        let dir_path = file.path.parent().map(|p| p.to_path_buf());
 
         let dir_widget = if let Some(path) = dir_path {
             let dir_path = path.clone();
@@ -138,7 +262,7 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         let file_context_menu = iced_aw::widgets::ContextMenu::new(
             iced::widget::text(filename.clone()).width(Length::FillPortion(1)),
             {
-                let file_path = file.clone();
+                let file_path = file.path.clone();
                 Box::new(move || {
                     iced::widget::column![
                         iced::widget::button("Delete")
@@ -150,10 +274,15 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
 
         let row = iced::widget::Row::new()
             .push(dir_widget)
-            .push(file_context_menu);
+            .push(file_context_menu)
+            .push(iced::widget::text(musician).width(Length::FillPortion(1)))
+            .push(iced::widget::text(album).width(Length::FillPortion(1)))
+            .push(iced::widget::text(title).width(Length::FillPortion(1)))
+            .push(iced::widget::text(genre).width(Length::FillPortion(1)));
 
-        col = col.push(row);
+        rows.push(row.into());
     }
+    col = col.push(iced::widget::column(rows));
     col.into()
 }
 
@@ -289,6 +418,7 @@ mod iced_tests {
     use tempfile::{tempdir, NamedTempFile};
     use std::fs::File;
     use crate::{update, view, FileTreeApp};
+    use crate::gui::RightPanelFile;
 
     // Helper function to create a test file tree
     fn create_test_tree() -> FileNode {
@@ -614,7 +744,7 @@ mod iced_tests {
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
             let msg = Message::AddToRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
-            assert!(app.right_panel_files.contains(&file_path));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file_path));
         }
 
         #[test]
@@ -631,33 +761,57 @@ mod iced_tests {
 
             let msg = Message::AddDirectoryToRightPanel(dir_path.clone());
             let _ = update(&mut app, msg);
-            assert!(app.right_panel_files.contains(&file1));
-            assert!(app.right_panel_files.contains(&file2));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file1));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file2));
         }
 
         #[test]
         fn test_remove_from_right_panel() {
             let file_path = PathBuf::from("/file.txt");
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
-            app.right_panel_files.push(file_path.clone());
+            app.right_panel_files.push(RightPanelFile {
+                path: file_path.clone(),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            });
             let msg = Message::RemoveFromRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
-            assert!(!app.right_panel_files.contains(&file_path));
+            assert!(!app.right_panel_files.iter().any(|f| f.path == file_path));
         }
 
         #[test]
         fn test_remove_directory_from_right_panel() {
             let dir_path = PathBuf::from("/dir");
-            let file1 = PathBuf::from("/dir/file1.txt");
-            let file2 = PathBuf::from("/dir/file2.txt");
-            let file3 = PathBuf::from("/other/file3.txt");
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
-            app.right_panel_files = vec![file1.clone(), file2.clone(), file3.clone()];
+            let right_panel_file1 = RightPanelFile {
+                path: PathBuf::from("/dir/file1.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file2 = RightPanelFile {
+                path: PathBuf::from("/dir/file2.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file3 = RightPanelFile {
+                path: PathBuf::from("/other/file3.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone(), right_panel_file3.clone()];
             let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
             let _ = update(&mut app, msg);
-            assert!(!app.right_panel_files.contains(&file1));
-            assert!(!app.right_panel_files.contains(&file2));
-            assert!(app.right_panel_files.contains(&file3));
+            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file1.path));
+            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file2.path));
+            assert!(app.right_panel_files.iter().any(|f| f.path == right_panel_file3.path));
         }
 
         #[test]
@@ -665,7 +819,21 @@ mod iced_tests {
             let file_a = PathBuf::from("/dir_a/file.txt");
             let file_b = PathBuf::from("/dir_b/file.txt");
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
-            app.right_panel_files = vec![file_b.clone(), file_a.clone()];
+            let right_panel_file_a = RightPanelFile {
+                path: file_a.clone(),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file_b = RightPanelFile {
+                path: file_b.clone(),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            app.right_panel_files = vec![right_panel_file_b.clone(), right_panel_file_a.clone()];
 
             let msg = Message::SortRightPanelByDirectory;
             let _ = update(&mut app, msg);
@@ -686,7 +854,21 @@ mod iced_tests {
             let file1 = PathBuf::from("/dir/file1.txt");
             let file2 = PathBuf::from("/dir/file2.txt");
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
-            app.right_panel_files = vec![file1.clone(), file2.clone()];
+            let right_panel_file1 = RightPanelFile {
+                path: file1.clone(),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file2 = RightPanelFile {
+                path: file2.clone(),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
             let msg = Message::ShuffleRightPanel;
             let _ = update(&mut app, msg);
             assert!(app.right_panel_shuffled);
@@ -696,11 +878,18 @@ mod iced_tests {
         fn test_add_duplicate_to_right_panel() {
             let file_path = PathBuf::from("/file.txt");
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
-            app.right_panel_files.push(file_path.clone());
+            let right_panel_file = RightPanelFile {
+                path: file_path.clone(),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            app.right_panel_files.push(right_panel_file.clone());
             let msg = Message::AddToRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
             // Should not add duplicate
-            assert_eq!(app.right_panel_files.iter().filter(|p| **p == file_path).count(), 1);
+            assert_eq!(app.right_panel_files.iter().filter(|p| **p == right_panel_file).count(), 1);
         }
 
         #[test]
@@ -718,7 +907,14 @@ mod iced_tests {
         fn test_remove_nonexistent_directory_from_right_panel() {
             let dir_path = PathBuf::from("/dir");
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
-            app.right_panel_files = vec![PathBuf::from("/other/file.txt")];
+            let right_panel_file = RightPanelFile {
+                path: PathBuf::from("/other/file.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            app.right_panel_files = vec![right_panel_file];
             let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
             let _ = update(&mut app, msg);
             // Should not remove unrelated files
@@ -733,11 +929,17 @@ mod iced_tests {
             assert!(app.right_panel_files.is_empty());
 
             // Single item
-            let file_path = PathBuf::from("/dir/file.txt");
-            app.right_panel_files.push(file_path.clone());
+            let right_panel_file = RightPanelFile {
+                path: PathBuf::from("/dir/file.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            app.right_panel_files.push(right_panel_file.clone());
             let _ = update(&mut app, Message::SortRightPanelByFile);
             assert_eq!(app.right_panel_files.len(), 1);
-            assert_eq!(app.right_panel_files[0], file_path);
+            assert_eq!(app.right_panel_files[0], right_panel_file);
         }
 
         #[test]
@@ -748,20 +950,38 @@ mod iced_tests {
             assert!(app.right_panel_shuffled);
 
             // Single item
-            let file_path = PathBuf::from("/dir/file.txt");
-            app.right_panel_files.push(file_path.clone());
+            let right_panel_file = RightPanelFile {
+                path: PathBuf::from("/dir/file.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            app.right_panel_files.push(right_panel_file.clone());
             let _ = update(&mut app, Message::ShuffleRightPanel);
             assert!(app.right_panel_shuffled);
             assert_eq!(app.right_panel_files.len(), 1);
-            assert_eq!(app.right_panel_files[0], file_path);
+            assert_eq!(app.right_panel_files[0], right_panel_file);
         }
 
         #[test]
         fn test_sort_then_shuffle_then_sort_right_panel() {
-            let file1 = PathBuf::from("/dir_a/file1.txt");
-            let file2 = PathBuf::from("/dir_b/file2.txt");
+            let right_panel_file1 = RightPanelFile {
+                path: PathBuf::from("/dir_a/file1.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file2 = RightPanelFile {
+                path: PathBuf::from("/dir_a/file2.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], PathBuf::from("/tmp"));
-            app.right_panel_files = vec![file1.clone(), file2.clone()];
+            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
 
             // Sort
             let _ = update(&mut app, Message::SortRightPanelByDirectory);
@@ -914,7 +1134,7 @@ mod iced_tests {
     mod view_tests {
         // View/rendering/UI feedback tests here
         use super::*;
-        use crate::file_tree::scan_directory;
+        use crate::fs::file_tree::scan_directory;
 
         #[test]
         fn test_view_with_root_node() {
@@ -1096,46 +1316,76 @@ mod iced_tests {
             // Add file to right panel
             let msg_add = Message::AddToRightPanel(file_path.clone());
             let _ = update(&mut app, msg_add);
-            assert!(app.right_panel_files.contains(&file_path), "File should be in right panel after adding");
+            assert!(app.right_panel_files.iter().any(|f| f.path == file_path), "File should be in right panel after adding");
 
             // Remove file from right panel
             let msg_remove = Message::RemoveFromRightPanel(file_path.clone());
             let _ = update(&mut app, msg_remove);
-            assert!(!app.right_panel_files.contains(&file_path), "File should not be in right panel after removing");
+            assert!(!app.right_panel_files.iter().any(|f| f.path == file_path), "File should not be in right panel after removing");
         }
 
         #[test]
         fn test_right_panel_remove_directory_ui_feedback() {
             let dir_path = std::path::PathBuf::from("/dir");
-            let file1 = dir_path.join("file1.txt");
-            let file2 = dir_path.join("file2.txt");
-            let file3 = std::path::PathBuf::from("/other/file3.txt");
+            let right_panel_file1 = RightPanelFile {
+                path: dir_path.join("file1.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file2 = RightPanelFile {
+                path: dir_path.join("file2.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file3 = RightPanelFile {
+                path: std::path::PathBuf::from("/other/file3.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
             let all_extensions = vec!["txt".to_string()];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
 
-            app.right_panel_files = vec![file1.clone(), file2.clone(), file3.clone()];
+            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone(), right_panel_file3.clone()];
 
             // Remove all files in /dir
             let msg_remove_dir = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
             let _ = update(&mut app, msg_remove_dir);
 
-            assert!(!app.right_panel_files.contains(&file1), "file1 should be removed from right panel");
-            assert!(!app.right_panel_files.contains(&file2), "file2 should be removed from right panel");
-            assert!(app.right_panel_files.contains(&file3), "file3 should remain in right panel");
+            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file1.path), "file1 should be removed from right panel");
+            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file2.path), "file2 should be removed from right panel");
+            assert!(app.right_panel_files.iter().any(|f| f.path == right_panel_file3.path), "file3 should be removed from right panel");
         }
 
         #[test]
         fn test_right_panel_shuffle_and_sort_ui_feedback() {
-            let file1 = std::path::PathBuf::from("/dir_a/file1.txt");
-            let file2 = std::path::PathBuf::from("/dir_b/file2.txt");
+            let right_panel_file1 = RightPanelFile {
+                path: std::path::PathBuf::from("/dir_a/file1.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
+            let right_panel_file2 = RightPanelFile {
+                path: std::path::PathBuf::from("/dir_a/file2.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
             let all_extensions = vec!["txt".to_string()];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
 
-            app.right_panel_files = vec![file1.clone(), file2.clone()];
+            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
 
             // Shuffle right panel
             let msg_shuffle = Message::ShuffleRightPanel;
@@ -1166,8 +1416,8 @@ mod iced_tests {
             let msg = Message::AddDirectoryToRightPanel(dir_path.clone());
             let _ = update(&mut app, msg);
 
-            assert!(app.right_panel_files.contains(&file1), "file1 should be added to right panel");
-            assert!(app.right_panel_files.contains(&file2), "file2 should be added to right panel");
+            assert!(app.right_panel_files.iter().any(|f| f.path == file1), "file1 should be removed from right panel");
+            assert!(app.right_panel_files.iter().any(|f| f.path == file2), "file2 should be removed from right panel");
         }
 
         #[test]
@@ -1223,20 +1473,26 @@ mod iced_tests {
         #[test]
         fn test_remove_nonexistent_directory_from_right_panel_ui_feedback() {
             let dir_path = std::path::PathBuf::from("/not_present_dir");
-            let file = std::path::PathBuf::from("/other/file.txt");
+            let right_panel_file = RightPanelFile {
+                path: std::path::PathBuf::from("/other/file.txt"),
+                musician: None,
+                album: None,
+                title: None,
+                genre: None,
+            };
             let all_extensions = vec!["txt".to_string()];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
 
-            app.right_panel_files = vec![file.clone()];
+            app.right_panel_files = vec![right_panel_file.clone()];
 
             let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
             let _ = update(&mut app, msg);
 
             // Should not remove unrelated files
             assert_eq!(app.right_panel_files.len(), 1, "Unrelated file should remain");
-            assert!(app.right_panel_files.contains(&file), "Unrelated file should remain");
+            assert!(app.right_panel_files.iter().any(|f| f.path == right_panel_file.path), "Unrelated file should remain");
         }
 
         #[test]
@@ -1334,15 +1590,15 @@ mod iced_tests {
 
             // Add file
             let _ = update(&mut app, Message::AddToRightPanel(file_path.clone()));
-            assert!(app.right_panel_files.contains(&file_path));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file_path));
 
             // Remove file
             let _ = update(&mut app, Message::RemoveFromRightPanel(file_path.clone()));
-            assert!(!app.right_panel_files.contains(&file_path));
+            assert!(!app.right_panel_files.iter().any(|f| f.path == file_path));
 
             // Add again
             let _ = update(&mut app, Message::AddToRightPanel(file_path.clone()));
-            assert!(app.right_panel_files.contains(&file_path));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file_path));
         }
 
         #[test]
@@ -1407,8 +1663,8 @@ mod iced_tests {
             // Add both files
             let _ = update(&mut app, Message::AddToRightPanel(file1.clone()));
             let _ = update(&mut app, Message::AddToRightPanel(file2.clone()));
-            assert!(app.right_panel_files.contains(&file1));
-            assert!(app.right_panel_files.contains(&file2));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file1));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file2));
 
             // Toggle extensions off
             let _ = update(&mut app, Message::ToggleExtension("txt".to_string()));
@@ -1418,8 +1674,8 @@ mod iced_tests {
 
             // Remove one file
             let _ = update(&mut app, Message::RemoveFromRightPanel(file1.clone()));
-            assert!(!app.right_panel_files.contains(&file1));
-            assert!(app.right_panel_files.contains(&file2));
+            assert!(!app.right_panel_files.iter().any(|f| f.path == file1));
+            assert!(app.right_panel_files.iter().any(|f| f.path == file2));
 
             // Toggle extensions on again
             let _ = update(&mut app, Message::ToggleExtension("txt".to_string()));

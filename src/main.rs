@@ -1,4 +1,4 @@
-mod file_tree;
+mod fs;
 mod gui;
 
 use gui::{FileTreeApp, update, view};
@@ -6,7 +6,7 @@ use gui::{FileTreeApp, update, view};
 fn main() -> iced::Result {
 
     let all_extensions = vec![
-        "sh", "rs", "txt", "md", "py", "json", "toml",
+        "mp3", "m4a", "wav", 
     ].into_iter().map(|s| s.to_string()).collect();
 
     iced::application("File Tree Viewer", update, view)

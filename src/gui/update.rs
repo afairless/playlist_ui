@@ -2,8 +2,9 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use iced::Task;
 use rfd::FileDialog;
-use crate::file_tree::{FileNode, NodeType, scan_directory};
-use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder};
+use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
+use crate::fs::media_metadata::extract_mp3_metadata;
+use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
  
 fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>) {
     node.is_expanded = expanded_dirs.contains(&node.path);
@@ -49,11 +50,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::ToggleExtension(ext) => {
-            //if app.selected_extensions.contains(&ext) {
-            //    app.selected_extensions.retain(|e| e != &ext);
-            //} else {
-            //    app.selected_extensions.push(ext.clone());
-            //}
             if app.all_extensions.contains(&ext) {
                 if app.selected_extensions.contains(&ext) {
                     app.selected_extensions.retain(|e| e != &ext);
@@ -110,8 +106,15 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         }
         Message::DirectoryAdded(None) => Task::none(),
         Message::AddToRightPanel(path) => {
-            if !app.right_panel_files.contains(&path) {
-                app.right_panel_files.push(path);
+            if !app.right_panel_files.iter().any(|f| f.path == path) {
+                let meta = extract_mp3_metadata(&path);
+                app.right_panel_files.push(RightPanelFile {
+                    path,
+                    musician: meta.musician,
+                    album: meta.album,
+                    title: meta.title,
+                    genre: meta.genre,
+                });
             }
             Task::none()
         }
@@ -121,8 +124,15 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     let mut files = Vec::new();
                     collect_files_recursively(node, &mut files);
                     for file in files {
-                        if !app.right_panel_files.contains(&file) {
-                            app.right_panel_files.push(file);
+                        if !app.right_panel_files.iter().any(|f| f.path == file) {
+                            let meta = extract_mp3_metadata(&file);
+                            app.right_panel_files.push(RightPanelFile {
+                                path: file,
+                                musician: meta.musician,
+                                album: meta.album,
+                                title: meta.title,
+                                genre: meta.genre,
+                            });
                         }
                     }
                 }
@@ -130,13 +140,13 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         }
         Message::RemoveFromRightPanel(path) => {
-            app.right_panel_files.retain(|p| p != &path);
+            app.right_panel_files.retain(|f| f.path != path);
             Task::none()
         }
         Message::RemoveDirectoryFromRightPanel(dir_path) => {
             app.right_panel_files.retain(|file| {
                 // Remove if file is not in dir_path or its subdirectories
-                !file.starts_with(&dir_path)
+                !file.path.starts_with(&dir_path)
             });
             Task::none()
         }
@@ -171,6 +181,58 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             let mut rng = rand::rng();
             app.right_panel_files.shuffle(&mut rng);
             app.right_panel_shuffled = true;
+            Task::none()
+        }
+        Message::SortRightPanelByMusician => {
+            if app.right_panel_sort_column == SortColumn::File {
+                app.right_panel_sort_order = match app.right_panel_sort_order {
+                    SortOrder::Asc => SortOrder::Desc,
+                    SortOrder::Desc => SortOrder::Asc,
+                };
+            } else {
+                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_order = SortOrder::Asc;
+            }
+            app.right_panel_shuffled = false;
+            Task::none()
+        }
+        Message::SortRightPanelByAlbum => {
+            if app.right_panel_sort_column == SortColumn::File {
+                app.right_panel_sort_order = match app.right_panel_sort_order {
+                    SortOrder::Asc => SortOrder::Desc,
+                    SortOrder::Desc => SortOrder::Asc,
+                };
+            } else {
+                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_order = SortOrder::Asc;
+            }
+            app.right_panel_shuffled = false;
+            Task::none()
+        }
+        Message::SortRightPanelByTitle => {
+            if app.right_panel_sort_column == SortColumn::File {
+                app.right_panel_sort_order = match app.right_panel_sort_order {
+                    SortOrder::Asc => SortOrder::Desc,
+                    SortOrder::Desc => SortOrder::Asc,
+                };
+            } else {
+                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_order = SortOrder::Asc;
+            }
+            app.right_panel_shuffled = false;
+            Task::none()
+        }
+        Message::SortRightPanelByGenre => {
+            if app.right_panel_sort_column == SortColumn::File {
+                app.right_panel_sort_order = match app.right_panel_sort_order {
+                    SortOrder::Asc => SortOrder::Desc,
+                    SortOrder::Desc => SortOrder::Asc,
+                };
+            } else {
+                app.right_panel_sort_column = SortColumn::File;
+                app.right_panel_sort_order = SortOrder::Asc;
+            }
+            app.right_panel_shuffled = false;
             Task::none()
         }
     }
