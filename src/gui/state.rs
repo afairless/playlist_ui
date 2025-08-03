@@ -85,10 +85,11 @@ impl FileTreeApp {
             right_panel_shuffled: false,
         }
     }
-    pub fn load(all_extensions: Vec<String>) -> Self {
-        let persist_path = get_persist_path();
+
+    pub fn load(all_extensions: Vec<String>, persist_path: Option<PathBuf>) -> Self {
+        let persist_path = persist_path.unwrap_or_else(get_persist_path);
         let top_dirs = if persist_path.exists() {
-            fs::read_to_string(&persist_path)
+            std::fs::read_to_string(&persist_path)
                 .ok()
                 .and_then(|s| serde_json::from_str::<Vec<PathBuf>>(&s).ok())
                 .unwrap_or_default()
@@ -106,5 +107,6 @@ impl FileTreeApp {
             let _ = fs::write(&self.persist_path, json);
         }
     }
+
 }
 

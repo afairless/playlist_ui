@@ -289,7 +289,7 @@ mod iced_tests {
     use tempfile::{tempdir, NamedTempFile};
     use std::fs::File;
     use crate::file_tree::scan_directory;
-    use crate::{update, FileTreeApp};
+    use crate::{update, view, FileTreeApp};
 
     // Helper function to create a test file tree
     fn create_test_tree() -> FileNode {
@@ -957,11 +957,521 @@ mod iced_tests {
 
     #[test]
     fn test_view_renders_with_empty_state() {
-        use crate::gui::{view, FileTreeApp};
-        use std::path::PathBuf;
-
         let app = FileTreeApp::new(vec![], vec![], PathBuf::from("/tmp"));
         let _element = view(&app);
         // Test passes if view() does not panic
+    }
+
+    #[test]
+    fn test_view_renders_with_many_extensions() {
+        let num_ext = 1000;
+        let all_extensions: Vec<String> = (0..num_ext).map(|i| format!("ext{i}")).collect();
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let app = FileTreeApp::new(vec![PathBuf::from("/dummy")], all_extensions, persist_path);
+
+        let _element = view(&app);
+        // Test passes if view() does not panic
+    }
+
+    #[test]
+    fn test_extension_menu_labels_with_many_extensions() {
+        let num_ext = 1000;
+        let all_extensions: Vec<String> = (0..num_ext).map(|i| format!("ext{i}")).collect();
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![std::path::PathBuf::from("/dummy")], all_extensions.clone(), persist_path);
+
+        // Expand the menu to render all extensions
+        app.extensions_menu_expanded = true;
+
+        // Generate expected labels
+        let expected_labels: Vec<String> = all_extensions.iter().map(|ext| format!("[x] .{ext}")).collect();
+
+        // Collect actual labels from extension_menu
+        let mut actual_labels = Vec::new();
+        for ext in &app.all_extensions {
+            let checked = app.selected_extensions.contains(ext);
+            let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+            actual_labels.push(label);
+        }
+
+        for expected in expected_labels {
+            assert!(
+                actual_labels.contains(&expected),
+                "Extension label '{expected}' not found in menu",
+            );
+        }
+    }
+
+    #[test]
+    fn test_extension_menu_label_feedback_on_toggle() {
+        let all_extensions = vec!["foo".to_string(), "bar".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![std::path::PathBuf::from("/dummy")], all_extensions.clone(), persist_path);
+
+        app.extensions_menu_expanded = true;
+
+        // Initial labels (all checked)
+        let labels_before: Vec<String> = all_extensions
+            .iter()
+            .map(|ext| format!("[x] .{ext}"))
+            .collect();
+
+        for ext in &all_extensions {
+            let checked = app.selected_extensions.contains(ext);
+            let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+            assert!(labels_before.contains(&label));
+        }
+
+        // Toggle "foo" off
+        let msg = Message::ToggleExtension("foo".to_string());
+        let _ = update(&mut app, msg);
+
+        // Labels after toggle
+        let labels_after: Vec<String> = all_extensions
+            .iter()
+            .map(|ext| {
+                let checked = app.selected_extensions.contains(ext);
+                if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
+            })
+            .collect();
+
+        assert!(labels_after.contains(&"[ ] .foo".to_string()));
+        assert!(labels_after.contains(&"[x] .bar".to_string()));
+
+        // Toggle "foo" on again
+        let msg = Message::ToggleExtension("foo".to_string());
+        let _ = update(&mut app, msg);
+
+        // Labels after second toggle
+        let labels_final: Vec<String> = all_extensions
+            .iter()
+            .map(|ext| {
+                let checked = app.selected_extensions.contains(ext);
+                if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
+            })
+            .collect();
+
+        assert!(labels_final.contains(&"[x] .foo".to_string()));
+        assert!(labels_final.contains(&"[x] .bar".to_string()));
+    }
+
+    #[test]
+    fn test_directory_expansion_ui_feedback() {
+        let dir_path = std::path::PathBuf::from("/root");
+        let mut dir_node = FileNode::new_directory("root".to_string(), dir_path.clone(), vec![]);
+        dir_node.is_expanded = false;
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir_path.clone()], all_extensions, persist_path);
+        app.root_nodes[0] = Some(dir_node);
+
+        // Helper to get expansion symbol from rendered label
+        fn get_expansion_symbol(app: &FileTreeApp) -> String {
+            let node = app.root_nodes[0].as_ref().unwrap();
+            let indent = "  ".repeat(0);
+            let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+            format!("{}{} 📁 {}", indent, expand_symbol, node.name)
+        }
+
+        // Initially collapsed
+        let label_before = get_expansion_symbol(&app);
+        assert!(label_before.contains("▶"), "Expected collapsed symbol");
+
+        // Toggle expansion
+        let msg = Message::ToggleExpansion(dir_path.clone());
+        let _ = update(&mut app, msg);
+
+        // Should be expanded now
+        let label_after = get_expansion_symbol(&app);
+        assert!(label_after.contains("▼"), "Expected expanded symbol");
+
+        // Toggle again to collapse
+        let msg = Message::ToggleExpansion(dir_path.clone());
+        let _ = update(&mut app, msg);
+
+        let label_final = get_expansion_symbol(&app);
+        assert!(label_final.contains("▶"), "Expected collapsed symbol again");
+    }
+
+    #[test]
+    fn test_right_panel_file_selection_ui_feedback() {
+        let file_path = std::path::PathBuf::from("/file.txt");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
+
+        // Add file to right panel
+        let msg_add = Message::AddToRightPanel(file_path.clone());
+        let _ = update(&mut app, msg_add);
+        assert!(app.right_panel_files.contains(&file_path), "File should be in right panel after adding");
+
+        // Remove file from right panel
+        let msg_remove = Message::RemoveFromRightPanel(file_path.clone());
+        let _ = update(&mut app, msg_remove);
+        assert!(!app.right_panel_files.contains(&file_path), "File should not be in right panel after removing");
+    }
+
+    #[test]
+    fn test_right_panel_remove_directory_ui_feedback() {
+        let dir_path = std::path::PathBuf::from("/dir");
+        let file1 = dir_path.join("file1.txt");
+        let file2 = dir_path.join("file2.txt");
+        let file3 = std::path::PathBuf::from("/other/file3.txt");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
+
+        app.right_panel_files = vec![file1.clone(), file2.clone(), file3.clone()];
+
+        // Remove all files in /dir
+        let msg_remove_dir = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
+        let _ = update(&mut app, msg_remove_dir);
+
+        assert!(!app.right_panel_files.contains(&file1), "file1 should be removed from right panel");
+        assert!(!app.right_panel_files.contains(&file2), "file2 should be removed from right panel");
+        assert!(app.right_panel_files.contains(&file3), "file3 should remain in right panel");
+    }
+
+    #[test]
+    fn test_right_panel_shuffle_and_sort_ui_feedback() {
+        let file1 = std::path::PathBuf::from("/dir_a/file1.txt");
+        let file2 = std::path::PathBuf::from("/dir_b/file2.txt");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
+
+        app.right_panel_files = vec![file1.clone(), file2.clone()];
+
+        // Shuffle right panel
+        let msg_shuffle = Message::ShuffleRightPanel;
+        let _ = update(&mut app, msg_shuffle);
+        assert!(app.right_panel_shuffled, "Right panel should be marked as shuffled");
+
+        // Sort right panel by directory
+        let msg_sort = Message::SortRightPanelByDirectory;
+        let _ = update(&mut app, msg_sort);
+        assert!(!app.right_panel_shuffled, "Right panel should not be marked as shuffled after sorting");
+        assert_eq!(app.right_panel_sort_column, SortColumn::Directory, "Sort column should be Directory");
+    }
+
+    #[test]
+    fn test_add_directory_to_right_panel_ui_feedback() {
+        let dir_path = std::path::PathBuf::from("/dir");
+        let file1 = dir_path.join("file1.txt");
+        let file2 = dir_path.join("file2.txt");
+        let mut dir_node = FileNode::new_directory("dir".to_string(), dir_path.clone(), vec![]);
+        dir_node.children.push(FileNode::new_file("file1.txt".to_string(), file1.clone()));
+        dir_node.children.push(FileNode::new_file("file2.txt".to_string(), file2.clone()));
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir_path.clone()], all_extensions, persist_path);
+        app.root_nodes[0] = Some(dir_node);
+
+        let msg = Message::AddDirectoryToRightPanel(dir_path.clone());
+        let _ = update(&mut app, msg);
+
+        assert!(app.right_panel_files.contains(&file1), "file1 should be added to right panel");
+        assert!(app.right_panel_files.contains(&file2), "file2 should be added to right panel");
+    }
+
+    #[test]
+    fn test_remove_top_dir_ui_feedback() {
+        let dir_path = std::path::PathBuf::from("/dir");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir_path.clone()], all_extensions, persist_path);
+
+        assert!(app.top_dirs.contains(&dir_path), "Top dir should be present before removal");
+
+        let msg = Message::RemoveTopDir(dir_path.clone());
+        let _ = update(&mut app, msg);
+
+        assert!(!app.top_dirs.contains(&dir_path), "Top dir should be removed after action");
+    }
+
+    #[test]
+    fn test_toggle_extensions_menu_ui_feedback() {
+        let dir_path = std::path::PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir_path.clone()], all_extensions, persist_path);
+
+        assert!(!app.extensions_menu_expanded, "Menu should be collapsed initially");
+
+        let msg = Message::ToggleExtensionsMenu;
+        let _ = update(&mut app, msg);
+        assert!(app.extensions_menu_expanded, "Menu should be expanded after toggle");
+
+        let _ = update(&mut app, Message::ToggleExtensionsMenu);
+        assert!(!app.extensions_menu_expanded, "Menu should be collapsed after second toggle");
+    }
+
+    #[test]
+    fn test_remove_nonexistent_file_from_right_panel_ui_feedback() {
+        let file_path = std::path::PathBuf::from("/not_present.txt");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
+
+        // Try to remove a file that's not present
+        let msg = Message::RemoveFromRightPanel(file_path.clone());
+        let _ = update(&mut app, msg);
+
+        // Should not panic and list remains empty
+        assert!(app.right_panel_files.is_empty(), "Right panel should remain empty");
+    }
+
+    #[test]
+    fn test_remove_nonexistent_directory_from_right_panel_ui_feedback() {
+        let dir_path = std::path::PathBuf::from("/not_present_dir");
+        let file = std::path::PathBuf::from("/other/file.txt");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
+
+        app.right_panel_files = vec![file.clone()];
+
+        let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
+        let _ = update(&mut app, msg);
+
+        // Should not remove unrelated files
+        assert_eq!(app.right_panel_files.len(), 1, "Unrelated file should remain");
+        assert!(app.right_panel_files.contains(&file), "Unrelated file should remain");
+    }
+
+    #[test]
+    fn test_toggle_nonexistent_extension_ui_feedback() {
+        let dir_path = std::path::PathBuf::from("/dummy");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir_path.clone()], all_extensions.clone(), persist_path);
+
+        let prev_selected = app.selected_extensions.clone();
+
+        // Try toggling an extension not in all_extensions
+        let msg = Message::ToggleExtension("md".to_string());
+        let _ = update(&mut app, msg);
+
+        // Should not add "md" to selected_extensions
+        assert_eq!(app.selected_extensions, prev_selected, "Selected extensions should not change");
+    }
+
+    #[test]
+    fn test_extension_menu_visual_consistency_after_toggle() {
+        let all_extensions = vec!["foo".to_string(), "bar".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![std::path::PathBuf::from("/dummy")], all_extensions.clone(), persist_path);
+        app.extensions_menu_expanded = true;
+
+        // Initial: all checked
+        let labels = all_extensions.iter().map(|ext| format!("[x] .{ext}")).collect::<Vec<_>>();
+        for ext in &all_extensions {
+            let checked = app.selected_extensions.contains(ext);
+            let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+            assert!(labels.contains(&label));
+        }
+
+        // Toggle "foo" off, then "bar" off
+        let _ = update(&mut app, Message::ToggleExtension("foo".to_string()));
+        let _ = update(&mut app, Message::ToggleExtension("bar".to_string()));
+        let labels = all_extensions.iter().map(|ext| {
+            let checked = app.selected_extensions.contains(ext);
+            if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
+        }).collect::<Vec<_>>();
+        assert!(labels.contains(&"[ ] .foo".to_string()));
+        assert!(labels.contains(&"[ ] .bar".to_string()));
+
+        // Toggle both on again
+        let _ = update(&mut app, Message::ToggleExtension("foo".to_string()));
+        let _ = update(&mut app, Message::ToggleExtension("bar".to_string()));
+        let labels = all_extensions.iter().map(|ext| {
+            let checked = app.selected_extensions.contains(ext);
+            if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
+        }).collect::<Vec<_>>();
+        assert!(labels.contains(&"[x] .foo".to_string()));
+        assert!(labels.contains(&"[x] .bar".to_string()));
+    }
+
+    #[test]
+    fn test_directory_expansion_visual_consistency_after_toggle() {
+        let dir_path = std::path::PathBuf::from("/root");
+        let mut dir_node = FileNode::new_directory("root".to_string(), dir_path.clone(), vec![]);
+        dir_node.is_expanded = false;
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![dir_path.clone()], all_extensions, persist_path);
+        app.root_nodes[0] = Some(dir_node);
+
+        fn get_expansion_symbol(app: &FileTreeApp) -> String {
+            let node = app.root_nodes[0].as_ref().unwrap();
+            let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+            format!("{expand_symbol}")
+        }
+
+        // Initial: collapsed
+        assert_eq!(get_expansion_symbol(&app), "▶");
+
+        // Expand
+        let _ = update(&mut app, Message::ToggleExpansion(dir_path.clone()));
+        assert_eq!(get_expansion_symbol(&app), "▼");
+
+        // Collapse
+        let _ = update(&mut app, Message::ToggleExpansion(dir_path.clone()));
+        assert_eq!(get_expansion_symbol(&app), "▶");
+    }
+
+    #[test]
+    fn test_right_panel_visual_consistency_after_add_remove() {
+        let file_path = std::path::PathBuf::from("/file.txt");
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![], all_extensions, persist_path);
+
+        // Add file
+        let _ = update(&mut app, Message::AddToRightPanel(file_path.clone()));
+        assert!(app.right_panel_files.contains(&file_path));
+
+        // Remove file
+        let _ = update(&mut app, Message::RemoveFromRightPanel(file_path.clone()));
+        assert!(!app.right_panel_files.contains(&file_path));
+
+        // Add again
+        let _ = update(&mut app, Message::AddToRightPanel(file_path.clone()));
+        assert!(app.right_panel_files.contains(&file_path));
+    }
+
+    #[test]
+    fn test_deeply_nested_directory_visual_consistency() {
+        let root_path = std::path::PathBuf::from("/root");
+        let level1_path = root_path.join("level1");
+        let level2_path = level1_path.join("level2");
+        let file_path = level2_path.join("deep.txt");
+
+        let mut level2 = FileNode::new_directory("level2".to_string(), level2_path.clone(), vec![]);
+        level2.children.push(FileNode::new_file("deep.txt".to_string(), file_path.clone()));
+        let level1 = FileNode::new_directory("level1".to_string(), level1_path.clone(), vec![level2]);
+        let root = FileNode::new_directory("root".to_string(), root_path.clone(), vec![level1]);
+
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![root_path.clone()], all_extensions, persist_path);
+        app.root_nodes[0] = Some(root);
+
+        // Helper to get expansion symbol for a given depth
+        fn get_expansion_symbol(node: &FileNode) -> &str {
+            if node.is_expanded { "▼" } else { "▶" }
+        }
+
+        // Initial: all collapsed
+        let root_node = app.root_nodes[0].as_ref().unwrap();
+        assert_eq!(get_expansion_symbol(root_node), "▶");
+        assert_eq!(get_expansion_symbol(&root_node.children[0]), "▶");
+        assert_eq!(get_expansion_symbol(&root_node.children[0].children[0]), "▶");
+
+        // Expand root
+        let _ = update(&mut app, Message::ToggleExpansion(root_path.clone()));
+        let root_node = app.root_nodes[0].as_ref().unwrap();
+        assert_eq!(get_expansion_symbol(root_node), "▼");
+
+        // Expand level1
+        let _ = update(&mut app, Message::ToggleExpansion(level1_path.clone()));
+        let root_node = app.root_nodes[0].as_ref().unwrap();
+        assert_eq!(get_expansion_symbol(&root_node.children[0]), "▼");
+
+        // Expand level2
+        let _ = update(&mut app, Message::ToggleExpansion(level2_path.clone()));
+        let root_node = app.root_nodes[0].as_ref().unwrap();
+        assert_eq!(get_expansion_symbol(&root_node.children[0].children[0]), "▼");
+
+        // Collapse level2
+        let _ = update(&mut app, Message::ToggleExpansion(level2_path.clone()));
+        let root_node = app.root_nodes[0].as_ref().unwrap();
+        assert_eq!(get_expansion_symbol(&root_node.children[0].children[0]), "▶");
+    }
+
+    #[test]
+    fn test_multiple_state_changes_visual_consistency() {
+        let file1 = std::path::PathBuf::from("/dir/file1.txt");
+        let file2 = std::path::PathBuf::from("/dir/file2.txt");
+        let all_extensions = vec!["txt".to_string(), "md".to_string()];
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+        let mut app = FileTreeApp::new(vec![], all_extensions.clone(), persist_path);
+
+        // Add both files
+        let _ = update(&mut app, Message::AddToRightPanel(file1.clone()));
+        let _ = update(&mut app, Message::AddToRightPanel(file2.clone()));
+        assert!(app.right_panel_files.contains(&file1));
+        assert!(app.right_panel_files.contains(&file2));
+
+        // Toggle extensions off
+        let _ = update(&mut app, Message::ToggleExtension("txt".to_string()));
+        let _ = update(&mut app, Message::ToggleExtension("md".to_string()));
+        assert!(!app.selected_extensions.contains(&"txt".to_string()));
+        assert!(!app.selected_extensions.contains(&"md".to_string()));
+
+        // Remove one file
+        let _ = update(&mut app, Message::RemoveFromRightPanel(file1.clone()));
+        assert!(!app.right_panel_files.contains(&file1));
+        assert!(app.right_panel_files.contains(&file2));
+
+        // Toggle extensions on again
+        let _ = update(&mut app, Message::ToggleExtension("txt".to_string()));
+        let _ = update(&mut app, Message::ToggleExtension("md".to_string()));
+        assert!(app.selected_extensions.contains(&"txt".to_string()));
+        assert!(app.selected_extensions.contains(&"md".to_string()));
+    }
+
+    #[test]
+    fn test_file_tree_app_top_dirs_persistence() {
+        use tempfile::tempdir;
+        let temp_dir = tempdir().unwrap();
+        let dir = temp_dir.path().to_path_buf();
+        let all_extensions = vec!["txt".to_string(), "md".to_string()];
+        let persist_path = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
+
+        let app = FileTreeApp::new(vec![dir.clone()], all_extensions.clone(), persist_path.clone());
+        app.persist_top_dirs();
+
+        let app2 = FileTreeApp::load(all_extensions.clone(), Some(persist_path));
+        assert!(app2.top_dirs.contains(&dir));
+    }
+
+    #[test]
+    fn test_file_tree_app_load_corrupted_top_dirs() {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+        let all_extensions = vec!["txt".to_string()];
+        let temp_file = NamedTempFile::new().unwrap();
+        let persist_path = temp_file.path().to_path_buf();
+
+        // Write corrupted data to the persistence file
+        let mut file = OpenOptions::new().write(true).open(&persist_path).unwrap();
+        writeln!(file, "corrupted data").unwrap();
+
+        // Attempt to load top_dirs (should fallback to empty)
+        let app = FileTreeApp::new(vec![], all_extensions.clone(), persist_path.clone());
+        app.persist_top_dirs(); // Ensure file exists for load
+
+        let loaded_app = FileTreeApp::load(all_extensions.clone(), Some(persist_path));
+        assert!(loaded_app.top_dirs.is_empty(), "Should handle corrupted top_dirs state gracefully");
     }
 }

@@ -10,5 +10,5 @@ fn main() -> iced::Result {
     ].into_iter().map(|s| s.to_string()).collect();
 
     iced::application("File Tree Viewer", update, view)
-        .run_with(|| (FileTreeApp::load(all_extensions), iced::Task::none()))
+        .run_with(|| (FileTreeApp::load(all_extensions, None), iced::Task::none()))
 }
