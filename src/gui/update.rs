@@ -176,13 +176,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             app.right_panel_shuffled = false;
             Task::none()
         }
-        Message::ShuffleRightPanel => {
-            use rand::seq::SliceRandom;
-            let mut rng = rand::rng();
-            app.right_panel_files.shuffle(&mut rng);
-            app.right_panel_shuffled = true;
-            Task::none()
-        }
         Message::SortRightPanelByMusician => {
             if app.right_panel_sort_column == SortColumn::Musician {
                 app.right_panel_sort_order = match app.right_panel_sort_order {
@@ -233,6 +226,13 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 app.right_panel_sort_order = SortOrder::Asc;
             }
             app.right_panel_shuffled = false;
+            Task::none()
+        }
+        Message::ShuffleRightPanel => {
+            use rand::seq::SliceRandom;
+            let mut rng = rand::rng();
+            app.right_panel_files.shuffle(&mut rng);
+            app.right_panel_shuffled = true;
             Task::none()
         }
     }

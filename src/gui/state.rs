@@ -24,11 +24,11 @@ pub enum Message {
     RemoveDirectoryFromRightPanel(PathBuf),
     SortRightPanelByDirectory,
     SortRightPanelByFile,
-    ShuffleRightPanel,
     SortRightPanelByMusician,
     SortRightPanelByAlbum,
     SortRightPanelByTitle,
     SortRightPanelByGenre,
+    ShuffleRightPanel,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

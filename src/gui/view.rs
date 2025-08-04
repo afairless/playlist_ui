@@ -1,4 +1,4 @@
-use iced::{Element, widget::{button, column, container, row, scrollable, text, Space}, Length};
+use iced::{Element, widget::{button, column, container, row, Scrollable, scrollable, text, Space}, Length};
 use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder};
@@ -224,6 +224,7 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
 
     let mut rows = Vec::new();
     for file_ref in &displayed_files {
+    // for file_ref in displayed_files.iter().skip(start).take(app.right_panel_visible_rows) {
         let file = file_ref.clone(); // Clone to own the data
 
         let dirname = file.path.parent()
@@ -282,7 +283,7 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
 
         rows.push(row.into());
     }
-    col = col.push(iced::widget::column(rows));
+    col = col.push(Scrollable::new(iced::widget::column(rows)));
     col.into()
 }
 
