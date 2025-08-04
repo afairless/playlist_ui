@@ -452,6 +452,7 @@ mod iced_tests {
     mod state_tests {
         // State-related tests here
         use super::*;
+        use crate::gui::update::restore_expansion_state;
 
         #[test]
         fn test_file_tree_app_new() {
@@ -549,6 +550,44 @@ mod iced_tests {
             assert!(!app.all_extensions.contains(&"md".to_string()));
         }
 
+        #[test]
+        fn test_initial_top_leve_directory_expansion_behavior_one_directory() {
+
+            let dir1 = PathBuf::from("/dir1");
+            let all_extensions = vec!["txt".to_string()];
+            let temp_file = NamedTempFile::new().unwrap();
+            let persist_path = temp_file.path().to_path_buf();
+            let mut app = FileTreeApp::new(vec![dir1.clone()], all_extensions.clone(), persist_path.clone());
+            // Simulate a scanned directory node
+            let node1 = FileNode::new_directory("dir1".to_string(), dir1.clone(), vec![]);
+            app.root_nodes[0] = Some(node1);
+            app.expanded_dirs.clear();
+            app.expanded_dirs.insert(dir1.clone());
+            restore_expansion_state(app.root_nodes[0].as_mut().unwrap(), &app.expanded_dirs);
+            assert!(app.root_nodes[0].as_ref().unwrap().is_expanded, "Single top-level directory should be expanded");
+        }
+
+        #[test]
+        fn test_initial_top_leve_directory_expansion_behavior_two_directories() {
+
+            let all_extensions = vec!["txt".to_string()];
+            let temp_file = NamedTempFile::new().unwrap();
+            let persist_path = temp_file.path().to_path_buf();
+
+            // Two top-level directories
+            let dir1 = PathBuf::from("/dir1");
+            let dir2 = PathBuf::from("/dir2");
+            let mut app2 = FileTreeApp::new(vec![dir1.clone(), dir2.clone()], all_extensions.clone(), persist_path.clone());
+            let node1 = FileNode::new_directory("dir1".to_string(), dir1.clone(), vec![]);
+            let node2 = FileNode::new_directory("dir2".to_string(), dir2.clone(), vec![]);
+            app2.root_nodes[0] = Some(node1);
+            app2.root_nodes[1] = Some(node2);
+            app2.expanded_dirs.clear();
+            restore_expansion_state(app2.root_nodes[0].as_mut().unwrap(), &app2.expanded_dirs);
+            restore_expansion_state(app2.root_nodes[1].as_mut().unwrap(), &app2.expanded_dirs);
+            assert!(!app2.root_nodes[0].as_ref().unwrap().is_expanded, "Multiple top-level directories should be collapsed");
+            assert!(!app2.root_nodes[1].as_ref().unwrap().is_expanded, "Multiple top-level directories should be collapsed");
+        }
     }
 
     mod update_tests {

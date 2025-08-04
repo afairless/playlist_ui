@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::collections::HashSet;
 use serde::{Serialize, Deserialize};
 use crate::fs::file_tree::{FileNode, scan_directory};
+use crate::gui::update::restore_expansion_state;
 
 const TOP_DIRS_FILE: &str = ".playlist_ui_top_dirs.json";
 
@@ -81,12 +82,17 @@ pub struct FileTreeApp {
 
 impl FileTreeApp {
     pub fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>, persist_path: PathBuf) -> Self {
-        let root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
+        let mut root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
             .map(|dir| scan_directory(dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
             .collect();
         let mut expanded_dirs = HashSet::new();
-        for n in root_nodes.iter().flatten() {
-            expanded_dirs.insert(n.path.clone());
+        if top_dirs.len() == 1 {
+            if let Some(Some(node)) = root_nodes.first() {
+                expanded_dirs.insert(node.path.clone());
+            }
+        }
+        for root in root_nodes.iter_mut().flatten() {
+            restore_expansion_state(root, &expanded_dirs);
         }
         FileTreeApp {
             root_nodes,

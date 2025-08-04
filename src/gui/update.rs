@@ -6,7 +6,7 @@ use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
 use crate::fs::media_metadata::extract_mp3_metadata;
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
  
-fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>) {
+pub fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>) {
     node.is_expanded = expanded_dirs.contains(&node.path);
     for child in &mut node.children {
         restore_expansion_state(child, expanded_dirs);
