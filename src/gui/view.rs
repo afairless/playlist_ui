@@ -309,7 +309,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         } else {
             String::new()
         };
-        let dir_label = text(format!("Top-level directory: {dir_name}")).size(16);
+        let dir_label = text(dir_name.to_string()).size(16);
 
         let remove_btn = button(text("Remove"))
             .on_press(Message::RemoveTopDir(app.top_dirs[i].clone()));
