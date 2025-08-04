@@ -339,7 +339,11 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .padding(10)
         .into();
 
-    let right_panel = right_panel(app);
+    let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
+            right_panel(app)
+        )
+        .width(Length::FillPortion(2))
+        .into();
 
     let split_row = row![
         left_panel,
