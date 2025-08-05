@@ -1,7 +1,7 @@
 use iced::{Element, widget::{button, column, container, row, Scrollable, scrollable, text, Space}, Length};
 use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
-use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder};
+use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
 
 fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     let header = button(
@@ -181,6 +181,53 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
     header_row
 }
 
+fn right_panel_dir_widget(file: &RightPanelFile) -> Element<'static, Message> {
+
+    let dirname = file.path.parent()
+        .and_then(|p| p.file_name())
+        .map(|d| d.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let dir_path = file.path.parent().map(|p| p.to_path_buf());
+    let dir_widget = if let Some(path) = dir_path {
+        let dir_path = path.clone();
+        iced_aw::widgets::ContextMenu::new(
+            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
+            Box::new(move || {
+                iced::widget::column![
+                    iced::widget::button("Delete All in Directory")
+                        .on_press(Message::RemoveDirectoryFromRightPanel(dir_path.clone()))
+                ].into()
+            }) as Box<dyn Fn() -> iced::Element<'static, Message>>
+        )
+    } else {
+        iced_aw::widgets::ContextMenu::new(
+            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
+            Box::new(|| iced::widget::column![].into()) as Box<dyn Fn() -> iced::Element<'static, Message>>
+        )
+    };
+    dir_widget.into()
+}
+
+fn right_panel_file_context_menu(file: &RightPanelFile) -> Element<'static, Message> {
+
+    let filename = file.path.file_name()
+        .map(|f| f.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let file_context_menu = iced_aw::widgets::ContextMenu::new(
+        iced::widget::text(filename.clone()).width(Length::FillPortion(1)),
+        {
+            let file_path = file.path.clone();
+            Box::new(move || {
+                iced::widget::column![
+                    iced::widget::button("Delete")
+                        .on_press(Message::RemoveFromRightPanel(file_path.clone()))
+                ].into()
+            }) as Box<dyn Fn() -> iced::Element<'static, Message>>
+        }
+    );
+    file_context_menu.into()
+}
+
 fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let displayed_files = app.sorted_right_panel_files();
 
@@ -196,46 +243,9 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let mut rows = Vec::new();
     for file_ref in &displayed_files {
         let file = file_ref.clone();
-        let dirname = file.path.parent()
-            .and_then(|p| p.file_name())
-            .map(|d| d.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let filename = file.path.file_name()
-            .map(|f| f.to_string_lossy().to_string())
-            .unwrap_or_default();
 
-        let dir_path = file.path.parent().map(|p| p.to_path_buf());
-
-        let dir_widget = if let Some(path) = dir_path {
-            let dir_path = path.clone();
-            iced_aw::widgets::ContextMenu::new(
-                iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
-                Box::new(move || {
-                    iced::widget::column![
-                        iced::widget::button("Delete All in Directory")
-                            .on_press(Message::RemoveDirectoryFromRightPanel(dir_path.clone()))
-                    ].into()
-                }) as Box<dyn Fn() -> iced::Element<'static, Message>>
-            )
-        } else {
-            iced_aw::widgets::ContextMenu::new(
-                iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
-                Box::new(|| iced::widget::column![].into()) as Box<dyn Fn() -> iced::Element<'static, Message>>
-            )
-        };
-
-        let file_context_menu = iced_aw::widgets::ContextMenu::new(
-            iced::widget::text(filename.clone()).width(Length::FillPortion(1)),
-            {
-                let file_path = file.path.clone();
-                Box::new(move || {
-                    iced::widget::column![
-                        iced::widget::button("Delete")
-                            .on_press(Message::RemoveFromRightPanel(file_path.clone()))
-                    ].into()
-                }) as Box<dyn Fn() -> iced::Element<'static, Message>>
-            }
-        );
+        let dir_widget = right_panel_dir_widget(&file);
+        let file_context_menu = right_panel_file_context_menu(&file);
 
         let mut row = iced::widget::Row::new()
             .push(dir_widget)
