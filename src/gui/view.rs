@@ -238,6 +238,7 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
                 shadow: iced::Shadow::default(),
                 text_color: iced::Color::WHITE,
             });
+
         rows.push(clickable_row.into());
     }
 
@@ -316,6 +317,12 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     container::<Message, iced::Theme, iced::Renderer>(split_row)
         .width(Length::Fill)
         .height(Length::Fill)
+        .style(|_theme| iced::widget::container::Style {
+            background: Some(iced::Background::Color(iced::Color::from_rgb(0.15, 0.15, 0.15))),
+            text_color: None,
+            border: iced::Border::default(),
+            shadow: iced::Shadow::default(),
+        })
         .into()
 }
 
