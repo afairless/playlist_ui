@@ -235,6 +235,19 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             app.right_panel_shuffled = true;
             Task::none()
         }
+        Message::ExportRightPanelAsXspf => {
+            Task::perform(
+                async move { rfd::FileDialog::new().set_file_name("playlist.xspf").save_file() },
+                |opt| match opt {
+                    Some(path) => Message::ExportRightPanelAsXspfTo(path),
+                    None => Message::ToggleExtensionsMenu, // no-op or feedback
+                }
+            )
+        }
+        Message::ExportRightPanelAsXspfTo(path) => {
+            let _ = crate::fs::xspf::export_xspf_playlist(&app.sorted_right_panel_files(), &path);
+            Task::none()
+        }
     }
 }
 

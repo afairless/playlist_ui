@@ -2803,6 +2803,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "xspf",
 ]
 
 [[package]]
@@ -4700,10 +4701,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
 
 [[package]]
+name = "xml"
+version = "0.8.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ede1c99c55b4b3ad0349018ef0eccbe954ce9c342334410707ee87177fcf2ab4"
+dependencies = [
+ "xml-rs",
+]
+
+[[package]]
 name = "xml-rs"
 version = "0.8.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fd8403733700263c6eb89f192880191f1b83e332f7a20371ddcf421c4a337c7"
+
+[[package]]
+name = "xspf"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c34c9a0eb2e6f49fc4cca0b071044bac1125123218f343564a6f5630c0c7f0b"
+dependencies = [
+ "xml",
+]
 
 [[package]]
 name = "yazi"

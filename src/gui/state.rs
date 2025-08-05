@@ -30,6 +30,8 @@ pub enum Message {
     SortRightPanelByTitle,
     SortRightPanelByGenre,
     ShuffleRightPanel,
+    ExportRightPanelAsXspf,
+    ExportRightPanelAsXspfTo(PathBuf),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -131,5 +133,69 @@ impl FileTreeApp {
         }
     }
 
+    pub fn sorted_right_panel_files(&self) -> Vec<RightPanelFile> {
+        let mut files = self.right_panel_files.clone();
+        if !self.right_panel_shuffled {
+            files.sort_by(|a, b| {
+                match self.right_panel_sort_column {
+                    SortColumn::Directory => {
+                        let a_dir = a.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                        let b_dir = b.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_dir.cmp(&b_dir)
+                        } else {
+                            b_dir.cmp(&a_dir)
+                        }
+                    }
+                    SortColumn::File => {
+                        let a_file = a.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                        let b_file = b.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_file.cmp(&b_file)
+                        } else {
+                            b_file.cmp(&a_file)
+                        }
+                    }
+                    SortColumn::Musician => {
+                        let a_musician = a.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        let b_musician = b.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_musician.cmp(&b_musician)
+                        } else {
+                            b_musician.cmp(&a_musician)
+                        }
+                    }
+                    SortColumn::Album => {
+                        let a_album = a.album.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        let b_album = b.album.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_album.cmp(&b_album)
+                        } else {
+                            b_album.cmp(&a_album)
+                        }
+                    }
+                    SortColumn::Title => {
+                        let a_title = a.title.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        let b_title = b.title.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_title.cmp(&b_title)
+                        } else {
+                            b_title.cmp(&a_title)
+                        }
+                    }
+                    SortColumn::Genre => {
+                        let a_genre = a.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        let b_genre = b.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_genre.cmp(&b_genre)
+                        } else {
+                            b_genre.cmp(&a_genre)
+                        }
+                    }
+                }
+            });
+        }
+        files
+    }
 }
 

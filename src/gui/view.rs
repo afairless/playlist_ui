@@ -84,6 +84,14 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     .on_press(Message::ShuffleRightPanel)
     .width(Length::Shrink);
 
+    let export_btn = iced::widget::button(
+        iced::widget::text("Export as XSPF")
+            .width(Length::Shrink)
+            .size(20)
+    )
+    .on_press(Message::ExportRightPanelAsXspf)
+    .width(Length::Shrink);
+
     let header_row = iced::widget::Row::new()
         .push(
             iced::widget::button(
@@ -157,70 +165,11 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             .on_press(Message::SortRightPanelByGenre)
             .width(Length::FillPortion(1))
         )
-        .push(shuffle_btn);
+        .push(shuffle_btn)
+        .push(export_btn);
     col = col.push(header_row);
 
-    let mut displayed_files = app.right_panel_files.clone();
-    if !app.right_panel_shuffled {
-        displayed_files.sort_by(|a, b| {
-            match app.right_panel_sort_column {
-                SortColumn::Directory => {
-                    let a_dir = a.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                    let b_dir = b.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                    if app.right_panel_sort_order == SortOrder::Asc {
-                        a_dir.cmp(&b_dir)
-                    } else {
-                        b_dir.cmp(&a_dir)
-                    }
-                }
-                SortColumn::File => {
-                    let a_file = a.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                    let b_file = b.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                    if app.right_panel_sort_order == SortOrder::Asc {
-                        a_file.cmp(&b_file)
-                    } else {
-                        b_file.cmp(&a_file)
-                    }
-                }
-                SortColumn::Musician => {
-                    let a_musician = a.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    let b_musician = b.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    if app.right_panel_sort_order == SortOrder::Asc {
-                        a_musician.cmp(&b_musician)
-                    } else {
-                        b_musician.cmp(&a_musician)
-                    }
-                }
-                SortColumn::Album => {
-                    let a_album = a.album.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    let b_album = b.album.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    if app.right_panel_sort_order == SortOrder::Asc {
-                        a_album.cmp(&b_album)
-                    } else {
-                        b_album.cmp(&a_album)
-                    }
-                }
-                SortColumn::Title => {
-                    let a_title = a.title.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    let b_title = b.title.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    if app.right_panel_sort_order == SortOrder::Asc {
-                        a_title.cmp(&b_title)
-                    } else {
-                        b_title.cmp(&a_title)
-                    }
-                }
-                SortColumn::Genre => {
-                    let a_genre = a.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    let b_genre = b.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
-                    if app.right_panel_sort_order == SortOrder::Asc {
-                        a_genre.cmp(&b_genre)
-                    } else {
-                        b_genre.cmp(&a_genre)
-                    }
-                }
-            }
-        });
-    }
+    let displayed_files = app.sorted_right_panel_files();
 
     let mut rows = Vec::new();
     for file_ref in &displayed_files {
