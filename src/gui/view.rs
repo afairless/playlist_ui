@@ -26,56 +26,52 @@ pub fn extension_menu(app: &FileTreeApp) -> Element<Message> {
 }
 
 pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
-    let mut col = iced::widget::Column::new();
+    let displayed_files = app.sorted_right_panel_files();
 
+    // Determine which columns to show
+    let show_musician = displayed_files.iter().any(|f| f.musician.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_album    = displayed_files.iter().any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_title    = displayed_files.iter().any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+
+    // Sorting arrows
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else {
-        ""
-    };
+    } else { "" };
     let file_arrow = if app.right_panel_sort_column == SortColumn::File {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else {
-        ""
-    };
-    let musician_arrow = if app.right_panel_sort_column == SortColumn::Musician {
+    } else { "" };
+    let musician_arrow = if show_musician && app.right_panel_sort_column == SortColumn::Musician {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else {
-        ""
-    };
-    let album_arrow = if app.right_panel_sort_column == SortColumn::Album {
+    } else { "" };
+    let album_arrow = if show_album && app.right_panel_sort_column == SortColumn::Album {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else {
-        ""
-    };
-    let title_arrow = if app.right_panel_sort_column == SortColumn::Title {
+    } else { "" };
+    let title_arrow = if show_title && app.right_panel_sort_column == SortColumn::Title {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else {
-        ""
-    };
-    let genre_arrow = if app.right_panel_sort_column == SortColumn::Genre {
+    } else { "" };
+    let genre_arrow = if show_genre && app.right_panel_sort_column == SortColumn::Genre {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else {
-        ""
-    };
+    } else { "" };
+
     let shuffle_btn = iced::widget::button(
         iced::widget::text("Shuffle")
             .width(Length::Shrink)
@@ -92,15 +88,13 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     .on_press(Message::ExportRightPanelAsXspf)
     .width(Length::Shrink);
 
-    let header_row = iced::widget::Row::new()
+    let mut header_row = iced::widget::Row::new()
         .push(
             iced::widget::button(
                 iced::widget::text(format!("Directory{dir_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
-                    .style(|_theme| iced::widget::text::Style {
-                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                    })
+                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
             )
             .on_press(Message::SortRightPanelByDirectory)
             .width(Length::FillPortion(1))
@@ -110,72 +104,66 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
                 iced::widget::text(format!("File{file_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
-                    .style(|_theme| iced::widget::text::Style {
-                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                    })
+                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
             )
             .on_press(Message::SortRightPanelByFile)
             .width(Length::FillPortion(1))
-        )
-        .push(
+        );
+
+    if show_musician {
+        header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Musician{musician_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
-                    .style(|_theme| iced::widget::text::Style {
-                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                    })
+                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
             )
             .on_press(Message::SortRightPanelByMusician)
             .width(Length::FillPortion(1))
-        )
-        .push(
+        );
+    }
+    if show_album {
+        header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Album{album_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
-                    .style(|_theme| iced::widget::text::Style {
-                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                    })
+                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
             )
             .on_press(Message::SortRightPanelByAlbum)
             .width(Length::FillPortion(1))
-        )
-        .push(
+        );
+    }
+    if show_title {
+        header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Title{title_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
-                    .style(|_theme| iced::widget::text::Style {
-                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                    })
+                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
             )
             .on_press(Message::SortRightPanelByTitle)
             .width(Length::FillPortion(1))
-        )
-        .push(
+        );
+    }
+    if show_genre {
+        header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Genre{genre_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(24)
-                    .style(|_theme| iced::widget::text::Style {
-                        color: Some([0.5, 0.5, 0.5, 1.0].into()),
-                    })
+                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
             )
             .on_press(Message::SortRightPanelByGenre)
             .width(Length::FillPortion(1))
-        )
-        .push(shuffle_btn)
-        .push(export_btn);
-    col = col.push(header_row);
+        );
+    }
 
-    let displayed_files = app.sorted_right_panel_files();
+    header_row = header_row.push(shuffle_btn).push(export_btn);
 
     let mut rows = Vec::new();
     for file_ref in &displayed_files {
-    // for file_ref in displayed_files.iter().skip(start).take(app.right_panel_visible_rows) {
-        let file = file_ref.clone(); // Clone to own the data
-
+        let file = file_ref.clone();
         let dirname = file.path.parent()
             .and_then(|p| p.file_name())
             .map(|d| d.to_string_lossy().to_string())
@@ -183,11 +171,6 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         let filename = file.path.file_name()
             .map(|f| f.to_string_lossy().to_string())
             .unwrap_or_default();
-
-        let musician = file.musician.clone().unwrap_or_default();
-        let album = file.album.clone().unwrap_or_default();
-        let title = file.title.clone().unwrap_or_default();
-        let genre = file.genre.clone().unwrap_or_default();
 
         let dir_path = file.path.parent().map(|p| p.to_path_buf());
 
@@ -222,17 +205,30 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             }
         );
 
-        let row = iced::widget::Row::new()
+        let mut row = iced::widget::Row::new()
             .push(dir_widget)
-            .push(file_context_menu)
-            .push(iced::widget::text(musician).width(Length::FillPortion(1)))
-            .push(iced::widget::text(album).width(Length::FillPortion(1)))
-            .push(iced::widget::text(title).width(Length::FillPortion(1)))
-            .push(iced::widget::text(genre).width(Length::FillPortion(1)));
+            .push(file_context_menu);
+
+        if show_musician {
+            row = row.push(iced::widget::text(file.musician.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+        }
+        if show_album {
+            row = row.push(iced::widget::text(file.album.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+        }
+        if show_title {
+            row = row.push(iced::widget::text(file.title.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+        }
+        if show_genre {
+            row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+        }
 
         rows.push(row.into());
     }
-    col = col.push(Scrollable::new(iced::widget::column(rows)));
+
+    let col = iced::widget::Column::new()
+        .push(header_row)
+        .push(Scrollable::new(iced::widget::column(rows)));
+
     col.into()
 }
 
