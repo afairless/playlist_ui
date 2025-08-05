@@ -96,6 +96,12 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     .on_press(Message::ExportAndPlayRightPanelAsXspf)
     .width(Length::Shrink);
 
+    let action_row = iced::widget::Row::new()
+        .push(shuffle_btn)
+        .push(export_btn)
+        .push(play_btn)
+        .spacing(10);
+
     let mut header_row = iced::widget::Row::new()
         .push(
             iced::widget::button(
@@ -166,8 +172,6 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             .width(Length::FillPortion(1))
         );
     }
-
-    header_row = header_row.push(shuffle_btn).push(export_btn).push(play_btn);
 
     let mut rows = Vec::new();
     for file_ref in &displayed_files {
@@ -243,10 +247,69 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     }
 
     let col = iced::widget::Column::new()
+        .push(action_row)
+        .push(Space::with_height(10))
         .push(header_row)
         .push(Scrollable::new(iced::widget::column(rows)));
 
     col.into()
+}
+
+pub fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
+    let indent = "  ".repeat(depth);
+
+    let mut content = column![];
+
+    match node.node_type {
+        NodeType::Directory => {
+            let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+            let dir_path = node.path.clone();
+
+            let dir_row = row![
+                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
+                    .size(14)
+            ];
+
+            let context_menu = ContextMenu::new(
+                button(dir_row)
+                    .on_press(Message::ToggleExpansion(node.path.clone())),
+                move || {
+                    column![
+                        button("Add all files to right panel")
+                            .on_press(Message::AddDirectoryToRightPanel(dir_path.clone()))
+                    ]
+                    .into()
+                },
+            );
+            content = content.push(context_menu);
+
+            if node.is_expanded {
+                for child in &node.children {
+                    content = content.push(render_node(child, depth + 1));
+                }
+            }
+        }
+        NodeType::File => {
+            let file_row = text(format!("{} 📄 {}", indent, node.name)).size(14);
+
+            // Wrap the file row in a context menu for right-click
+            let file_path = node.path.clone();
+            let context_menu = ContextMenu::new(
+                button(file_row),
+                move || {
+                    column![
+                        button("Add to right panel")
+                            .on_press(Message::AddToRightPanel(file_path.clone()))
+                    ]
+                    .into()
+                },
+            );
+
+            content = content.push(context_menu);
+        }
+    }
+
+    content.into()
 }
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
@@ -326,64 +389,6 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .into()
 }
 
-pub fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
-    let indent = "  ".repeat(depth);
-
-    let mut content = column![];
-
-    match node.node_type {
-        NodeType::Directory => {
-            let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
-            let dir_path = node.path.clone();
-
-            let dir_row = row![
-                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
-                    .size(14)
-            ];
-
-            let context_menu = ContextMenu::new(
-                button(dir_row)
-                    .on_press(Message::ToggleExpansion(node.path.clone())),
-                move || {
-                    column![
-                        button("Add all files to right panel")
-                            .on_press(Message::AddDirectoryToRightPanel(dir_path.clone()))
-                    ]
-                    .into()
-                },
-            );
-            content = content.push(context_menu);
-
-            if node.is_expanded {
-                for child in &node.children {
-                    content = content.push(render_node(child, depth + 1));
-                }
-            }
-        }
-        NodeType::File => {
-            let file_row = text(format!("{} 📄 {}", indent, node.name)).size(14);
-
-            // Wrap the file row in a context menu for right-click
-            let file_path = node.path.clone();
-            let context_menu = ContextMenu::new(
-                button(file_row),
-                move || {
-                    column![
-                        button("Add to right panel")
-                            .on_press(Message::AddToRightPanel(file_path.clone()))
-                    ]
-                    .into()
-                },
-            );
-
-            content = content.push(context_menu);
-        }
-    }
-
-    content.into()
-}
-
- 
 #[cfg(test)]
 mod iced_tests {
     use super::*;
