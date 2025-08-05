@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use iced::Task;
 use rfd::FileDialog;
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
-use crate::fs::media_metadata::extract_mp3_metadata;
+use crate::fs::media_metadata::extract_media_metadata;
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
  
 pub fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>) {
@@ -107,7 +107,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::DirectoryAdded(None) => Task::none(),
         Message::AddToRightPanel(path) => {
             if !app.right_panel_files.iter().any(|f| f.path == path) {
-                let meta = extract_mp3_metadata(&path);
+                let meta = extract_media_metadata(&path);
                 app.right_panel_files.push(RightPanelFile {
                     path,
                     musician: meta.musician,
@@ -125,7 +125,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     collect_files_recursively(node, &mut files);
                     for file in files {
                         if !app.right_panel_files.iter().any(|f| f.path == file) {
-                            let meta = extract_mp3_metadata(&file);
+                            let meta = extract_media_metadata(&file);
                             app.right_panel_files.push(RightPanelFile {
                                 path: file,
                                 musician: meta.musician,
