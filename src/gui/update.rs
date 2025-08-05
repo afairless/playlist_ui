@@ -258,6 +258,31 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             let _ = crate::fs::xspf::export_xspf_playlist(&audio_files, &path);
             Task::none()
         }
+        Message::ExportAndPlayRightPanelAsXspf => {
+            use std::env::temp_dir;
+            use std::process::Command;
+
+            let audio_exts: &Vec<String> = &app.audio_extensions;
+            let audio_files: Vec<RightPanelFile> = app.sorted_right_panel_files()
+                .into_iter()
+                .filter(|f| {
+                    f.path.extension()
+                        .and_then(|e| e.to_str())
+                        .map(|ext| audio_exts.iter().any(|ae| ae == ext))
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            let xspf_path = temp_dir().join("playlist.xspf");
+            let _ = crate::fs::xspf::export_xspf_playlist(&audio_files, &xspf_path);
+
+            // Launch VLC with the playlist
+            let _ = Command::new("vlc")
+                .arg(xspf_path.to_str().unwrap())
+                .spawn();
+
+            Task::none()
+        }
     }
 }
 

@@ -88,6 +88,14 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     .on_press(Message::ExportRightPanelAsXspf)
     .width(Length::Shrink);
 
+    let play_btn = iced::widget::button(
+        iced::widget::text("Play in VLC")
+            .width(Length::Shrink)
+            .size(20)
+    )
+    .on_press(Message::ExportAndPlayRightPanelAsXspf)
+    .width(Length::Shrink);
+
     let mut header_row = iced::widget::Row::new()
         .push(
             iced::widget::button(
@@ -159,7 +167,7 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         );
     }
 
-    header_row = header_row.push(shuffle_btn).push(export_btn);
+    header_row = header_row.push(shuffle_btn).push(export_btn).push(play_btn);
 
     let mut rows = Vec::new();
     for file_ref in &displayed_files {

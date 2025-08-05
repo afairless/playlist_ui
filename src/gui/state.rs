@@ -176,6 +176,7 @@ pub enum Message {
     ShuffleRightPanel,
     ExportRightPanelAsXspf,
     ExportRightPanelAsXspfTo(PathBuf),
+    ExportAndPlayRightPanelAsXspf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
