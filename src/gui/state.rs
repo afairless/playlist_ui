@@ -11,6 +11,56 @@ fn get_persist_path() -> PathBuf {
     dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(TOP_DIRS_FILE)
 }
 
+#[derive(Debug, Clone)]
+pub enum Message {
+    ToggleExpansion(PathBuf),
+    ToggleExtension(String),
+    ToggleExtensionsMenu,
+    RemoveTopDir(PathBuf),
+    AddDirectory,
+    DirectoryAdded(Option<std::path::PathBuf>),
+    AddToRightPanel(PathBuf),
+    AddDirectoryToRightPanel(PathBuf),
+    RemoveFromRightPanel(PathBuf),
+    RemoveDirectoryFromRightPanel(PathBuf),
+    SortRightPanelByDirectory,
+    SortRightPanelByFile,
+    SortRightPanelByMusician,
+    SortRightPanelByAlbum,
+    SortRightPanelByTitle,
+    SortRightPanelByGenre,
+    ShuffleRightPanel,
+    ExportRightPanelAsXspf,
+    ExportRightPanelAsXspfTo(PathBuf),
+    ExportAndPlayRightPanelAsXspf,
+    OpenRightPanelFile(PathBuf),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortColumn {
+    Directory,
+    File,
+    Musician,
+    Album,
+    Title,
+    Genre,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortOrder {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RightPanelFile {
+    pub path: PathBuf,
+    pub musician: Option<String>,
+    pub album: Option<String>,
+    pub title: Option<String>,
+    pub genre: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileTreeApp {
     #[serde(skip)]
@@ -153,55 +203,5 @@ impl FileTreeApp {
         }
         files
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    ToggleExpansion(PathBuf),
-    ToggleExtension(String),
-    ToggleExtensionsMenu,
-    RemoveTopDir(PathBuf),
-    AddDirectory,
-    DirectoryAdded(Option<std::path::PathBuf>),
-    AddToRightPanel(PathBuf),
-    AddDirectoryToRightPanel(PathBuf),
-    RemoveFromRightPanel(PathBuf),
-    RemoveDirectoryFromRightPanel(PathBuf),
-    SortRightPanelByDirectory,
-    SortRightPanelByFile,
-    SortRightPanelByMusician,
-    SortRightPanelByAlbum,
-    SortRightPanelByTitle,
-    SortRightPanelByGenre,
-    ShuffleRightPanel,
-    ExportRightPanelAsXspf,
-    ExportRightPanelAsXspfTo(PathBuf),
-    ExportAndPlayRightPanelAsXspf,
-    OpenRightPanelFile(PathBuf),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SortColumn {
-    Directory,
-    File,
-    Musician,
-    Album,
-    Title,
-    Genre,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SortOrder {
-    Asc,
-    Desc,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct RightPanelFile {
-    pub path: PathBuf,
-    pub musician: Option<String>,
-    pub album: Option<String>,
-    pub title: Option<String>,
-    pub genre: Option<String>,
 }
 

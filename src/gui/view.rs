@@ -3,7 +3,7 @@ use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder};
 
-pub fn extension_menu(app: &FileTreeApp) -> Element<Message> {
+fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     let header = button(
         text(if app.extensions_menu_expanded { "▼ File Extensions" } else { "▶ File Extensions" }).size(16)
     )
@@ -25,14 +25,46 @@ pub fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     }
 }
 
-pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
-    let displayed_files = app.sorted_right_panel_files();
+fn right_panel_action_row() -> iced::widget::Row<'static, Message> {
 
-    // Determine which columns to show
-    let show_musician = displayed_files.iter().any(|f| f.musician.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_album    = displayed_files.iter().any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_title    = displayed_files.iter().any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let row_text_color = [0.0, 1.0, 1.0, 1.0];
+    let row_size = 20;
+
+    let shuffle_btn = iced::widget::button(
+        iced::widget::text("Shuffle")
+            .width(Length::Shrink)
+            .size(row_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(row_text_color.into()) })
+    )
+    .on_press(Message::ShuffleRightPanel)
+    .width(Length::Shrink);
+
+    let export_btn = iced::widget::button(
+        iced::widget::text("Export as XSPF")
+            .width(Length::Shrink)
+            .size(row_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(row_text_color.into()) })
+    )
+    .on_press(Message::ExportRightPanelAsXspf)
+    .width(Length::Shrink);
+
+    let play_btn = iced::widget::button(
+        iced::widget::text("Play in VLC")
+            .width(Length::Shrink)
+            .size(row_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(row_text_color.into()) })
+    )
+    .on_press(Message::ExportAndPlayRightPanelAsXspf)
+    .width(Length::Shrink);
+
+    iced::widget::Row::new()
+        .push(shuffle_btn)
+        .push(export_btn)
+        .push(play_btn)
+        .spacing(10)
+}
+
+fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bool, show_title: bool, show_genre: bool) -> iced::widget::Row<'static, Message> {
 
     // Sorting arrows
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
@@ -72,43 +104,16 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         }
     } else { "" };
 
-    let shuffle_btn = iced::widget::button(
-        iced::widget::text("Shuffle")
-            .width(Length::Shrink)
-            .size(20)
-    )
-    .on_press(Message::ShuffleRightPanel)
-    .width(Length::Shrink);
-
-    let export_btn = iced::widget::button(
-        iced::widget::text("Export as XSPF")
-            .width(Length::Shrink)
-            .size(20)
-    )
-    .on_press(Message::ExportRightPanelAsXspf)
-    .width(Length::Shrink);
-
-    let play_btn = iced::widget::button(
-        iced::widget::text("Play in VLC")
-            .width(Length::Shrink)
-            .size(20)
-    )
-    .on_press(Message::ExportAndPlayRightPanelAsXspf)
-    .width(Length::Shrink);
-
-    let action_row = iced::widget::Row::new()
-        .push(shuffle_btn)
-        .push(export_btn)
-        .push(play_btn)
-        .spacing(10);
+    let header_text_color = [1.0, 1.0, 0.0, 1.0];
+    let header_size = 20;
 
     let mut header_row = iced::widget::Row::new()
         .push(
             iced::widget::button(
                 iced::widget::text(format!("Directory{dir_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(24)
-                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
+                    .size(header_size)
+                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByDirectory)
             .width(Length::FillPortion(1))
@@ -117,8 +122,8 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             iced::widget::button(
                 iced::widget::text(format!("File{file_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(24)
-                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
+                    .size(header_size)
+                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByFile)
             .width(Length::FillPortion(1))
@@ -129,8 +134,8 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             iced::widget::button(
                 iced::widget::text(format!("Musician{musician_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(24)
-                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
+                    .size(header_size)
+                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByMusician)
             .width(Length::FillPortion(1))
@@ -141,8 +146,8 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             iced::widget::button(
                 iced::widget::text(format!("Album{album_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(24)
-                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
+                    .size(header_size)
+                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByAlbum)
             .width(Length::FillPortion(1))
@@ -153,8 +158,8 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             iced::widget::button(
                 iced::widget::text(format!("Title{title_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(24)
-                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
+                    .size(header_size)
+                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByTitle)
             .width(Length::FillPortion(1))
@@ -165,13 +170,28 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             iced::widget::button(
                 iced::widget::text(format!("Genre{genre_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(24)
-                    .style(|_theme| iced::widget::text::Style { color: Some([0.5, 0.5, 0.5, 1.0].into()) })
+                    .size(header_size)
+                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByGenre)
             .width(Length::FillPortion(1))
         );
     }
+
+    header_row
+}
+
+fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
+    let displayed_files = app.sorted_right_panel_files();
+
+    // Determine which columns to show
+    let show_musician = displayed_files.iter().any(|f| f.musician.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_album    = displayed_files.iter().any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_title    = displayed_files.iter().any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+
+    let action_row = right_panel_action_row();
+    let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre);
 
     let mut rows = Vec::new();
     for file_ref in &displayed_files {
@@ -255,7 +275,7 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     col.into()
 }
 
-pub fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
+fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
     let indent = "  ".repeat(depth);
 
     let mut content = column![];
