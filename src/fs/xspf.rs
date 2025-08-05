@@ -35,6 +35,12 @@ pub fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::path::P
         if let Some(annotation) = meta.annotation {
             xml.push_str(&format!("<annotation>{}</annotation>", xml_escape(&annotation)));
         }
+        if let Some(track_num) = meta.track_num {
+            xml.push_str(&format!("<trackNum>{track_num}</trackNum>"));
+        }
+        if let Some(image_uri) = meta.image_uri {
+            xml.push_str(&format!("<image>{}</image>", xml_escape(&image_uri)));
+        }
         xml.push_str("</track>");
     }
 
@@ -79,7 +85,7 @@ mod tests {
         };
 
         let persist_path = NamedTempFile::new().unwrap().path().to_path_buf();
-        let mut app = FileTreeApp::new(vec![], vec![], persist_path);
+        let mut app = FileTreeApp::new(vec![], vec![], Vec::new(), persist_path);
         app.right_panel_files = vec![file2.clone(), file1.clone()]; // Intentionally reversed
         app.right_panel_sort_column = SortColumn::File;
         app.right_panel_sort_order = SortOrder::Asc;

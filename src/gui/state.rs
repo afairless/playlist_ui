@@ -11,56 +11,10 @@ fn get_persist_path() -> PathBuf {
     dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(TOP_DIRS_FILE)
 }
 
-#[derive(Debug, Clone)]
-pub enum Message {
-    ToggleExpansion(PathBuf),
-    ToggleExtension(String),
-    ToggleExtensionsMenu,
-    RemoveTopDir(PathBuf),
-    AddDirectory,
-    DirectoryAdded(Option<std::path::PathBuf>),
-    AddToRightPanel(PathBuf),
-    AddDirectoryToRightPanel(PathBuf),
-    RemoveFromRightPanel(PathBuf),
-    RemoveDirectoryFromRightPanel(PathBuf),
-    SortRightPanelByDirectory,
-    SortRightPanelByFile,
-    SortRightPanelByMusician,
-    SortRightPanelByAlbum,
-    SortRightPanelByTitle,
-    SortRightPanelByGenre,
-    ShuffleRightPanel,
-    ExportRightPanelAsXspf,
-    ExportRightPanelAsXspfTo(PathBuf),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SortColumn {
-    Directory,
-    File,
-    Musician,
-    Album,
-    Title,
-    Genre,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SortOrder {
-    Asc,
-    Desc,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct RightPanelFile {
-    pub path: PathBuf,
-    pub musician: Option<String>,
-    pub album: Option<String>,
-    pub title: Option<String>,
-    pub genre: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileTreeApp {
+    #[serde(skip)]
+    pub audio_extensions: Vec<String>,
     #[serde(skip)]
     pub root_nodes: Vec<Option<FileNode>>,
     pub top_dirs: Vec<PathBuf>,
@@ -83,7 +37,7 @@ pub struct FileTreeApp {
 }
 
 impl FileTreeApp {
-    pub fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>, persist_path: PathBuf) -> Self {
+    pub fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>, audio_extensions: Vec<String>, persist_path: PathBuf) -> Self {
         let mut root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
             .map(|dir| scan_directory(dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
             .collect();
@@ -97,6 +51,7 @@ impl FileTreeApp {
             restore_expansion_state(root, &expanded_dirs);
         }
         FileTreeApp {
+            audio_extensions,
             root_nodes,
             top_dirs,
             persist_path,
@@ -111,8 +66,9 @@ impl FileTreeApp {
         }
     }
 
-    pub fn load(all_extensions: Vec<String>, persist_path: Option<PathBuf>) -> Self {
+    pub fn load(all_extensions: Vec<String>, audio_extensions: Option<Vec<String>>, persist_path: Option<PathBuf>) -> Self {
         let persist_path = persist_path.unwrap_or_else(get_persist_path);
+        let audio_extensions = audio_extensions.unwrap_or_default();
         let top_dirs = if persist_path.exists() {
             std::fs::read_to_string(&persist_path)
                 .ok()
@@ -124,7 +80,7 @@ impl FileTreeApp {
         } else {
             Vec::new()
         };
-        FileTreeApp::new(top_dirs, all_extensions, persist_path)
+        FileTreeApp::new(top_dirs, all_extensions, audio_extensions, persist_path)
     }
 
     pub fn persist_top_dirs(&self) {
@@ -197,5 +153,53 @@ impl FileTreeApp {
         }
         files
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    ToggleExpansion(PathBuf),
+    ToggleExtension(String),
+    ToggleExtensionsMenu,
+    RemoveTopDir(PathBuf),
+    AddDirectory,
+    DirectoryAdded(Option<std::path::PathBuf>),
+    AddToRightPanel(PathBuf),
+    AddDirectoryToRightPanel(PathBuf),
+    RemoveFromRightPanel(PathBuf),
+    RemoveDirectoryFromRightPanel(PathBuf),
+    SortRightPanelByDirectory,
+    SortRightPanelByFile,
+    SortRightPanelByMusician,
+    SortRightPanelByAlbum,
+    SortRightPanelByTitle,
+    SortRightPanelByGenre,
+    ShuffleRightPanel,
+    ExportRightPanelAsXspf,
+    ExportRightPanelAsXspfTo(PathBuf),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortColumn {
+    Directory,
+    File,
+    Musician,
+    Album,
+    Title,
+    Genre,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SortOrder {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RightPanelFile {
+    pub path: PathBuf,
+    pub musician: Option<String>,
+    pub album: Option<String>,
+    pub title: Option<String>,
+    pub genre: Option<String>,
 }
 

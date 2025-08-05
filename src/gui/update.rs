@@ -245,7 +245,17 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             )
         }
         Message::ExportRightPanelAsXspfTo(path) => {
-            let _ = crate::fs::xspf::export_xspf_playlist(&app.sorted_right_panel_files(), &path);
+            let audio_exts: &Vec<String> = &app.audio_extensions;
+            let audio_files: Vec<RightPanelFile> = app.sorted_right_panel_files()
+                .into_iter()
+                .filter(|f| {
+                    f.path.extension()
+                        .and_then(|e| e.to_str())
+                        .map(|ext| audio_exts.iter().any(|ae| ae == ext))
+                        .unwrap_or(false)
+                })
+                .collect();
+            let _ = crate::fs::xspf::export_xspf_playlist(&audio_files, &path);
             Task::none()
         }
     }
