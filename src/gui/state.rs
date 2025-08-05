@@ -177,6 +177,7 @@ pub enum Message {
     ExportRightPanelAsXspf,
     ExportRightPanelAsXspfTo(PathBuf),
     ExportAndPlayRightPanelAsXspf,
+    OpenRightPanelFile(PathBuf),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

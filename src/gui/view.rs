@@ -230,7 +230,9 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)));
         }
 
-        rows.push(row.into());
+        let clickable_row = iced::widget::button(row)
+            .on_press(Message::OpenRightPanelFile(file.path.clone()));
+        rows.push(clickable_row.into());
     }
 
     let col = iced::widget::Column::new()
