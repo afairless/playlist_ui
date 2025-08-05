@@ -231,7 +231,13 @@ pub fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         }
 
         let clickable_row = iced::widget::button(row)
-            .on_press(Message::OpenRightPanelFile(file.path.clone()));
+            .on_press(Message::OpenRightPanelFile(file.path.clone()))
+            .style(|_theme, _style| iced::widget::button::Style {
+                background: None,
+                border: iced::Border::default(),
+                shadow: iced::Shadow::default(),
+                text_color: iced::Color::WHITE,
+            });
         rows.push(clickable_row.into());
     }
 
