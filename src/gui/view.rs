@@ -64,7 +64,7 @@ fn right_panel_action_row() -> iced::widget::Row<'static, Message> {
         .spacing(10)
 }
 
-fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bool, show_title: bool, show_genre: bool) -> iced::widget::Row<'static, Message> {
+fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bool, show_title: bool, show_genre: bool, column_spacing: u16) -> iced::widget::Row<'static, Message> {
 
     // Sorting arrows
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
@@ -178,6 +178,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
         );
     }
 
+    header_row = header_row.spacing(column_spacing);
     header_row
 }
 
@@ -238,7 +239,8 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
 
     let action_row = right_panel_action_row();
-    let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre);
+    let column_spacing: u16 = 16;
+    let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre, column_spacing);
 
     let mut rows = Vec::new();
     for file_ref in &displayed_files {
@@ -263,6 +265,7 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         if show_genre {
             row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)));
         }
+        row = row.spacing(column_spacing);
 
         let clickable_row = iced::widget::button(row)
             .on_press(Message::OpenRightPanelFile(file.path.clone()))
