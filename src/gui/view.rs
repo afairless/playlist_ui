@@ -243,7 +243,7 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre, column_spacing);
 
     let mut rows = Vec::new();
-    for file_ref in &displayed_files {
+    for (i, file_ref) in displayed_files.iter().enumerate() {
         let file = file_ref.clone();
 
         let dir_widget = right_panel_dir_widget(&file);
@@ -253,24 +253,32 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
             .push(dir_widget)
             .push(file_context_menu);
 
+        let row_text_size = 16;
         if show_musician {
-            row = row.push(iced::widget::text(file.musician.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+            row = row.push(iced::widget::text(file.musician.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(row_text_size));
         }
         if show_album {
-            row = row.push(iced::widget::text(file.album.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+            row = row.push(iced::widget::text(file.album.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(row_text_size));
         }
         if show_title {
-            row = row.push(iced::widget::text(file.title.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+            row = row.push(iced::widget::text(file.title.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(row_text_size));
         }
         if show_genre {
-            row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)));
+            row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(row_text_size));
         }
         row = row.spacing(column_spacing);
 
+        let pair = (i / 2) % 2;
+        let bg_color = if pair == 0 {
+            iced::Color::from_rgb(0.13, 0.13, 0.13) // darker
+        } else {
+            iced::Color::from_rgb(0.18, 0.18, 0.18) // lighter
+        };
+
         let clickable_row = iced::widget::button(row)
             .on_press(Message::OpenRightPanelFile(file.path.clone()))
-            .style(|_theme, _style| iced::widget::button::Style {
-                background: None,
+            .style(move |_theme, _style| iced::widget::button::Style {
+                background: Some(iced::Background::Color(bg_color)),
                 border: iced::Border::default(),
                 shadow: iced::Shadow::default(),
                 text_color: iced::Color::WHITE,
