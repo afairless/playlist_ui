@@ -3,9 +3,12 @@ use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
 
-fn extension_menu(app: &FileTreeApp) -> Element<Message> {
+fn create_extension_menu(app: &FileTreeApp, menu_size: u16, menu_text_color: [f32; 4]) -> Element<Message> {
+
     let header = button(
-        text(if app.extensions_menu_expanded { "▼ File Extensions" } else { "▶ File Extensions" }).size(16)
+        text(if app.extensions_menu_expanded { "▼ File Extensions" } else { "▶ File Extensions" })
+            .size(menu_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
     )
     .on_press(Message::ToggleExtensionsMenu);
 
@@ -25,16 +28,13 @@ fn extension_menu(app: &FileTreeApp) -> Element<Message> {
     }
 }
 
-fn right_panel_action_row() -> iced::widget::Row<'static, Message> {
-
-    let row_text_color = [0.0, 1.0, 1.0, 1.0];
-    let row_size = 20;
+fn right_panel_menu_row(menu_size: u16, menu_spacing: u16, menu_text_color: [f32; 4]) -> iced::widget::Row<'static, Message> {
 
     let shuffle_btn = iced::widget::button(
         iced::widget::text("Shuffle")
             .width(Length::Shrink)
-            .size(row_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(row_text_color.into()) })
+            .size(menu_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
     )
     .on_press(Message::ShuffleRightPanel)
     .width(Length::Shrink);
@@ -42,8 +42,8 @@ fn right_panel_action_row() -> iced::widget::Row<'static, Message> {
     let export_btn = iced::widget::button(
         iced::widget::text("Export as XSPF")
             .width(Length::Shrink)
-            .size(row_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(row_text_color.into()) })
+            .size(menu_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
     )
     .on_press(Message::ExportRightPanelAsXspf)
     .width(Length::Shrink);
@@ -51,8 +51,8 @@ fn right_panel_action_row() -> iced::widget::Row<'static, Message> {
     let play_btn = iced::widget::button(
         iced::widget::text("Play in VLC")
             .width(Length::Shrink)
-            .size(row_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(row_text_color.into()) })
+            .size(menu_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
     )
     .on_press(Message::ExportAndPlayRightPanelAsXspf)
     .width(Length::Shrink);
@@ -61,7 +61,7 @@ fn right_panel_action_row() -> iced::widget::Row<'static, Message> {
         .push(shuffle_btn)
         .push(export_btn)
         .push(play_btn)
-        .spacing(10)
+        .spacing(menu_spacing)
 }
 
 fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bool, show_title: bool, show_genre: bool, column_spacing: u16, header_text_size: u16) -> iced::widget::Row<'static, Message> {
@@ -228,7 +228,7 @@ fn right_panel_file_context_menu(file: &RightPanelFile, row_text_size: u16) -> E
     file_context_menu.into()
 }
 
-fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
+fn right_panel(app: &FileTreeApp, menu_size: u16, menu_spacing: u16, menu_text_color: [f32; 4]) -> iced::Element<Message> {
     let displayed_files = app.sorted_right_panel_files();
 
     // Determine which columns to show
@@ -240,7 +240,7 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let column_spacing: u16 = 14;
     let row_text_size = 14;
     let header_text_size = row_text_size + 4;
-    let action_row = right_panel_action_row();
+    let menu_row = right_panel_menu_row(menu_size, menu_spacing, menu_text_color);
     let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre, column_spacing, header_text_size);
 
     let mut rows = Vec::new();
@@ -268,6 +268,7 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
         }
         row = row.spacing(column_spacing);
 
+        // Shade alternating pairs of rows
         let pair = (i / 2) % 2;
         let bg_color = if pair == 0 {
             iced::Color::from_rgb(0.13, 0.13, 0.13) // darker
@@ -288,7 +289,7 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     }
 
     let col = iced::widget::Column::new()
-        .push(action_row)
+        .push(menu_row)
         .push(Space::with_height(10))
         .push(header_row)
         .push(Scrollable::new(iced::widget::column(rows)));
@@ -355,14 +356,20 @@ fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
 
-    let add_dir_btn = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+    let menu_size = 20;
+    let menu_spacing = 10;
+    let menu_text_color = [0.0, 1.0, 1.0, 1.0];
+    let directory_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
         iced::widget::text("Add Directory")
+            .size(menu_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
     )
     .on_press(Message::AddDirectory);
 
-    let add_dir_row = iced::widget::row![add_dir_btn];
+    let extension_menu = create_extension_menu(app, menu_size, menu_text_color);
 
-    let ext_menu = extension_menu(app);
+    let menu_row = iced::widget::row![directory_button, extension_menu].spacing(menu_spacing);
+
 
     let mut trees = column![];
     for (i, node_opt) in app.root_nodes.iter().enumerate() {
@@ -391,9 +398,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     }
 
     let left_content = column![
-        add_dir_row,
-        Space::with_height(10),
-        ext_menu,
+        menu_row,
         Space::with_height(10),
         trees
     ];
@@ -406,7 +411,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .into();
 
     let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
-            right_panel(app)
+            right_panel(app, menu_size, menu_spacing, menu_text_color)
         )
         .width(Length::FillPortion(2))
         .into();
