@@ -3,7 +3,27 @@ use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
 
+
+struct AudioColumnToggles {
+    show_musician: bool,
+    show_album: bool,
+    show_title: bool,
+    show_genre: bool,
+}
+
+
+#[derive(Debug, Clone, Copy)]
+struct MenuStyle {
+    text_size: u16,
+    spacing: u16,
+    text_color: [f32; 4],
+}
+
+
 fn create_extension_menu(app: &FileTreeApp, menu_size: u16, menu_text_color: [f32; 4]) -> Element<Message> {
+    // Creates the file extension filter menu for the left panel, including a styled header button
+    //     that toggles the menu and a list of extension toggle buttons. The menu appearance is controlled
+    //     by the given text size and color.
 
     let header = button(
         text(if app.extensions_menu_expanded { "▼ File Extensions" } else { "▶ File Extensions" })
@@ -28,31 +48,144 @@ fn create_extension_menu(app: &FileTreeApp, menu_size: u16, menu_text_color: [f3
     }
 }
 
-fn right_panel_menu_row(menu_size: u16, menu_spacing: u16, menu_text_color: [f32; 4]) -> iced::widget::Row<'static, Message> {
+
+fn create_left_panel_menu_row(app: &FileTreeApp, menu_style: MenuStyle) -> Element<Message> {
+    // Constructs the left panel's menu row containing the "Add Directory" button and the file extension menu,
+    //     applying the specified text size, spacing, and color styling to both buttons.
+
+    let directory_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+        iced::widget::text("Add Directory")
+            .size(menu_style.text_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
+    )
+    .on_press(Message::AddDirectory);
+
+    let extension_menu = create_extension_menu(app, menu_style.text_size, menu_style.text_color);
+
+    iced::widget::row![directory_button, extension_menu].spacing(menu_style.spacing).into()
+}
+
+
+fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_size: u16) -> Element<Message> {
+    //  Recursively renders a file tree node (directory or file) with indentation based on depth,  
+    //      including context menus for directory and file actions.
+
+    let indent = "  ".repeat(depth);
+
+    let mut content = column![];
+
+    match node.node_type {
+        NodeType::Directory => {
+            let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+            let dir_path = node.path.clone();
+
+            let dir_row = row![
+                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name)).size(directory_row_size)
+            ];
+
+            let context_menu = ContextMenu::new(
+                button(dir_row)
+                    .on_press(Message::ToggleExpansion(node.path.clone())),
+                move || {
+                    column![
+                        button("Add all files to right panel")
+                            .on_press(Message::AddDirectoryToRightPanel(dir_path.clone()))
+                    ]
+                    .into()
+                },
+            );
+            content = content.push(context_menu);
+
+            if node.is_expanded {
+                for child in &node.children {
+                    content = content.push(render_node(child, depth + 1, directory_row_size, file_row_size));
+                }
+            }
+        }
+        NodeType::File => {
+            let file_row = text(format!("{} 📄 {}", indent, node.name)).size(file_row_size);
+
+            // Wrap the file row in a context menu for right-click
+            let file_path = node.path.clone();
+            let context_menu = ContextMenu::new(
+                button(file_row),
+                move || {
+                    column![
+                        button("Add to right panel")
+                            .on_press(Message::AddToRightPanel(file_path.clone()))
+                    ]
+                    .into()
+                },
+            );
+
+            content = content.push(context_menu);
+        }
+    }
+
+    content.into()
+}
+
+
+fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, directory_name_text_size: u16, directory_row_size: u16, file_row_size: u16) -> iced::widget::Column<'_, Message> {
+    // Builds the column of directory trees for the left panel, including directory headers and file trees,
+    //     with configurable spacing between rows and directory name text size.
+
+    let mut trees = column![];
+    for (i, node_opt) in app.root_nodes.iter().enumerate() {
+        let directory_name = if let Some(p) = app.top_dirs.get(i) {
+            if let Some(name) = p.file_name().and_then(|os_str| os_str.to_str()) {
+                name.to_string()
+            } else {
+                p.display().to_string()
+            }
+        } else {
+            String::new()
+        };
+        let directory_label = text(directory_name.to_string()).size(directory_name_text_size);
+
+        let remove_button = button(text("Remove"))
+            .on_press(Message::RemoveTopDir(app.top_dirs[i].clone()));
+
+        let header_row = row![directory_label, remove_button];
+
+        if let Some(node) = node_opt {
+            trees = trees.push(column![header_row, render_node(node, 0, directory_row_size, file_row_size)]);
+        } else {
+            trees = trees.push(column![header_row, text("No files found")]);
+        }
+        trees = trees.push(Space::with_height(tree_row_height));
+    }
+    trees
+}
+
+
+fn create_right_panel_menu_row(menu_style: MenuStyle) -> Element<'static, Message> {
+    //  Creates the right panel's menu row with "Shuffle", "Export to XSPF", and "Play in VLC" buttons,
+    //      applying the specified text size, spacing, and color styling to each button.
 
     let shuffle_btn = iced::widget::button(
         iced::widget::text("Shuffle")
             .width(Length::Shrink)
-            .size(menu_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
+            .size(menu_style.text_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
     )
     .on_press(Message::ShuffleRightPanel)
     .width(Length::Shrink);
 
     let export_btn = iced::widget::button(
-        iced::widget::text("Export as XSPF")
+        iced::widget::text("Export to XSPF")
             .width(Length::Shrink)
-            .size(menu_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
+            .size(menu_style.text_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
     )
     .on_press(Message::ExportRightPanelAsXspf)
     .width(Length::Shrink);
 
     let play_btn = iced::widget::button(
-        iced::widget::text("Play in VLC")
+        iced::widget::text("Play")
             .width(Length::Shrink)
-            .size(menu_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
+            .size(menu_style.text_size)
+            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
     )
     .on_press(Message::ExportAndPlayRightPanelAsXspf)
     .width(Length::Shrink);
@@ -61,10 +194,14 @@ fn right_panel_menu_row(menu_size: u16, menu_spacing: u16, menu_text_color: [f32
         .push(shuffle_btn)
         .push(export_btn)
         .push(play_btn)
-        .spacing(menu_spacing)
+        .spacing(menu_style.spacing).into()
 }
 
-fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bool, show_title: bool, show_genre: bool, column_spacing: u16, header_text_size: u16) -> iced::widget::Row<'static, Message> {
+
+fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnToggles, column_spacing: u16, header_text_size: u16, header_text_color: [f32; 4]) -> iced::widget::Row<'static, Message> {
+    //  Builds the header row for the right panel table, including sortable column buttons for  
+    //      directory, file, and optionally musician, album, title, and genre. Column spacing and  
+    //      text size are configurable via parameters.
 
     // Sorting arrows
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
@@ -79,32 +216,30 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             SortOrder::Asc => " ↓",
         }
     } else { "" };
-    let musician_arrow = if show_musician && app.right_panel_sort_column == SortColumn::Musician {
+    let musician_arrow = if audio_column_toggles.show_musician && app.right_panel_sort_column == SortColumn::Musician {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
     } else { "" };
-    let album_arrow = if show_album && app.right_panel_sort_column == SortColumn::Album {
+    let album_arrow = if audio_column_toggles.show_album && app.right_panel_sort_column == SortColumn::Album {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
     } else { "" };
-    let title_arrow = if show_title && app.right_panel_sort_column == SortColumn::Title {
+    let title_arrow = if audio_column_toggles.show_title && app.right_panel_sort_column == SortColumn::Title {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
     } else { "" };
-    let genre_arrow = if show_genre && app.right_panel_sort_column == SortColumn::Genre {
+    let genre_arrow = if audio_column_toggles.show_genre && app.right_panel_sort_column == SortColumn::Genre {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
     } else { "" };
-
-    let header_text_color = [1.0, 1.0, 0.0, 1.0];
 
     let mut header_row = iced::widget::Row::new()
         .push(
@@ -128,7 +263,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             .width(Length::FillPortion(1))
         );
 
-    if show_musician {
+    if audio_column_toggles.show_musician {
         header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Musician{musician_arrow}"))
@@ -140,7 +275,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             .width(Length::FillPortion(1))
         );
     }
-    if show_album {
+    if audio_column_toggles.show_album {
         header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Album{album_arrow}"))
@@ -152,7 +287,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             .width(Length::FillPortion(1))
         );
     }
-    if show_title {
+    if audio_column_toggles.show_title {
         header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Title{title_arrow}"))
@@ -164,7 +299,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             .width(Length::FillPortion(1))
         );
     }
-    if show_genre {
+    if audio_column_toggles.show_genre {
         header_row = header_row.push(
             iced::widget::button(
                 iced::widget::text(format!("Genre{genre_arrow}"))
@@ -181,7 +316,10 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
     header_row
 }
 
-fn right_panel_dir_widget(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
+
+fn create_right_panel_dir_widget(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
+    //  Creates the directory cell widget for a right panel row, displaying the parent directory  
+    //      name with the specified text size and providing a context menu for directory actions.
 
     let dirname = file.path.parent()
         .and_then(|p| p.file_name())
@@ -208,7 +346,10 @@ fn right_panel_dir_widget(file: &RightPanelFile, row_text_size: u16) -> Element<
     dir_widget.into()
 }
 
-fn right_panel_file_context_menu(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
+
+fn create_right_panel_file_context_menu(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
+    //  Creates the file cell widget for a right panel row, displaying the file name with the  
+    //      specified text size and providing a context menu for file-specific actions.
 
     let filename = file.path.file_name()
         .map(|f| f.to_string_lossy().to_string())
@@ -228,7 +369,11 @@ fn right_panel_file_context_menu(file: &RightPanelFile, row_text_size: u16) -> E
     file_context_menu.into()
 }
 
-fn right_panel(app: &FileTreeApp, menu_size: u16, menu_spacing: u16, menu_text_color: [f32; 4]) -> iced::Element<Message> {
+
+fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, column_row_spacing: u16, column_height_spacing: u16, row_text_size: u16, header_text_color: [f32; 4]) -> Element<Message> {
+    //  Assembles the entire right panel, including the menu row, header row, and all file rows,  
+    //      applying the specified menu size, spacing, and text color to controls and table content.
+
     let displayed_files = app.sorted_right_panel_files();
 
     // Determine which columns to show
@@ -237,18 +382,24 @@ fn right_panel(app: &FileTreeApp, menu_size: u16, menu_spacing: u16, menu_text_c
     let show_title    = displayed_files.iter().any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
     let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
 
-    let column_spacing: u16 = 14;
-    let row_text_size = 14;
+    let audio_column_toggles = AudioColumnToggles {
+        show_musician,
+        show_album,
+        show_title,
+        show_genre,
+    };
+
     let header_text_size = row_text_size + 4;
-    let menu_row = right_panel_menu_row(menu_size, menu_spacing, menu_text_color);
-    let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre, column_spacing, header_text_size);
+    let menu_row = create_right_panel_menu_row(menu_style);
+
+    let header_row = right_panel_header_row(app, audio_column_toggles, column_row_spacing, header_text_size, header_text_color);
 
     let mut rows = Vec::new();
     for (i, file_ref) in displayed_files.iter().enumerate() {
         let file = file_ref.clone();
 
-        let dir_widget = right_panel_dir_widget(&file, row_text_size);
-        let file_context_menu = right_panel_file_context_menu(&file, row_text_size);
+        let dir_widget = create_right_panel_dir_widget(&file, row_text_size);
+        let file_context_menu = create_right_panel_file_context_menu(&file, row_text_size);
 
         let mut row = iced::widget::Row::new()
             .push(dir_widget)
@@ -266,7 +417,7 @@ fn right_panel(app: &FileTreeApp, menu_size: u16, menu_spacing: u16, menu_text_c
         if show_genre {
             row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(row_text_size));
         }
-        row = row.spacing(column_spacing);
+        row = row.spacing(column_row_spacing);
 
         // Shade alternating pairs of rows
         let pair = (i / 2) % 2;
@@ -289,116 +440,36 @@ fn right_panel(app: &FileTreeApp, menu_size: u16, menu_spacing: u16, menu_text_c
     }
 
     let col = iced::widget::Column::new()
+        .push(Space::with_height(column_height_spacing))
         .push(menu_row)
-        .push(Space::with_height(10))
+        .push(Space::with_height(column_height_spacing))
         .push(header_row)
         .push(Scrollable::new(iced::widget::column(rows)));
 
     col.into()
 }
 
-fn render_node(node: &FileNode, depth: usize) -> Element<Message> {
-    let indent = "  ".repeat(depth);
-
-    let mut content = column![];
-
-    match node.node_type {
-        NodeType::Directory => {
-            let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
-            let dir_path = node.path.clone();
-
-            let dir_row = row![
-                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
-                    .size(14)
-            ];
-
-            let context_menu = ContextMenu::new(
-                button(dir_row)
-                    .on_press(Message::ToggleExpansion(node.path.clone())),
-                move || {
-                    column![
-                        button("Add all files to right panel")
-                            .on_press(Message::AddDirectoryToRightPanel(dir_path.clone()))
-                    ]
-                    .into()
-                },
-            );
-            content = content.push(context_menu);
-
-            if node.is_expanded {
-                for child in &node.children {
-                    content = content.push(render_node(child, depth + 1));
-                }
-            }
-        }
-        NodeType::File => {
-            let file_row = text(format!("{} 📄 {}", indent, node.name)).size(14);
-
-            // Wrap the file row in a context menu for right-click
-            let file_path = node.path.clone();
-            let context_menu = ContextMenu::new(
-                button(file_row),
-                move || {
-                    column![
-                        button("Add to right panel")
-                            .on_press(Message::AddToRightPanel(file_path.clone()))
-                    ]
-                    .into()
-                },
-            );
-
-            content = content.push(context_menu);
-        }
-    }
-
-    content.into()
-}
 
 pub fn view(app: &FileTreeApp) -> Element<Message> {
+    //  Composes the entire application UI, including the left and right panels, menus, and file trees,  
+    //      using the current application state to determine layout and content.
 
-    let menu_size = 20;
-    let menu_spacing = 10;
-    let menu_text_color = [0.0, 1.0, 1.0, 1.0];
-    let directory_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-        iced::widget::text("Add Directory")
-            .size(menu_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
-    )
-    .on_press(Message::AddDirectory);
+    let menu_style = MenuStyle {
+        text_size: 20,
+        spacing: 10,
+        text_color: [0.0, 1.0, 1.0, 1.0],
+    };
 
-    let extension_menu = create_extension_menu(app, menu_size, menu_text_color);
+    let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
 
-    let menu_row = iced::widget::row![directory_button, extension_menu].spacing(menu_spacing);
-
-
-    let mut trees = column![];
-    for (i, node_opt) in app.root_nodes.iter().enumerate() {
-        let dir_name = if let Some(p) = app.top_dirs.get(i) {
-            if let Some(name) = p.file_name().and_then(|os_str| os_str.to_str()) {
-                name.to_string()
-            } else {
-                p.display().to_string()
-            }
-        } else {
-            String::new()
-        };
-        let dir_label = text(dir_name.to_string()).size(16);
-
-        let remove_btn = button(text("Remove"))
-            .on_press(Message::RemoveTopDir(app.top_dirs[i].clone()));
-
-        let header_row = row![dir_label, remove_btn];
-
-        if let Some(node) = node_opt {
-            trees = trees.push(column![header_row, render_node(node, 0)]);
-        } else {
-            trees = trees.push(column![header_row, text("No files found")]);
-        }
-        trees = trees.push(Space::with_height(10));
-    }
+    let tree_row_height = 10;
+    let directory_name_text_size = 16;
+    let directory_row_size = 14;
+    let file_row_size = 14;
+    let trees = create_left_panel_file_trees(app, tree_row_height, directory_name_text_size, directory_row_size, file_row_size);
 
     let left_content = column![
-        menu_row,
+        left_panel_menu_row,
         Space::with_height(10),
         trees
     ];
@@ -410,8 +481,12 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .padding(10)
         .into();
 
+    let column_row_spacing = 14;
+    let column_height_spacing = 10;
+    let row_text_size = 14;
+    let header_text_color = [1.0, 1.0, 0.0, 1.0];
     let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
-            right_panel(app, menu_size, menu_spacing, menu_text_color)
+            create_right_panel(app, menu_style, column_row_spacing, column_height_spacing, row_text_size, header_text_color)
         )
         .width(Length::FillPortion(2))
         .into();
@@ -1754,7 +1829,8 @@ mod iced_tests {
                 PathBuf::from("/test.txt")
             );
             
-            let _element = render_node(&file_node, 0);
+            let row_size = 12;
+            let _element = render_node(&file_node, 0, row_size, row_size);
             
             // Test passes if render_node() doesn't panic
         }
@@ -1767,7 +1843,8 @@ mod iced_tests {
                 vec![]
             );
             
-            let _element = render_node(&dir_node, 1);
+            let row_size = 12;
+            let _element = render_node(&dir_node, 1, row_size, row_size);
             
             // Test passes if render_node() doesn't panic
         }
