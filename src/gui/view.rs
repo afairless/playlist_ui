@@ -64,7 +64,7 @@ fn right_panel_action_row() -> iced::widget::Row<'static, Message> {
         .spacing(10)
 }
 
-fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bool, show_title: bool, show_genre: bool, column_spacing: u16) -> iced::widget::Row<'static, Message> {
+fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bool, show_title: bool, show_genre: bool, column_spacing: u16, header_text_size: u16) -> iced::widget::Row<'static, Message> {
 
     // Sorting arrows
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
@@ -105,14 +105,13 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
     } else { "" };
 
     let header_text_color = [1.0, 1.0, 0.0, 1.0];
-    let header_size = 20;
 
     let mut header_row = iced::widget::Row::new()
         .push(
             iced::widget::button(
                 iced::widget::text(format!("Directory{dir_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(header_size)
+                    .size(header_text_size)
                     .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByDirectory)
@@ -122,7 +121,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             iced::widget::button(
                 iced::widget::text(format!("File{file_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(header_size)
+                    .size(header_text_size)
                     .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByFile)
@@ -134,7 +133,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             iced::widget::button(
                 iced::widget::text(format!("Musician{musician_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(header_size)
+                    .size(header_text_size)
                     .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByMusician)
@@ -146,7 +145,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             iced::widget::button(
                 iced::widget::text(format!("Album{album_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(header_size)
+                    .size(header_text_size)
                     .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByAlbum)
@@ -158,7 +157,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             iced::widget::button(
                 iced::widget::text(format!("Title{title_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(header_size)
+                    .size(header_text_size)
                     .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByTitle)
@@ -170,7 +169,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
             iced::widget::button(
                 iced::widget::text(format!("Genre{genre_arrow}"))
                     .width(Length::FillPortion(1))
-                    .size(header_size)
+                    .size(header_text_size)
                     .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByGenre)
@@ -182,7 +181,7 @@ fn right_panel_header_row(app: &FileTreeApp, show_musician: bool, show_album: bo
     header_row
 }
 
-fn right_panel_dir_widget(file: &RightPanelFile) -> Element<'static, Message> {
+fn right_panel_dir_widget(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
 
     let dirname = file.path.parent()
         .and_then(|p| p.file_name())
@@ -192,7 +191,7 @@ fn right_panel_dir_widget(file: &RightPanelFile) -> Element<'static, Message> {
     let dir_widget = if let Some(path) = dir_path {
         let dir_path = path.clone();
         iced_aw::widgets::ContextMenu::new(
-            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
+            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)).size(row_text_size),
             Box::new(move || {
                 iced::widget::column![
                     iced::widget::button("Delete All in Directory")
@@ -202,20 +201,20 @@ fn right_panel_dir_widget(file: &RightPanelFile) -> Element<'static, Message> {
         )
     } else {
         iced_aw::widgets::ContextMenu::new(
-            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)),
+            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)).size(row_text_size),
             Box::new(|| iced::widget::column![].into()) as Box<dyn Fn() -> iced::Element<'static, Message>>
         )
     };
     dir_widget.into()
 }
 
-fn right_panel_file_context_menu(file: &RightPanelFile) -> Element<'static, Message> {
+fn right_panel_file_context_menu(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
 
     let filename = file.path.file_name()
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_default();
     let file_context_menu = iced_aw::widgets::ContextMenu::new(
-        iced::widget::text(filename.clone()).width(Length::FillPortion(1)),
+        iced::widget::text(filename.clone()).width(Length::FillPortion(1)).size(row_text_size),
         {
             let file_path = file.path.clone();
             Box::new(move || {
@@ -238,22 +237,23 @@ fn right_panel(app: &FileTreeApp) -> iced::Element<Message> {
     let show_title    = displayed_files.iter().any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
     let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
 
+    let column_spacing: u16 = 14;
+    let row_text_size = 14;
+    let header_text_size = row_text_size + 4;
     let action_row = right_panel_action_row();
-    let column_spacing: u16 = 16;
-    let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre, column_spacing);
+    let header_row = right_panel_header_row(app, show_musician, show_album, show_title, show_genre, column_spacing, header_text_size);
 
     let mut rows = Vec::new();
     for (i, file_ref) in displayed_files.iter().enumerate() {
         let file = file_ref.clone();
 
-        let dir_widget = right_panel_dir_widget(&file);
-        let file_context_menu = right_panel_file_context_menu(&file);
+        let dir_widget = right_panel_dir_widget(&file, row_text_size);
+        let file_context_menu = right_panel_file_context_menu(&file, row_text_size);
 
         let mut row = iced::widget::Row::new()
             .push(dir_widget)
             .push(file_context_menu);
 
-        let row_text_size = 16;
         if show_musician {
             row = row.push(iced::widget::text(file.musician.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(row_text_size));
         }
