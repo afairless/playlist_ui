@@ -139,8 +139,7 @@ fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, remove_
 
         // Remove button (narrow column)
         let remove_button = button(
-                text("X")
-                    .size(directory_row_size)
+                text("X").size(directory_row_size)
             )
             .width(remove_button_width - gap_width)
             .on_press(Message::RemoveTopDir(dir_path.clone()));
@@ -154,9 +153,9 @@ fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, remove_
 
         // Row: [X][directory tree]
         let row = row![
-            remove_button,
+            content,
             Space::with_width(gap_width),
-            content
+            remove_button,
         ]
         .align_y(iced::Alignment::Start);
 
