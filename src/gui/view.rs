@@ -126,33 +126,41 @@ fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_
 }
 
 
-fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, directory_name_text_size: u16, directory_row_size: u16, file_row_size: u16) -> iced::widget::Column<'_, Message> {
+fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, remove_button_width: u16, directory_row_size: u16, file_row_size: u16) -> iced::widget::Column<'_, Message> {
     // Builds the column of directory trees for the left panel, including directory headers and file trees,
     //     with configurable spacing between rows and directory name text size.
 
+    let gap_width = remove_button_width / 4;
+
     let mut trees = column![];
     for (i, node_opt) in app.root_nodes.iter().enumerate() {
-        let directory_name = if let Some(p) = app.top_dirs.get(i) {
-            if let Some(name) = p.file_name().and_then(|os_str| os_str.to_str()) {
-                name.to_string()
-            } else {
-                p.display().to_string()
-            }
+
+        let dir_path = app.top_dirs.get(i).cloned().unwrap_or_default();
+
+        // Remove button (narrow column)
+        let remove_button = button(
+                text("X")
+                    .size(directory_row_size)
+            )
+            .width(remove_button_width - gap_width)
+            .on_press(Message::RemoveTopDir(dir_path.clone()));
+
+        let content = if let Some(node) = node_opt {
+            // Directory tree
+            render_node(node, 0, directory_row_size, file_row_size)
         } else {
-            String::new()
+            text("No files found").into()
         };
-        let directory_label = text(directory_name.to_string()).size(directory_name_text_size);
 
-        let remove_button = button(text("Remove"))
-            .on_press(Message::RemoveTopDir(app.top_dirs[i].clone()));
+        // Row: [X][directory tree]
+        let row = row![
+            remove_button,
+            Space::with_width(gap_width),
+            content
+        ]
+        .align_y(iced::Alignment::Start);
 
-        let header_row = row![directory_label, remove_button];
-
-        if let Some(node) = node_opt {
-            trees = trees.push(column![header_row, render_node(node, 0, directory_row_size, file_row_size)]);
-        } else {
-            trees = trees.push(column![header_row, text("No files found")]);
-        }
+        trees = trees.push(row);
         trees = trees.push(Space::with_height(tree_row_height));
     }
     trees
@@ -463,10 +471,10 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
 
     let tree_row_height = 10;
-    let directory_name_text_size = 16;
-    let directory_row_size = 14;
+    let remove_button_width = 40;
+    let directory_row_size = 16;
     let file_row_size = 14;
-    let trees = create_left_panel_file_trees(app, tree_row_height, directory_name_text_size, directory_row_size, file_row_size);
+    let trees = create_left_panel_file_trees(app, tree_row_height, remove_button_width, directory_row_size, file_row_size);
 
     let left_content = column![
         left_panel_menu_row,
@@ -488,7 +496,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
             create_right_panel(app, menu_style, column_row_spacing, column_height_spacing, row_text_size, header_text_color)
         )
-        .width(Length::FillPortion(2))
+        .width(Length::FillPortion(3))
         .into();
 
     let split_row = row![
