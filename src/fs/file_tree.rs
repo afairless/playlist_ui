@@ -1,11 +1,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+
 #[derive(Debug, Clone)]
 pub enum NodeType {
     File,
     Directory,
 }
+
 
 #[derive(Debug, Clone)]
 pub struct FileNode {
@@ -15,6 +17,7 @@ pub struct FileNode {
     pub children: Vec<FileNode>,
     pub is_expanded: bool,
 }
+
 
 impl FileNode {
     pub fn new_file(name: String, path: PathBuf) -> Self {
@@ -38,6 +41,7 @@ impl FileNode {
     }
 }
 
+
 pub fn scan_directory(
     dir: &Path,
     allowed_extensions: &[&str],
@@ -45,6 +49,9 @@ pub fn scan_directory(
     scan_directory_with_expansion(dir, allowed_extensions, true)
 }
 
+
+/// Recursively scans a directory for files matching the allowed extensions,
+///     building a tree of `FileNode` objects and marking the root node as expanded if specified.
 fn scan_directory_with_expansion(
     dir: &Path,
     allowed_extensions: &[&str],

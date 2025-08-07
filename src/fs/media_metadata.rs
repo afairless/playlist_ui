@@ -18,6 +18,9 @@ pub struct MediaMetadata {
     pub annotation: Option<String>,
 }
 
+/// Extracts media metadata from the given file path using the `lofty` crate,
+///     returning information such as artist, album, title, genre, track number,
+///     duration, album art URI, identifier, and annotation if available.
 pub fn extract_media_metadata(path: &PathBuf) -> MediaMetadata {
     match read_from_path(path) {
         Ok(tagged_file) => {

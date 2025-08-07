@@ -6,6 +6,9 @@ use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
 use crate::fs::media_metadata::extract_media_metadata;
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
  
+ 
+/// Restores the expansion state of a file tree node and its descendants based on the
+///     provided set of expanded directory paths.
 pub fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<PathBuf>) {
     node.is_expanded = expanded_dirs.contains(&node.path);
     for child in &mut node.children {
@@ -13,6 +16,9 @@ pub fn restore_expansion_state(node: &mut FileNode, expanded_dirs: &HashSet<Path
     }
 }
 
+
+/// Recursively collects all file paths from the given file tree node and its descendants,
+///     appending them to the provided vector.
 fn collect_files_recursively(node: &FileNode, files: &mut Vec<PathBuf>) {
     match node.node_type {
         NodeType::File => files.push(node.path.clone()),
@@ -24,6 +30,9 @@ fn collect_files_recursively(node: &FileNode, files: &mut Vec<PathBuf>) {
     }
 }
 
+
+/// Recursively searches for a node in the file tree with the specified path,
+///     returning a reference to the node if found.
 fn find_node_by_path<'a>(node: &'a FileNode, path: &PathBuf) -> Option<&'a FileNode> {
     if &node.path == path {
         return Some(node);
@@ -36,6 +45,9 @@ fn find_node_by_path<'a>(node: &'a FileNode, path: &PathBuf) -> Option<&'a FileN
     None
 }
 
+
+/// Handles all application state updates in response to user actions or messages,
+///     modifying the `FileTreeApp` state and returning an optional asynchronous task.
 pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
     match message {
         Message::ToggleExpansion(path) => {
