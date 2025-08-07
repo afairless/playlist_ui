@@ -192,6 +192,28 @@ fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, remove_
 }
 
 
+fn create_totals_display(displayed_files: &[RightPanelFile], menu_style: MenuStyle) -> Element<'static, Message> {
+    // Creates a widget displaying the total number of items and the sum of durations
+    //      for all files shown in the right panel.
+
+    let total_duration_ms: u64 = displayed_files
+        .iter()
+        .filter_map(|f| f.duration_ms)
+        .sum();
+    let row_count = displayed_files.len();
+    let total_duration_str = format!(
+        " {} Item{}, Time: {}",
+        row_count,
+        if row_count == 1 { "" } else { "s" },
+        format_duration(Some(total_duration_ms)),
+    );
+    iced::widget::text(total_duration_str)
+        .size(menu_style.text_size)
+        .style(move |_theme| iced::widget::text::Style { color: Some([1.0, 1.0, 1.0, 1.0].into()) })
+        .into()
+}
+
+
 fn create_right_panel_menu_row(
     menu_style: MenuStyle,
     extra_widget: Option<Element<'static, Message>>,
@@ -451,24 +473,10 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, column_row_spaci
         show_duration,
     };
 
-    let total_duration_ms: u64 = displayed_files
-        .iter()
-        .filter_map(|f| f.duration_ms)
-        .sum();
-    let row_count = displayed_files.len();
-    let total_duration_str = format!(
-        " {} Item{}, Time: {}",
-        row_count,
-        if row_count == 1 { "" } else { "s" },
-        format_duration(Some(total_duration_ms)),
-    );
-    let total_duration_widget = iced::widget::text(total_duration_str)
-        .size(menu_style.text_size)
-        .style(move |_theme| iced::widget::text::Style { color: Some([1.0, 1.0, 1.0, 1.0].into()) })
-        .into();
 
+    let totals_display = create_totals_display(&displayed_files, menu_style);
     let header_text_size = row_text_size + 4;
-    let menu_row = create_right_panel_menu_row(menu_style, Some(total_duration_widget));
+    let menu_row = create_right_panel_menu_row(menu_style, Some(totals_display));
 
     let header_row = right_panel_header_row(app, audio_column_toggles, column_row_spacing, header_text_size, header_text_color);
 
