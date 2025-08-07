@@ -455,7 +455,13 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, column_row_spaci
         .iter()
         .filter_map(|f| f.duration_ms)
         .sum();
-    let total_duration_str = format!("Total: {}", format_duration(Some(total_duration_ms)));
+    let row_count = displayed_files.len();
+    let total_duration_str = format!(
+        " {} Item{}, Time: {}",
+        row_count,
+        if row_count == 1 { "" } else { "s" },
+        format_duration(Some(total_duration_ms)),
+    );
     let total_duration_widget = iced::widget::text(total_duration_str)
         .size(menu_style.text_size)
         .style(move |_theme| iced::widget::text::Style { color: Some([1.0, 1.0, 1.0, 1.0].into()) })
