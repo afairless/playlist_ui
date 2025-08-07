@@ -192,7 +192,10 @@ fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, remove_
 }
 
 
-fn create_right_panel_menu_row(menu_style: MenuStyle) -> Element<'static, Message> {
+fn create_right_panel_menu_row(
+    menu_style: MenuStyle,
+    extra_widget: Option<Element<'static, Message>>,
+) -> Element<'static, Message> {
     //  Creates the right panel's menu row with "Shuffle", "Export to XSPF", and "Play in VLC" buttons,
     //      applying the specified text size, spacing, and color styling to each button.
 
@@ -223,11 +226,17 @@ fn create_right_panel_menu_row(menu_style: MenuStyle) -> Element<'static, Messag
     .on_press(Message::ExportAndPlayRightPanelAsXspf)
     .width(Length::Shrink);
 
-    iced::widget::Row::new()
+    let mut row = iced::widget::Row::new()
         .push(shuffle_btn)
         .push(export_btn)
         .push(play_btn)
-        .spacing(menu_style.spacing).into()
+        .spacing(menu_style.spacing);
+
+    if let Some(widget) = extra_widget {
+        row = row.push(Space::with_width(Length::Fill)).push(widget);
+    }
+
+    row.into()
 }
 
 
@@ -442,8 +451,18 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, column_row_spaci
         show_duration,
     };
 
+    let total_duration_ms: u64 = displayed_files
+        .iter()
+        .filter_map(|f| f.duration_ms)
+        .sum();
+    let total_duration_str = format!("Total: {}", format_duration(Some(total_duration_ms)));
+    let total_duration_widget = iced::widget::text(total_duration_str)
+        .size(menu_style.text_size)
+        .style(move |_theme| iced::widget::text::Style { color: Some([1.0, 1.0, 1.0, 1.0].into()) })
+        .into();
+
     let header_text_size = row_text_size + 4;
-    let menu_row = create_right_panel_menu_row(menu_style);
+    let menu_row = create_right_panel_menu_row(menu_style, Some(total_duration_widget));
 
     let header_row = right_panel_header_row(app, audio_column_toggles, column_row_spacing, header_text_size, header_text_color);
 
