@@ -66,7 +66,10 @@ fn create_left_panel_menu_row(app: &FileTreeApp, menu_style: MenuStyle) -> Eleme
 }
 
 
-fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_size: u16) -> Element<Message> {
+fn render_node(
+    node: &FileNode, depth: usize, directory_row_size: u16, file_row_size: u16, 
+    flat_button_style: impl Fn(&iced::Theme, iced::widget::button::Status) -> iced::widget::button::Style + Copy + 'static,
+    ) -> Element<Message> {
     //  Recursively renders a file tree node (directory or file) with indentation based on depth,  
     //      including context menus for directory and file actions.
 
@@ -79,9 +82,12 @@ fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_
             let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
             let dir_path = node.path.clone();
 
-            let dir_row = row![
+            let dir_label = container(
                 text(format!("{}{} 📁 {}", indent, expand_symbol, node.name)).size(directory_row_size)
-            ];
+            ).width(Length::Fill);
+
+            let dir_row = row![dir_label];
+
 
             let context_menu = ContextMenu::new(
                 button(dir_row)
@@ -109,7 +115,7 @@ fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_
                 });
                 for &i in &indices {
                     let child = &node.children[i];
-                    content = content.push(render_node(child, depth + 1, directory_row_size, file_row_size));
+                    content = content.push(render_node(child, depth + 1, directory_row_size, file_row_size, flat_button_style));
                 }
             }
         }
@@ -117,8 +123,9 @@ fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_
             let file_row = text(format!("{} 📄 {}", indent, node.name)).size(file_row_size);
 
             let file_path = node.path.clone();
+
             let context_menu = ContextMenu::new(
-                button(file_row),
+                button(file_row).style(flat_button_style),
                 move || {
                     column![
                         button("Add to right panel")
@@ -140,6 +147,13 @@ fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, remove_
     // Builds the column of directory trees for the left panel, including directory headers and file trees,
     //     with configurable spacing between rows and directory name text size.
 
+    let flat_button_style = |_theme: &iced::Theme, _status: iced::widget::button::Status| iced::widget::button::Style {
+        background: None,
+        border: iced::Border::default(),
+        shadow: iced::Shadow::default(),
+        text_color: iced::Color::WHITE,
+    };
+
     let gap_width = remove_button_width / 4;
 
     let mut trees = column![];
@@ -156,7 +170,7 @@ fn create_left_panel_file_trees(app: &FileTreeApp, tree_row_height: u16, remove_
 
         let content = if let Some(node) = node_opt {
             // Directory tree
-            render_node(node, 0, directory_row_size, file_row_size)
+            render_node(node, 0, directory_row_size, file_row_size, flat_button_style)
         } else {
             text("No files found").into()
         };
@@ -1841,19 +1855,34 @@ mod iced_tests {
 
         #[test]
         fn test_render_node_file() {
+
+            let flat_button_style = |_theme: &iced::Theme, _status: iced::widget::button::Status| iced::widget::button::Style {
+                background: None,
+                border: iced::Border::default(),
+                shadow: iced::Shadow::default(),
+                text_color: iced::Color::WHITE,
+            };
+
             let file_node = FileNode::new_file(
                 "test.txt".to_string(),
                 PathBuf::from("/test.txt")
             );
             
             let row_size = 12;
-            let _element = render_node(&file_node, 0, row_size, row_size);
-            
+            let _element = render_node(&file_node, 0, row_size, row_size, flat_button_style);
             // Test passes if render_node() doesn't panic
         }
 
         #[test]
         fn test_render_node_directory() {
+
+            let flat_button_style = |_theme: &iced::Theme, _status: iced::widget::button::Status| iced::widget::button::Style {
+                background: None,
+                border: iced::Border::default(),
+                shadow: iced::Shadow::default(),
+                text_color: iced::Color::WHITE,
+            };
+
             let dir_node = FileNode::new_directory(
                 "testdir".to_string(),
                 PathBuf::from("/testdir"),
@@ -1861,8 +1890,7 @@ mod iced_tests {
             );
             
             let row_size = 12;
-            let _element = render_node(&dir_node, 1, row_size, row_size);
-            
+            let _element = render_node(&dir_node, 1, row_size, row_size, flat_button_style);
             // Test passes if render_node() doesn't panic
         }
 
