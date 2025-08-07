@@ -114,6 +114,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     album: meta.album,
                     title: meta.title,
                     genre: meta.genre,
+                    duration_ms: meta.duration_ms,
                 });
             }
             Task::none()
@@ -132,6 +133,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                                 album: meta.album,
                                 title: meta.title,
                                 genre: meta.genre,
+                                duration_ms: meta.duration_ms,
                             });
                         }
                     }
@@ -223,6 +225,19 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 };
             } else {
                 app.right_panel_sort_column = SortColumn::Genre;
+                app.right_panel_sort_order = SortOrder::Asc;
+            }
+            app.right_panel_shuffled = false;
+            Task::none()
+        }
+        Message::SortRightPanelByDuration => {
+            if app.right_panel_sort_column == SortColumn::Duration {
+                app.right_panel_sort_order = match app.right_panel_sort_order {
+                    SortOrder::Asc => SortOrder::Desc,
+                    SortOrder::Desc => SortOrder::Asc,
+                };
+            } else {
+                app.right_panel_sort_column = SortColumn::Duration;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
             app.right_panel_shuffled = false;

@@ -9,6 +9,7 @@ struct AudioColumnToggles {
     show_album: bool,
     show_title: bool,
     show_genre: bool,
+    show_duration: bool,
 }
 
 
@@ -17,6 +18,19 @@ struct MenuStyle {
     text_size: u16,
     spacing: u16,
     text_color: [f32; 4],
+}
+
+
+fn format_duration(duration_ms: Option<u64>) -> String {
+    match duration_ms {
+        Some(ms) => {
+            let total_seconds = ms / 1000;
+            let minutes = total_seconds / 60;
+            let seconds = total_seconds % 60;
+            format!("{}:{:02}", minutes, seconds)
+        }
+        None => "".to_string(),
+    }
 }
 
 
@@ -271,6 +285,12 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
             SortOrder::Asc => " ↓",
         }
     } else { "" };
+    let duration_arrow = if app.right_panel_sort_column == SortColumn::Duration {
+        match app.right_panel_sort_order {
+            SortOrder::Desc => " ↑",
+            SortOrder::Asc => " ↓",
+        }
+    } else { "" };
 
     let mut header_row = iced::widget::Row::new()
         .push(
@@ -339,6 +359,18 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
                     .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
             )
             .on_press(Message::SortRightPanelByGenre)
+            .width(Length::FillPortion(1))
+        );
+    }
+    if audio_column_toggles.show_duration {
+        header_row = header_row.push(
+            iced::widget::button(
+                iced::widget::text(format!("Duration{duration_arrow}"))
+                    .width(Length::FillPortion(1))
+                    .size(header_text_size)
+                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+            )
+            .on_press(Message::SortRightPanelByDuration)
             .width(Length::FillPortion(1))
         );
     }
@@ -412,12 +444,14 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, column_row_spaci
     let show_album    = displayed_files.iter().any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
     let show_title    = displayed_files.iter().any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
     let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_duration = displayed_files.iter().any(|f| f.duration_ms.is_some());
 
     let audio_column_toggles = AudioColumnToggles {
         show_musician,
         show_album,
         show_title,
         show_genre,
+        show_duration,
     };
 
     let header_text_size = row_text_size + 4;
@@ -447,6 +481,9 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, column_row_spaci
         }
         if show_genre {
             row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(row_text_size));
+        }
+        if show_duration {
+            row = row.push(iced::widget::text(format_duration(file.duration_ms)).width(Length::FillPortion(1)).size(row_text_size));
         }
         row = row.spacing(column_row_spacing);
 
@@ -957,6 +994,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             });
             let msg = Message::RemoveFromRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
@@ -973,6 +1011,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file2 = RightPanelFile {
                 path: PathBuf::from("/dir/file2.txt"),
@@ -980,6 +1019,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file3 = RightPanelFile {
                 path: PathBuf::from("/other/file3.txt"),
@@ -987,6 +1027,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone(), right_panel_file3.clone()];
             let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
@@ -1007,6 +1048,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file_b = RightPanelFile {
                 path: file_b.clone(),
@@ -1014,6 +1056,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             app.right_panel_files = vec![right_panel_file_b.clone(), right_panel_file_a.clone()];
 
@@ -1042,6 +1085,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file2 = RightPanelFile {
                 path: file2.clone(),
@@ -1049,6 +1093,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
             let msg = Message::ShuffleRightPanel;
@@ -1066,6 +1111,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             app.right_panel_files.push(right_panel_file.clone());
             let msg = Message::AddToRightPanel(file_path.clone());
@@ -1095,6 +1141,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             app.right_panel_files = vec![right_panel_file];
             let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
@@ -1117,6 +1164,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             app.right_panel_files.push(right_panel_file.clone());
             let _ = update(&mut app, Message::SortRightPanelByFile);
@@ -1138,6 +1186,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             app.right_panel_files.push(right_panel_file.clone());
             let _ = update(&mut app, Message::ShuffleRightPanel);
@@ -1154,6 +1203,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file2 = RightPanelFile {
                 path: PathBuf::from("/dir_a/file2.txt"),
@@ -1161,6 +1211,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let mut app = FileTreeApp::new(vec![], vec!["txt".to_string()], Vec::new(), PathBuf::from("/tmp"));
             app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
@@ -1515,6 +1566,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file2 = RightPanelFile {
                 path: dir_path.join("file2.txt"),
@@ -1522,6 +1574,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file3 = RightPanelFile {
                 path: std::path::PathBuf::from("/other/file3.txt"),
@@ -1529,6 +1582,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let file_extensions = vec!["txt".to_string()];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -1554,6 +1608,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let right_panel_file2 = RightPanelFile {
                 path: std::path::PathBuf::from("/dir_a/file2.txt"),
@@ -1561,6 +1616,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let file_extensions = vec!["txt".to_string()];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
@@ -1661,6 +1717,7 @@ mod iced_tests {
                 album: None,
                 title: None,
                 genre: None,
+                duration_ms: None,
             };
             let file_extensions = vec!["txt".to_string()];
             let temp_file = tempfile::NamedTempFile::new().unwrap();

@@ -30,6 +30,7 @@ pub enum Message {
     SortRightPanelByAlbum,
     SortRightPanelByTitle,
     SortRightPanelByGenre,
+    SortRightPanelByDuration,
     ShuffleRightPanel,
     ExportRightPanelAsXspf,
     ExportRightPanelAsXspfTo(PathBuf),
@@ -45,6 +46,7 @@ pub enum SortColumn {
     Album,
     Title,
     Genre,
+    Duration,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -60,6 +62,7 @@ pub struct RightPanelFile {
     pub album: Option<String>,
     pub title: Option<String>,
     pub genre: Option<String>,
+    pub duration_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -200,6 +203,15 @@ impl FileTreeApp {
                             a_genre.cmp(&b_genre)
                         } else {
                             b_genre.cmp(&a_genre)
+                        }
+                    }
+                    SortColumn::Duration => {
+                        let a_dur = a.duration_ms.unwrap_or(0);
+                        let b_dur = b.duration_ms.unwrap_or(0);
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_dur.cmp(&b_dur)
+                        } else {
+                            b_dur.cmp(&a_dur)
                         }
                     }
                 }

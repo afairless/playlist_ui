@@ -75,6 +75,7 @@ mod tests {
             album: Some("Album1".to_string()),
             title: Some("Title1".to_string()),
             genre: Some("Genre1".to_string()),
+            duration_ms: Some(1),
         };
         let file2 = RightPanelFile {
             path: PathBuf::from("/music/b.mp3"),
@@ -82,6 +83,7 @@ mod tests {
             album: Some("Album2".to_string()),
             title: Some("Title2".to_string()),
             genre: Some("Genre2".to_string()),
+            duration_ms: Some(1),
         };
 
         let persist_path = NamedTempFile::new().unwrap().path().to_path_buf();
