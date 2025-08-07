@@ -491,6 +491,12 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         text_color: [0.0, 1.0, 1.0, 1.0],
     };
 
+    // toggle appearance of left panel
+    let toggle_left_panel_btn = button(
+        text(if app.left_panel_expanded { "←" } else { "→" }).size(20)
+    )
+    .on_press(Message::ToggleLeftPanel);
+
     let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
 
     let tree_row_height = 10;
@@ -499,11 +505,17 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     let file_row_size = 14;
     let trees = create_left_panel_file_trees(app, tree_row_height, remove_button_width, directory_row_size, file_row_size);
 
-    let left_content = column![
-        left_panel_menu_row,
-        Space::with_height(10),
-        trees
-    ];
+    let left_content = if app.left_panel_expanded {
+        column![
+            toggle_left_panel_btn,
+            Space::with_height(10),
+            left_panel_menu_row,
+            Space::with_height(10),
+            trees
+        ]
+    } else {
+        column![toggle_left_panel_btn]
+    };
 
     let left_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
             scrollable(left_content)
@@ -516,10 +528,11 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     let column_height_spacing = 10;
     let row_text_size = 14;
     let header_text_color = [1.0, 1.0, 0.0, 1.0];
+    let right_panel_width = if app.left_panel_expanded {3} else {20};
     let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
             create_right_panel(app, menu_style, column_row_spacing, column_height_spacing, row_text_size, header_text_color)
         )
-        .width(Length::FillPortion(3))
+        .width(Length::FillPortion(right_panel_width))
         .into();
 
     let split_row = row![

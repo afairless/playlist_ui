@@ -301,6 +301,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
 
             Task::none()
         }
+        Message::ToggleLeftPanel => {
+            app.left_panel_expanded = !app.left_panel_expanded;
+            Task::none()
+        }
     }
 }
 

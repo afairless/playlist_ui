@@ -13,6 +13,7 @@ fn get_persist_path() -> PathBuf {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    ToggleLeftPanel,
     ToggleExpansion(PathBuf),
     ToggleExtension(String),
     ToggleExtensionsMenu,
@@ -64,6 +65,8 @@ pub struct RightPanelFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileTreeApp {
     #[serde(skip)]
+    pub left_panel_expanded: bool,
+    #[serde(skip)]
     pub audio_extensions: Vec<String>,
     #[serde(skip)]
     pub root_nodes: Vec<Option<FileNode>>,
@@ -101,6 +104,7 @@ impl FileTreeApp {
             restore_expansion_state(root, &expanded_dirs);
         }
         FileTreeApp {
+            left_panel_expanded: true,
             audio_extensions,
             root_nodes,
             top_dirs,
