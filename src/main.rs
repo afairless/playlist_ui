@@ -1,5 +1,6 @@
 mod fs;
 mod gui;
+mod utils;
 
 use gui::{FileTreeApp, update, view};
 

@@ -2,6 +2,7 @@ use iced::{Element, widget::{button, column, container, row, Scrollable, scrolla
 use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
+use crate::utils::format_duration;
 
 
 struct AudioColumnToggles {
@@ -18,19 +19,6 @@ struct MenuStyle {
     text_size: u16,
     spacing: u16,
     text_color: [f32; 4],
-}
-
-
-fn format_duration(duration_ms: Option<u64>) -> String {
-    match duration_ms {
-        Some(ms) => {
-            let total_seconds = ms / 1000;
-            let minutes = total_seconds / 60;
-            let seconds = total_seconds % 60;
-            format!("{}:{:02}", minutes, seconds)
-        }
-        None => "".to_string(),
-    }
 }
 
 
