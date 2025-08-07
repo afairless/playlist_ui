@@ -97,7 +97,18 @@ fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_
             content = content.push(context_menu);
 
             if node.is_expanded {
-                for child in &node.children {
+                let mut indices: Vec<usize> = (0..node.children.len()).collect();
+                indices.sort_by(|&i, &j| {
+                    let a = &node.children[i];
+                    let b = &node.children[j];
+                    match (a.node_type.clone(), b.node_type.clone()) {
+                        (NodeType::Directory, NodeType::File) => std::cmp::Ordering::Less,
+                        (NodeType::File, NodeType::Directory) => std::cmp::Ordering::Greater,
+                        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                    }
+                });
+                for &i in &indices {
+                    let child = &node.children[i];
                     content = content.push(render_node(child, depth + 1, directory_row_size, file_row_size));
                 }
             }
@@ -105,7 +116,6 @@ fn render_node(node: &FileNode, depth: usize, directory_row_size: u16, file_row_
         NodeType::File => {
             let file_row = text(format!("{} 📄 {}", indent, node.name)).size(file_row_size);
 
-            // Wrap the file row in a context menu for right-click
             let file_path = node.path.clone();
             let context_menu = ContextMenu::new(
                 button(file_row),
