@@ -89,7 +89,9 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             if let Some(idx) = app.top_dirs.iter().position(|d| d == &dir) {
                 app.top_dirs.remove(idx);
                 app.root_nodes.remove(idx);
-                app.persist_top_dirs();
+                if let Err(e) = app.persist_top_dirs() {
+                    log::error!("Failed to persist top dirs: {e}");
+                }
             }
             Task::none()
         }
@@ -112,7 +114,9 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     &path,
                     &app.selected_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()
                 ));
-                app.persist_top_dirs();
+                if let Err(e) = app.persist_top_dirs() {
+                    log::error!("Failed to persist top dirs: {e}");
+                }
             }
             Task::none()
         }

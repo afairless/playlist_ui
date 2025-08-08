@@ -717,7 +717,7 @@ mod iced_tests {
             let persist_path = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
 
             let app = FileTreeApp::new(vec![dir.clone()], file_extensions, persist_path.clone());
-            app.persist_top_dirs();
+            let _ = app.persist_top_dirs();
 
             let app2 = FileTreeApp::load(file_extensions, Some(persist_path));
             assert!(app2.top_dirs.contains(&dir));
@@ -738,7 +738,7 @@ mod iced_tests {
 
             // Attempt to load top_dirs (should fallback to empty)
             let app = FileTreeApp::new(vec![], file_extensions, persist_path.clone());
-            app.persist_top_dirs(); // Ensure file exists for load
+            let _ = app.persist_top_dirs(); // Ensure file exists for load
 
             let loaded_app = FileTreeApp::load(file_extensions, Some(persist_path));
             assert!(loaded_app.top_dirs.is_empty(), "Should handle corrupted top_dirs state gracefully");

@@ -149,11 +149,16 @@ impl FileTreeApp {
 
     /// Persists the current list of top-level directories to disk as JSON,
     ///     using the application's configured persistence path.
-    pub(crate) fn persist_top_dirs(&self) {
-        if let Ok(json) = serde_json::to_string(&self.top_dirs) {
-            let _ = fs::write(&self.persist_path, json);
-        }
+    pub(crate) fn persist_top_dirs(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let json = serde_json::to_string(&self.top_dirs)?;
+        fs::write(&self.persist_path, json)?;
+        Ok(())
     }
+    //pub(crate) fn persist_top_dirs(&self) {
+    //    if let Ok(json) = serde_json::to_string(&self.top_dirs) {
+    //        let _ = fs::write(&self.persist_path, json);
+    //    }
+    //}
 
 
     /// Returns a sorted vector of files currently in the right panel, using the
