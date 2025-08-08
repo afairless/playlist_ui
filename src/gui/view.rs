@@ -5,6 +5,7 @@ use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
 use crate::utils::format_duration;
 
 
+#[derive(Default)]
 struct AudioColumnToggles {
     show_musician: bool,
     show_album: bool,
