@@ -97,7 +97,7 @@ impl FileTreeApp {
     /// Creates a new `FileTreeApp` instance with the given top-level directories,
     ///     file extensions, audio extensions, and persistence path. Initializes the
     ///     file tree, expansion state, and right panel state.
-    pub fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>, audio_extensions: Vec<String>, persist_path: PathBuf) -> Self {
+    pub(crate) fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>, audio_extensions: Vec<String>, persist_path: PathBuf) -> Self {
         let mut root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
             .map(|dir| scan_directory(dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
             .collect();
@@ -130,7 +130,7 @@ impl FileTreeApp {
 
     /// Loads a `FileTreeApp` instance from persisted state, restoring top-level directories
     ///     from disk if available, and initializing with the provided file and audio extensions.
-    pub fn load(all_extensions: Vec<String>, audio_extensions: Option<Vec<String>>, persist_path: Option<PathBuf>) -> Self {
+    pub(crate) fn load(all_extensions: Vec<String>, audio_extensions: Option<Vec<String>>, persist_path: Option<PathBuf>) -> Self {
         let persist_path = persist_path.unwrap_or_else(get_persist_path);
         let audio_extensions = audio_extensions.unwrap_or_default();
         let top_dirs = if persist_path.exists() {
@@ -150,7 +150,7 @@ impl FileTreeApp {
 
     /// Persists the current list of top-level directories to disk as JSON,
     ///     using the application's configured persistence path.
-    pub fn persist_top_dirs(&self) {
+    pub(crate) fn persist_top_dirs(&self) {
         if let Ok(json) = serde_json::to_string(&self.top_dirs) {
             let _ = fs::write(&self.persist_path, json);
         }
@@ -159,7 +159,7 @@ impl FileTreeApp {
 
     /// Returns a sorted vector of files currently in the right panel, using the
     ///     configured sort column and order, unless the panel is marked as shuffled.
-    pub fn sorted_right_panel_files(&self) -> Vec<RightPanelFile> {
+    pub(crate) fn sorted_right_panel_files(&self) -> Vec<RightPanelFile> {
         let mut files = self.right_panel_files.clone();
         if !self.right_panel_shuffled {
             files.sort_by(|a, b| {

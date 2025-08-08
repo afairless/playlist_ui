@@ -2,7 +2,7 @@
 /// Formats an optional duration in milliseconds as a human-readable string,
 ///     using `H:MM:SS` for durations of one hour or more, and `M:SS` otherwise.
 ///     Returns an empty string if the input is `None`.
-pub fn format_duration(duration_ms: Option<u64>) -> String {
+pub(crate) fn format_duration(duration_ms: Option<u64>) -> String {
     match duration_ms {
         Some(ms) => {
             let total_seconds = ms / 1000;

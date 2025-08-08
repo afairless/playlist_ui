@@ -7,7 +7,7 @@ use crate::gui::RightPanelFile;
 /// Exports a playlist of the given files to an XSPF (XML Shareable Playlist Format) file
 ///     at the specified output path, including metadata such as title, artist, album,
 ///     duration, genre, and more for each track.
-pub fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::path::Path) -> std::io::Result<()> {
+pub(crate) fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::path::Path) -> std::io::Result<()> {
     let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
     xml.push_str(r#"<playlist version="1" xmlns="http://xspf.org/ns/0/"><trackList>"#);
 

@@ -10,7 +10,7 @@ pub enum NodeType {
 
 
 #[derive(Debug, Clone)]
-pub struct FileNode {
+pub(crate) struct FileNode {
     pub name: String,
     pub path: PathBuf,
     pub node_type: NodeType,
@@ -20,7 +20,7 @@ pub struct FileNode {
 
 
 impl FileNode {
-    pub fn new_file(name: String, path: PathBuf) -> Self {
+    pub(crate) fn new_file(name: String, path: PathBuf) -> Self {
         FileNode {
             name,
             path,
@@ -30,7 +30,7 @@ impl FileNode {
         }
     }
 
-    pub fn new_directory(name: String, path: PathBuf, children: Vec<FileNode>) -> Self {
+    pub(crate) fn new_directory(name: String, path: PathBuf, children: Vec<FileNode>) -> Self {
         FileNode {
             name,
             path,
@@ -42,7 +42,7 @@ impl FileNode {
 }
 
 
-pub fn scan_directory(
+pub(crate) fn scan_directory(
     dir: &Path,
     allowed_extensions: &[&str],
 ) -> Option<FileNode> {
