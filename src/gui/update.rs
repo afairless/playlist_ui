@@ -54,7 +54,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             if app.expanded_dirs.contains(&path) {
                 app.expanded_dirs.remove(&path);
             } else {
-                app.expanded_dirs.insert(path.clone());
+                app.expanded_dirs.insert(path);
             }
             for root in app.root_nodes.iter_mut().flatten() {
                 restore_expansion_state(root, &app.expanded_dirs);
@@ -66,7 +66,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 if app.selected_extensions.contains(&ext) {
                     app.selected_extensions.retain(|e| e != &ext);
                 } else {
-                    app.selected_extensions.push(ext.clone());
+                    app.selected_extensions.push(ext);
                 }
             }
             app.root_nodes = app.top_dirs.iter()
