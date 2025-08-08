@@ -1,4 +1,4 @@
-use std::path::{PathBuf};
+use std::path::Path;
 use lofty::{
     file::{AudioFile, TaggedFileExt},
     prelude::ItemKey,
@@ -21,7 +21,7 @@ pub struct MediaMetadata {
 /// Extracts media metadata from the given file path using the `lofty` crate,
 ///     returning information such as artist, album, title, genre, track number,
 ///     duration, album art URI, identifier, and annotation if available.
-pub fn extract_media_metadata(path: &PathBuf) -> MediaMetadata {
+pub fn extract_media_metadata(path: &Path) -> MediaMetadata {
     match read_from_path(path) {
         Ok(tagged_file) => {
             let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());

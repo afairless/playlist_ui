@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use iced::Task;
 use rfd::FileDialog;
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
@@ -33,8 +33,8 @@ fn collect_files_recursively(node: &FileNode, files: &mut Vec<PathBuf>) {
 
 /// Recursively searches for a node in the file tree with the specified path,
 ///     returning a reference to the node if found.
-fn find_node_by_path<'a>(node: &'a FileNode, path: &PathBuf) -> Option<&'a FileNode> {
-    if &node.path == path {
+fn find_node_by_path<'a>(node: &'a FileNode, path: &Path) -> Option<&'a FileNode> {
+    if node.path.as_path() == path {
         return Some(node);
     }
     for child in &node.children {
