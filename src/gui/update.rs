@@ -272,7 +272,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             )
         }
         Message::ExportRightPanelAsXspfTo(path) => {
-            let audio_exts: &Vec<String> = &app.audio_extensions;
+            let audio_exts: &Vec<String> = &app.all_extensions;
             let audio_files: Vec<RightPanelFile> = app.sorted_right_panel_files()
                 .into_iter()
                 .filter(|f| {
@@ -289,7 +289,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             use std::env::temp_dir;
             use std::process::Command;
 
-            let audio_exts: &Vec<String> = &app.audio_extensions;
+            let audio_exts: &Vec<String> = &app.all_extensions;
             let audio_files: Vec<RightPanelFile> = app.sorted_right_panel_files()
                 .into_iter()
                 .filter(|f| {

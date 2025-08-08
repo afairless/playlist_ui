@@ -91,7 +91,7 @@ mod tests {
         };
 
         let persist_path = NamedTempFile::new().unwrap().path().to_path_buf();
-        let mut app = FileTreeApp::new(vec![], vec![], Vec::new(), persist_path);
+        let mut app = FileTreeApp::new(vec![], &[], persist_path);
         app.right_panel_files = vec![file2.clone(), file1.clone()]; // Intentionally reversed
         app.right_panel_sort_column = SortColumn::File;
         app.right_panel_sort_order = SortOrder::Asc;

@@ -70,8 +70,6 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub left_panel_expanded: bool,
     #[serde(skip)]
-    pub audio_extensions: Vec<String>,
-    #[serde(skip)]
     pub root_nodes: Vec<Option<FileNode>>,
     pub top_dirs: Vec<PathBuf>,
     #[serde(skip)]
@@ -97,9 +95,12 @@ impl FileTreeApp {
     /// Creates a new `FileTreeApp` instance with the given top-level directories,
     ///     file extensions, audio extensions, and persistence path. Initializes the
     ///     file tree, expansion state, and right panel state.
-    pub(crate) fn new(top_dirs: Vec<PathBuf>, all_extensions: Vec<String>, audio_extensions: Vec<String>, persist_path: PathBuf) -> Self {
+    pub(crate) fn new(top_dirs: Vec<PathBuf>, all_extensions: &[&str], persist_path: PathBuf) -> Self {
+
+        let all_extensions_vec: Vec<String> = all_extensions.iter().map(|s| s.to_string()).collect();
+
         let mut root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
-            .map(|dir| scan_directory(dir, &all_extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
+            .map(|dir| scan_directory(dir, &all_extensions_vec.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
             .collect();
         let mut expanded_dirs = HashSet::new();
         if top_dirs.len() == 1 {
@@ -112,12 +113,11 @@ impl FileTreeApp {
         }
         FileTreeApp {
             left_panel_expanded: true,
-            audio_extensions,
             root_nodes,
             top_dirs,
             persist_path,
-            selected_extensions: all_extensions.clone(),
-            all_extensions,
+            selected_extensions: all_extensions_vec.clone(),
+            all_extensions: all_extensions_vec,
             extensions_menu_expanded: false,
             expanded_dirs,
             right_panel_files: Vec::new(),
@@ -130,9 +130,8 @@ impl FileTreeApp {
 
     /// Loads a `FileTreeApp` instance from persisted state, restoring top-level directories
     ///     from disk if available, and initializing with the provided file and audio extensions.
-    pub(crate) fn load(all_extensions: Vec<String>, audio_extensions: Option<Vec<String>>, persist_path: Option<PathBuf>) -> Self {
+    pub(crate) fn load(all_extensions: &[&str], persist_path: Option<PathBuf>) -> Self {
         let persist_path = persist_path.unwrap_or_else(get_persist_path);
-        let audio_extensions = audio_extensions.unwrap_or_default();
         let top_dirs = if persist_path.exists() {
             std::fs::read_to_string(&persist_path)
                 .ok()
@@ -144,7 +143,7 @@ impl FileTreeApp {
         } else {
             Vec::new()
         };
-        FileTreeApp::new(top_dirs, all_extensions, audio_extensions, persist_path)
+        FileTreeApp::new(top_dirs, all_extensions, persist_path)
     }
 
 
