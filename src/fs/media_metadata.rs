@@ -45,7 +45,7 @@ pub(crate) fn extract_media_metadata(path: &Path) -> MediaMetadata {
             let image_uri = tag.pictures().first().and_then(|pic| {
                 let img_path = path.with_extension("cover.jpg");
                 if std::fs::write(&img_path, pic.data()).is_ok() {
-                    Some(format!("file://{}", img_path.to_string_lossy()))
+                    Some(format!("file://{}", img_path.display()))
                 } else {
                     None
                 }

@@ -16,7 +16,7 @@ pub(crate) fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::
         xml.push_str("<track>");
         xml.push_str(&format!(
             "<location>file://{}</location>",
-            file.path.to_string_lossy()
+            file.path.display()
         ));
         if let Some(title) = meta.title {
             xml.push_str(&format!("<title>{}</title>", xml_escape(&title)));
