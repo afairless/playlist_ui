@@ -1444,6 +1444,29 @@ mod iced_tests {
             assert!(level2_node.is_expanded);
         }
 
+        #[test]
+        fn test_toggle_left_panel_sort_mode() {
+            use crate::gui::{update, FileTreeApp, Message, LeftPanelSortMode};
+            use std::path::PathBuf;
+            use tempfile::NamedTempFile;
+
+            let dir = PathBuf::from("/dummy");
+            let file_extensions = &["txt"];
+            let temp_file = NamedTempFile::new().unwrap();
+            let persist_path = temp_file.path().to_path_buf();
+            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+
+            // Default should be Alphanumeric
+            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::Alphanumeric);
+
+            // Toggle once
+            let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
+            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::ModifiedDate);
+
+            // Toggle again
+            let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
+            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::Alphanumeric);
+        }
     }
 
     mod view_tests {
