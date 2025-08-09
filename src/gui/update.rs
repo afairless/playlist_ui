@@ -4,7 +4,7 @@ use iced::Task;
 use rfd::FileDialog;
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
 use crate::fs::media_metadata::extract_media_metadata;
-use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
+use crate::gui::{FileTreeApp, Message, LeftPanelSortMode, SortColumn, SortOrder, RightPanelFile};
  
  
 /// Restores the expansion state of a file tree node and its descendants based on the
@@ -334,6 +334,13 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         }
         Message::ToggleLeftPanel => {
             app.left_panel_expanded = !app.left_panel_expanded;
+            Task::none()
+        }
+        Message::ToggleLeftPanelSortMode => {
+            app.left_panel_sort_mode = match app.left_panel_sort_mode {
+                LeftPanelSortMode::Alphanumeric => LeftPanelSortMode::ModifiedDate,
+                LeftPanelSortMode::ModifiedDate => LeftPanelSortMode::Alphanumeric,
+            };
             Task::none()
         }
     }

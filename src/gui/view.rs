@@ -1,7 +1,8 @@
+use std::fs;
 use iced::{Element, widget::{button, column, container, row, Scrollable, scrollable, text, Space}, Length};
 use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
-use crate::gui::{FileTreeApp, Message, SortColumn, SortOrder, RightPanelFile};
+use crate::gui::{FileTreeApp, Message, LeftPanelSortMode, SortColumn, SortOrder, RightPanelFile};
 use crate::utils::format_duration;
 
 
@@ -86,14 +87,25 @@ fn create_left_panel_menu_row(app: &FileTreeApp, menu_style: MenuStyle) -> Eleme
 
     let extension_menu = create_extension_menu(app, menu_style.text_size, menu_style.text_color);
 
-    iced::widget::row![directory_button, extension_menu].spacing(menu_style.spacing).into()
+    let sort_mode_label = match app.left_panel_sort_mode {
+        LeftPanelSortMode::Alphanumeric => "Sort: Name",
+        LeftPanelSortMode::ModifiedDate => "Sort: Modified",
+    };
+    let sort_mode_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+        iced::widget::text(sort_mode_label)
+            .size(menu_style.text_size)
+            .style(move |_theme: &iced::Theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
+    )
+    .on_press(Message::ToggleLeftPanelSortMode);
+
+    iced::widget::row![directory_button, extension_menu, sort_mode_button].spacing(menu_style.spacing).into()
 }
 
 
 ///  Recursively renders a file tree node (directory or file) with indentation based on depth,  
 ///      including context menus for directory and file actions.
 fn render_node(
-    node: &FileNode, depth: usize, directory_row_size: u16, file_row_size: u16, 
+    node: &FileNode, depth: usize, directory_row_size: u16, file_row_size: u16, sort_mode: LeftPanelSortMode,
     flat_button_style: impl Fn(&iced::Theme, iced::widget::button::Status) -> iced::widget::button::Style + Copy + 'static,
     ) -> Element<Message> {
 
@@ -128,18 +140,39 @@ fn render_node(
 
             if node.is_expanded {
                 let mut indices: Vec<usize> = (0..node.children.len()).collect();
-                indices.sort_by(|&i, &j| {
-                    let a = &node.children[i];
-                    let b = &node.children[j];
-                    match (a.node_type.clone(), b.node_type.clone()) {
-                        (NodeType::Directory, NodeType::File) => std::cmp::Ordering::Less,
-                        (NodeType::File, NodeType::Directory) => std::cmp::Ordering::Greater,
-                        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                match sort_mode {
+                    LeftPanelSortMode::Alphanumeric => {
+                        indices.sort_by(|&i, &j| {
+                            let a = &node.children[i];
+                            let b = &node.children[j];
+                            match (a.node_type.clone(), b.node_type.clone()) {
+                                (NodeType::Directory, NodeType::File) => std::cmp::Ordering::Less,
+                                (NodeType::File, NodeType::Directory) => std::cmp::Ordering::Greater,
+                                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                            }
+                        });
                     }
-                });
+                    LeftPanelSortMode::ModifiedDate => {
+                        indices.sort_by(|&i, &j| {
+                            let a = &node.children[i];
+                            let b = &node.children[j];
+                            let a_time = fs::metadata(&a.path)
+                                .and_then(|m| m.modified())
+                                .ok();
+                            let b_time = fs::metadata(&b.path)
+                                .and_then(|m| m.modified())
+                                .ok();
+                            match (a.node_type.clone(), b.node_type.clone()) {
+                                (NodeType::Directory, NodeType::File) => std::cmp::Ordering::Less,
+                                (NodeType::File, NodeType::Directory) => std::cmp::Ordering::Greater,
+                                _ => b_time.cmp(&a_time), // newest first
+                            }
+                        });
+                    }
+                }
                 for &i in &indices {
                     let child = &node.children[i];
-                    content = content.push(render_node(child, depth + 1, directory_row_size, file_row_size, flat_button_style));
+                    content = content.push(render_node(child, depth + 1, directory_row_size, file_row_size, sort_mode, flat_button_style));
                 }
             }
         }
@@ -194,7 +227,7 @@ fn create_left_panel_tree_browser(app: &FileTreeApp, tree_browser_style: TreeBro
 
         let content = if let Some(node) = node_opt {
             // Directory tree
-            render_node(node, 0, tree_browser_style.directory_row_size, tree_browser_style.file_row_size, flat_button_style)
+            render_node(node, 0, tree_browser_style.directory_row_size, tree_browser_style.file_row_size, app.left_panel_sort_mode, flat_button_style)
         } else {
             text("No files found").into()
         };
@@ -1990,7 +2023,7 @@ mod iced_tests {
             );
             
             let row_size = 12;
-            let _element = render_node(&file_node, 0, row_size, row_size, flat_button_style);
+            let _element = render_node(&file_node, 0, row_size, row_size, LeftPanelSortMode::Alphanumeric, flat_button_style);
             // Test passes if render_node() doesn't panic
         }
 
@@ -2011,7 +2044,7 @@ mod iced_tests {
             );
             
             let row_size = 12;
-            let _element = render_node(&dir_node, 1, row_size, row_size, flat_button_style);
+            let _element = render_node(&dir_node, 1, row_size, row_size, LeftPanelSortMode::Alphanumeric, flat_button_style);
             // Test passes if render_node() doesn't panic
         }
 

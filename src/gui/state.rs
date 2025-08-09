@@ -17,6 +17,7 @@ pub enum Message {
     ToggleExpansion(PathBuf),
     ToggleExtension(String),
     ToggleExtensionsMenu,
+    ToggleLeftPanelSortMode,
     RemoveTopDir(PathBuf),
     AddDirectory,
     DirectoryAdded(Option<std::path::PathBuf>),
@@ -36,6 +37,13 @@ pub enum Message {
     ExportRightPanelAsXspfTo(PathBuf),
     ExportAndPlayRightPanelAsXspf,
     OpenRightPanelFile(PathBuf),
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LeftPanelSortMode {
+    #[default]
+    Alphanumeric,
+    ModifiedDate,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -69,6 +77,8 @@ pub struct RightPanelFile {
 pub struct FileTreeApp {
     #[serde(skip)]
     pub left_panel_expanded: bool,
+    #[serde(skip)]
+    pub left_panel_sort_mode: LeftPanelSortMode,
     #[serde(skip)]
     pub root_nodes: Vec<Option<FileNode>>,
     pub top_dirs: Vec<PathBuf>,
@@ -113,6 +123,7 @@ impl FileTreeApp {
         }
         FileTreeApp {
             left_panel_expanded: true,
+            left_panel_sort_mode: LeftPanelSortMode::Alphanumeric,
             root_nodes,
             top_dirs,
             persist_path,
