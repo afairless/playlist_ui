@@ -74,10 +74,28 @@ fn create_extension_menu(app: &FileTreeApp, menu_size: u16, menu_text_color: [f3
 }
 
 
+/// Creates the toggle button for the left panel, displaying either a left or right arrow
+///     depending on the current expansion state. The button uses the specified menu style for
+///     text size and triggers the `ToggleLeftPanel` message when pressed.
+fn create_toggle_left_panel_button(app: &FileTreeApp, menu_style: MenuStyle) -> iced::widget::Button<Message> {
+
+    // toggle appearance of left panel
+    button(
+        text(if app.left_panel_expanded { "←" } else { "→" }).size(menu_style.text_size)
+    )
+    .on_press(Message::ToggleLeftPanel)
+}
+
+
 /// Constructs the left panel's menu row containing the "Add Directory" button and the file extension menu,
 ///     applying the specified text size, spacing, and color styling to both buttons.
-fn create_left_panel_menu_row(app: &FileTreeApp, menu_style: MenuStyle) -> Element<Message> {
+// fn create_left_panel_menu_row(app: &FileTreeApp, toggle_left_panel_button: iced::widget::Button<Message>, menu_style: MenuStyle) -> Element<Message> {
+fn create_left_panel_menu_row<'a>(
+    app: &'a FileTreeApp,
+    menu_style: MenuStyle,
+) -> Element<'a, Message> {
 
+    let toggle_left_panel_button = create_toggle_left_panel_button(app, menu_style);
     let directory_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
         iced::widget::text("Add Directory")
             .size(menu_style.text_size)
@@ -85,11 +103,9 @@ fn create_left_panel_menu_row(app: &FileTreeApp, menu_style: MenuStyle) -> Eleme
     )
     .on_press(Message::AddDirectory);
 
-    let extension_menu = create_extension_menu(app, menu_style.text_size, menu_style.text_color);
-
     let sort_mode_label = match app.left_panel_sort_mode {
         LeftPanelSortMode::Alphanumeric => "Sort: Name",
-        LeftPanelSortMode::ModifiedDate => "Sort: Modified",
+        LeftPanelSortMode::ModifiedDate => "Sort: Date Modified",
     };
     let sort_mode_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
         iced::widget::text(sort_mode_label)
@@ -98,7 +114,7 @@ fn create_left_panel_menu_row(app: &FileTreeApp, menu_style: MenuStyle) -> Eleme
     )
     .on_press(Message::ToggleLeftPanelSortMode);
 
-    iced::widget::row![directory_button, extension_menu, sort_mode_button].spacing(menu_style.spacing).into()
+    iced::widget::row![toggle_left_panel_button, directory_button, sort_mode_button].spacing(menu_style.spacing).into()
 }
 
 
@@ -622,24 +638,19 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         light_row_shade: [0.13, 0.13, 0.13],
         dark_row_shade: [0.16, 0.16, 0.16],
     };
-
-    // toggle appearance of left panel
-    let toggle_left_panel_button = button(
-        text(if app.left_panel_expanded { "←" } else { "→" }).size(menu_style.text_size)
-    )
-    .on_press(Message::ToggleLeftPanel);
     let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
+    let extension_menu = create_extension_menu(app, menu_style.text_size, menu_style.text_color);
     let tree_browser = create_left_panel_tree_browser(app, tree_browser_style);
     let left_content = if app.left_panel_expanded {
         column![
-            toggle_left_panel_button,
-            Space::with_height(10),
             left_panel_menu_row,
+            Space::with_height(10),
+            extension_menu,
             Space::with_height(10),
             tree_browser,
         ]
     } else {
-        column![toggle_left_panel_button]
+        column![create_toggle_left_panel_button(app, menu_style)]
     };
     let left_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
             scrollable(left_content)
