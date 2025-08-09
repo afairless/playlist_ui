@@ -1,13 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-
 #[derive(Debug, Clone)]
 pub enum NodeType {
     File,
     Directory,
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct FileNode {
@@ -17,7 +15,6 @@ pub(crate) struct FileNode {
     pub children: Vec<FileNode>,
     pub is_expanded: bool,
 }
-
 
 impl FileNode {
     pub(crate) fn new_file(name: String, path: PathBuf) -> Self {
@@ -30,7 +27,11 @@ impl FileNode {
         }
     }
 
-    pub(crate) fn new_directory(name: String, path: PathBuf, children: Vec<FileNode>) -> Self {
+    pub(crate) fn new_directory(
+        name: String,
+        path: PathBuf,
+        children: Vec<FileNode>,
+    ) -> Self {
         FileNode {
             name,
             path,
@@ -41,7 +42,6 @@ impl FileNode {
     }
 }
 
-
 pub(crate) fn scan_directory(
     dir: &Path,
     allowed_extensions: &[&str],
@@ -49,15 +49,16 @@ pub(crate) fn scan_directory(
     scan_directory_with_expansion(dir, allowed_extensions, true)
 }
 
-
 /// Recursively scans a directory for files matching the allowed extensions,
-///     building a tree of `FileNode` objects and marking the root node as expanded if specified.
+/// building a tree of `FileNode` objects and marking the root node as expanded
+/// if specified.
 fn scan_directory_with_expansion(
     dir: &Path,
     allowed_extensions: &[&str],
     is_root: bool,
 ) -> Option<FileNode> {
-    let allowed: Vec<String> = allowed_extensions.iter().map(|e| e.to_lowercase()).collect();
+    let allowed: Vec<String> =
+        allowed_extensions.iter().map(|e| e.to_lowercase()).collect();
     let mut children = Vec::new();
 
     if let Ok(entries) = fs::read_dir(dir) {
@@ -72,7 +73,11 @@ fn scan_directory_with_expansion(
                     }
                 }
             } else if path.is_dir() {
-                if let Some(child_node) = scan_directory_with_expansion(&path, allowed_extensions, false) {
+                if let Some(child_node) = scan_directory_with_expansion(
+                    &path,
+                    allowed_extensions,
+                    false,
+                ) {
                     if !child_node.children.is_empty() {
                         children.push(child_node);
                     }
@@ -89,10 +94,10 @@ fn scan_directory_with_expansion(
             dir.to_path_buf(),
             children,
         );
-        
+
         // Only expand the root directory by default
         node.is_expanded = is_root;
-        
+
         Some(node)
     } else {
         None
@@ -102,8 +107,8 @@ fn scan_directory_with_expansion(
 #[cfg(test)]
 mod file_tree_tests {
     use super::*;
-    use tempfile::tempdir;
     use std::fs::{File, create_dir};
+    use tempfile::tempdir;
 
     #[test]
     fn test_scan_directory_01() {

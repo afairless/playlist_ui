@@ -1,9 +1,9 @@
-use std::fs;
-use std::path::PathBuf;
-use std::collections::HashSet;
-use serde::{Serialize, Deserialize};
 use crate::fs::file_tree::{FileNode, scan_directory};
 use crate::gui::update::restore_expansion_state;
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::fs;
+use std::path::PathBuf;
 
 const TOP_DIRS_FILE: &str = ".playlist_ui_top_dirs.json";
 
@@ -101,16 +101,28 @@ pub struct FileTreeApp {
 }
 
 impl FileTreeApp {
+    /// Creates a new `FileTreeApp` instance with the given top-level
+    /// directories, file extensions, audio extensions, and persistence path.
+    /// Initializes the file tree, expansion state, and right panel state.
+    pub(crate) fn new(
+        top_dirs: Vec<PathBuf>,
+        all_extensions: &[&str],
+        persist_path: PathBuf,
+    ) -> Self {
+        let all_extensions_vec: Vec<String> =
+            all_extensions.iter().map(|s| s.to_string()).collect();
 
-    /// Creates a new `FileTreeApp` instance with the given top-level directories,
-    ///     file extensions, audio extensions, and persistence path. Initializes the
-    ///     file tree, expansion state, and right panel state.
-    pub(crate) fn new(top_dirs: Vec<PathBuf>, all_extensions: &[&str], persist_path: PathBuf) -> Self {
-
-        let all_extensions_vec: Vec<String> = all_extensions.iter().map(|s| s.to_string()).collect();
-
-        let mut root_nodes: Vec<Option<FileNode>> = top_dirs.iter()
-            .map(|dir| scan_directory(dir, &all_extensions_vec.iter().map(|s| s.as_str()).collect::<Vec<_>>()))
+        let mut root_nodes: Vec<Option<FileNode>> = top_dirs
+            .iter()
+            .map(|dir| {
+                scan_directory(
+                    dir,
+                    &all_extensions_vec
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>(),
+                )
+            })
             .collect();
         let mut expanded_dirs = HashSet::new();
         if top_dirs.len() == 1 {
@@ -138,10 +150,13 @@ impl FileTreeApp {
         }
     }
 
-
-    /// Loads a `FileTreeApp` instance from persisted state, restoring top-level directories
-    ///     from disk if available, and initializing with the provided file and audio extensions.
-    pub(crate) fn load(all_extensions: &[&str], persist_path: Option<PathBuf>) -> Self {
+    /// Loads a `FileTreeApp` instance from persisted state, restoring top-level
+    /// directories from disk if available, and initializing with the provided
+    /// file and audio extensions.
+    pub(crate) fn load(
+        all_extensions: &[&str],
+        persist_path: Option<PathBuf>,
+    ) -> Self {
         let persist_path = persist_path.unwrap_or_else(get_persist_path);
         let top_dirs = if persist_path.exists() {
             std::fs::read_to_string(&persist_path)
@@ -157,95 +172,142 @@ impl FileTreeApp {
         FileTreeApp::new(top_dirs, all_extensions, persist_path)
     }
 
-
     /// Persists the current list of top-level directories to disk as JSON,
     ///     using the application's configured persistence path.
-    pub(crate) fn persist_top_dirs(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn persist_top_dirs(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let json = serde_json::to_string(&self.top_dirs)?;
         fs::write(&self.persist_path, json)?;
         Ok(())
     }
-    //pub(crate) fn persist_top_dirs(&self) {
-    //    if let Ok(json) = serde_json::to_string(&self.top_dirs) {
-    //        let _ = fs::write(&self.persist_path, json);
-    //    }
-    //}
-
 
     /// Returns a sorted vector of files currently in the right panel, using the
-    ///     configured sort column and order, unless the panel is marked as shuffled.
+    ///     configured sort column and order, unless the panel is marked as
+    ///     shuffled.
     pub(crate) fn sorted_right_panel_files(&self) -> Vec<RightPanelFile> {
         let mut files = self.right_panel_files.clone();
         if !self.right_panel_shuffled {
-            files.sort_by(|a, b| {
-                match self.right_panel_sort_column {
-                    SortColumn::Directory => {
-                        let a_dir = a.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                        let b_dir = b.path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                        if self.right_panel_sort_order == SortOrder::Asc {
-                            a_dir.cmp(&b_dir)
-                        } else {
-                            b_dir.cmp(&a_dir)
-                        }
+            files.sort_by(|a, b| match self.right_panel_sort_column {
+                SortColumn::Directory => {
+                    let a_dir = a
+                        .path
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    let b_dir = b
+                        .path
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    if self.right_panel_sort_order == SortOrder::Asc {
+                        a_dir.cmp(&b_dir)
+                    } else {
+                        b_dir.cmp(&a_dir)
                     }
-                    SortColumn::File => {
-                        let a_file = a.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                        let b_file = b.path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
-                        if self.right_panel_sort_order == SortOrder::Asc {
-                            a_file.cmp(&b_file)
-                        } else {
-                            b_file.cmp(&a_file)
-                        }
+                },
+                SortColumn::File => {
+                    let a_file = a
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    let b_file = b
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    if self.right_panel_sort_order == SortOrder::Asc {
+                        a_file.cmp(&b_file)
+                    } else {
+                        b_file.cmp(&a_file)
                     }
-                    SortColumn::Musician => {
-                        let a_musician = a.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        let b_musician = b.musician.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        if self.right_panel_sort_order == SortOrder::Asc {
-                            a_musician.cmp(&b_musician)
-                        } else {
-                            b_musician.cmp(&a_musician)
-                        }
+                },
+                SortColumn::Musician => {
+                    let a_musician = a
+                        .musician
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_musician = b
+                        .musician
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    if self.right_panel_sort_order == SortOrder::Asc {
+                        a_musician.cmp(&b_musician)
+                    } else {
+                        b_musician.cmp(&a_musician)
                     }
-                    SortColumn::Album => {
-                        let a_album = a.album.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        let b_album = b.album.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        if self.right_panel_sort_order == SortOrder::Asc {
-                            a_album.cmp(&b_album)
-                        } else {
-                            b_album.cmp(&a_album)
-                        }
+                },
+                SortColumn::Album => {
+                    let a_album = a
+                        .album
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_album = b
+                        .album
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    if self.right_panel_sort_order == SortOrder::Asc {
+                        a_album.cmp(&b_album)
+                    } else {
+                        b_album.cmp(&a_album)
                     }
-                    SortColumn::Title => {
-                        let a_title = a.title.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        let b_title = b.title.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        if self.right_panel_sort_order == SortOrder::Asc {
-                            a_title.cmp(&b_title)
-                        } else {
-                            b_title.cmp(&a_title)
-                        }
+                },
+                SortColumn::Title => {
+                    let a_title = a
+                        .title
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_title = b
+                        .title
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    if self.right_panel_sort_order == SortOrder::Asc {
+                        a_title.cmp(&b_title)
+                    } else {
+                        b_title.cmp(&a_title)
                     }
-                    SortColumn::Genre => {
-                        let a_genre = a.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        let b_genre = b.genre.as_deref().unwrap_or_default().to_ascii_lowercase();
-                        if self.right_panel_sort_order == SortOrder::Asc {
-                            a_genre.cmp(&b_genre)
-                        } else {
-                            b_genre.cmp(&a_genre)
-                        }
+                },
+                SortColumn::Genre => {
+                    let a_genre = a
+                        .genre
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_genre = b
+                        .genre
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    if self.right_panel_sort_order == SortOrder::Asc {
+                        a_genre.cmp(&b_genre)
+                    } else {
+                        b_genre.cmp(&a_genre)
                     }
-                    SortColumn::Duration => {
-                        let a_dur = a.duration_ms.unwrap_or(0);
-                        let b_dur = b.duration_ms.unwrap_or(0);
-                        if self.right_panel_sort_order == SortOrder::Asc {
-                            a_dur.cmp(&b_dur)
-                        } else {
-                            b_dur.cmp(&a_dur)
-                        }
+                },
+                SortColumn::Duration => {
+                    let a_dur = a.duration_ms.unwrap_or(0);
+                    let b_dur = b.duration_ms.unwrap_or(0);
+                    if self.right_panel_sort_order == SortOrder::Asc {
+                        a_dur.cmp(&b_dur)
+                    } else {
+                        b_dur.cmp(&a_dur)
                     }
-                }
+                },
             });
         }
         files
     }
 }
-

@@ -1,15 +1,19 @@
+use crate::fs::media_metadata::extract_media_metadata;
+use crate::gui::RightPanelFile;
 use std::fs::File;
 use std::io::Write;
-use crate::fs::media_metadata::{extract_media_metadata};
-use crate::gui::RightPanelFile;
 
-
-/// Exports a playlist of the given files to an XSPF (XML Shareable Playlist Format) file
-///     at the specified output path, including metadata such as title, artist, album,
-///     duration, genre, and more for each track.
-pub(crate) fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::path::Path) -> std::io::Result<()> {
+/// Exports a playlist of the given files to an XSPF (XML Shareable Playlist
+/// Format) file at the specified output path, including metadata such as title,
+/// artist, album, duration, genre, and more for each track.
+pub(crate) fn export_xspf_playlist(
+    files: &[RightPanelFile],
+    output_path: &std::path::Path,
+) -> std::io::Result<()> {
     let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
-    xml.push_str(r#"<playlist version="1" xmlns="http://xspf.org/ns/0/"><trackList>"#);
+    xml.push_str(
+        r#"<playlist version="1" xmlns="http://xspf.org/ns/0/"><trackList>"#,
+    );
 
     for file in files {
         let meta = extract_media_metadata(&file.path);
@@ -22,7 +26,10 @@ pub(crate) fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::
             xml.push_str(&format!("<title>{}</title>", xml_escape(&title)));
         }
         if let Some(creator) = meta.musician {
-            xml.push_str(&format!("<creator>{}</creator>", xml_escape(&creator)));
+            xml.push_str(&format!(
+                "<creator>{}</creator>",
+                xml_escape(&creator)
+            ));
         }
         if let Some(album) = meta.album {
             xml.push_str(&format!("<album>{}</album>", xml_escape(&album)));
@@ -34,10 +41,16 @@ pub(crate) fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::
             xml.push_str(&format!("<genre>{}</genre>", xml_escape(&genre)));
         }
         if let Some(identifier) = meta.identifier {
-            xml.push_str(&format!("<identifier>{}</identifier>", xml_escape(&identifier)));
+            xml.push_str(&format!(
+                "<identifier>{}</identifier>",
+                xml_escape(&identifier)
+            ));
         }
         if let Some(annotation) = meta.annotation {
-            xml.push_str(&format!("<annotation>{}</annotation>", xml_escape(&annotation)));
+            xml.push_str(&format!(
+                "<annotation>{}</annotation>",
+                xml_escape(&annotation)
+            ));
         }
         if let Some(track_num) = meta.track_num {
             xml.push_str(&format!("<trackNum>{track_num}</trackNum>"));
@@ -58,10 +71,10 @@ pub(crate) fn export_xspf_playlist(files: &[RightPanelFile], output_path: &std::
 // Simple XML escape for special characters
 fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
-     .replace('"', "&quot;")
-     .replace('\'', "&apos;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]
@@ -101,7 +114,8 @@ mod tests {
         assert_eq!(sorted[1].path, file2.path);
 
         let out_file = NamedTempFile::new().unwrap();
-        crate::fs::xspf::export_xspf_playlist(&sorted, out_file.path()).unwrap();
+        crate::fs::xspf::export_xspf_playlist(&sorted, out_file.path())
+            .unwrap();
 
         let xml = std::fs::read_to_string(out_file.path()).unwrap();
         let locations: Vec<_> = xml
@@ -110,7 +124,13 @@ mod tests {
             .map(|s| s.split("</location>").next().unwrap().to_string())
             .collect();
 
-        assert_eq!(locations[0], format!("file://{}", file1.path.to_string_lossy()));
-        assert_eq!(locations[1], format!("file://{}", file2.path.to_string_lossy()));
+        assert_eq!(
+            locations[0],
+            format!("file://{}", file1.path.to_string_lossy())
+        );
+        assert_eq!(
+            locations[1],
+            format!("file://{}", file2.path.to_string_lossy())
+        );
     }
 }

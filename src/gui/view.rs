@@ -1,10 +1,17 @@
-use std::fs;
-use iced::{Element, widget::{button, column, container, row, Scrollable, scrollable, text, Space}, Length};
-use iced_aw::widgets::ContextMenu;
 use crate::fs::file_tree::{FileNode, NodeType};
-use crate::gui::{FileTreeApp, Message, LeftPanelSortMode, SortColumn, SortOrder, RightPanelFile};
+use crate::gui::{
+    FileTreeApp, LeftPanelSortMode, Message, RightPanelFile, SortColumn,
+    SortOrder,
+};
 use crate::utils::format_duration;
-
+use iced::{
+    Element, Length,
+    widget::{
+        Scrollable, Space, button, column, container, row, scrollable, text,
+    },
+};
+use iced_aw::widgets::ContextMenu;
+use std::fs;
 
 #[derive(Default)]
 struct AudioColumnToggles {
@@ -15,14 +22,12 @@ struct AudioColumnToggles {
     show_duration: bool,
 }
 
-
 #[derive(Debug, Clone, Copy)]
 struct MenuStyle {
     text_size: u16,
     spacing: u16,
     text_color: [f32; 4],
 }
-
 
 #[derive(Debug, Clone, Copy)]
 struct TreeBrowserStyle {
@@ -31,7 +36,6 @@ struct TreeBrowserStyle {
     directory_row_size: u16,
     file_row_size: u16,
 }
-
 
 #[derive(Debug, Clone, Copy)]
 struct ItemListStyle {
@@ -44,16 +48,24 @@ struct ItemListStyle {
     dark_row_shade: [f32; 3],
 }
 
-
-/// Creates the file extension filter menu for the left panel, including a styled header button
-///     that toggles the menu and a list of extension toggle buttons. The menu appearance is controlled
-///     by the given text size and color.
-fn create_extension_menu(app: &FileTreeApp, menu_size: u16, menu_text_color: [f32; 4]) -> Element<Message> {
-
+/// Creates the file extension filter menu for the left panel, including a
+/// styled header button that toggles the menu and a list of extension toggle
+/// buttons. The menu appearance is controlled by the given text size and color.
+fn create_extension_menu(
+    app: &FileTreeApp,
+    menu_size: u16,
+    menu_text_color: [f32; 4],
+) -> Element<Message> {
     let header = button(
-        text(if app.extensions_menu_expanded { "▼ File Extensions" } else { "▶ File Extensions" })
-            .size(menu_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_text_color.into()) })
+        text(if app.extensions_menu_expanded {
+            "▼ File Extensions"
+        } else {
+            "▶ File Extensions"
+        })
+        .size(menu_size)
+        .style(move |_theme| iced::widget::text::Style {
+            color: Some(menu_text_color.into()),
+        }),
     )
     .on_press(Message::ToggleExtensionsMenu);
 
@@ -61,10 +73,14 @@ fn create_extension_menu(app: &FileTreeApp, menu_size: u16, menu_text_color: [f3
         let mut menu = column![];
         for ext in &app.all_extensions {
             let checked = app.selected_extensions.contains(ext);
-            let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+            let label = if checked {
+                format!("[x] .{ext}")
+            } else {
+                format!("[ ] .{ext}")
+            };
             menu = menu.push(
                 button(text(label))
-                    .on_press(Message::ToggleExtension(ext.clone()))
+                    .on_press(Message::ToggleExtension(ext.clone())),
             );
         }
         column![header, menu].into()
@@ -73,58 +89,79 @@ fn create_extension_menu(app: &FileTreeApp, menu_size: u16, menu_text_color: [f3
     }
 }
 
-
-/// Creates the toggle button for the left panel, displaying either a left or right arrow
-///     depending on the current expansion state. The button uses the specified menu style for
-///     text size and triggers the `ToggleLeftPanel` message when pressed.
-fn create_toggle_left_panel_button(app: &FileTreeApp, menu_style: MenuStyle) -> iced::widget::Button<Message> {
-
+/// Creates the toggle button for the left panel, displaying either a left or
+/// right arrow depending on the current expansion state. The button uses the
+/// specified menu style for text size and triggers the `ToggleLeftPanel`
+/// message when pressed.
+fn create_toggle_left_panel_button(
+    app: &FileTreeApp,
+    menu_style: MenuStyle,
+) -> iced::widget::Button<Message> {
     // toggle appearance of left panel
     button(
-        text(if app.left_panel_expanded { "←" } else { "→" }).size(menu_style.text_size)
+        text(if app.left_panel_expanded { "←" } else { "→" })
+            .size(menu_style.text_size),
     )
     .on_press(Message::ToggleLeftPanel)
 }
 
-
-/// Constructs the left panel's menu row containing the "Add Directory" button and the file extension menu,
-///     applying the specified text size, spacing, and color styling to both buttons.
-// fn create_left_panel_menu_row(app: &FileTreeApp, toggle_left_panel_button: iced::widget::Button<Message>, menu_style: MenuStyle) -> Element<Message> {
+/// Constructs the left panel's menu row containing the "Add Directory" button
+/// and the file extension menu, applying the specified text size, spacing, and
+/// color styling to both buttons.
 fn create_left_panel_menu_row<'a>(
     app: &'a FileTreeApp,
     menu_style: MenuStyle,
 ) -> Element<'a, Message> {
-
-    let toggle_left_panel_button = create_toggle_left_panel_button(app, menu_style);
-    let directory_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-        iced::widget::text("Add Directory")
-            .size(menu_style.text_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
-    )
-    .on_press(Message::AddDirectory);
+    let toggle_left_panel_button =
+        create_toggle_left_panel_button(app, menu_style);
+    let directory_button =
+        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+            iced::widget::text("Add Directory")
+                .size(menu_style.text_size)
+                .style(move |_theme| iced::widget::text::Style {
+                    color: Some(menu_style.text_color.into()),
+                }),
+        )
+        .on_press(Message::AddDirectory);
 
     let sort_mode_label = match app.left_panel_sort_mode {
         LeftPanelSortMode::Alphanumeric => "Sort: Name",
         LeftPanelSortMode::ModifiedDate => "Sort: Date Modified",
     };
-    let sort_mode_button = iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-        iced::widget::text(sort_mode_label)
-            .size(menu_style.text_size)
-            .style(move |_theme: &iced::Theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
-    )
-    .on_press(Message::ToggleLeftPanelSortMode);
+    let sort_mode_button =
+        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+            iced::widget::text(sort_mode_label)
+                .size(menu_style.text_size)
+                .style(move |_theme: &iced::Theme| iced::widget::text::Style {
+                    color: Some(menu_style.text_color.into()),
+                }),
+        )
+        .on_press(Message::ToggleLeftPanelSortMode);
 
-    iced::widget::row![toggle_left_panel_button, directory_button, sort_mode_button].spacing(menu_style.spacing).into()
+    iced::widget::row![
+        toggle_left_panel_button,
+        directory_button,
+        sort_mode_button
+    ]
+    .spacing(menu_style.spacing)
+    .into()
 }
 
-
-///  Recursively renders a file tree node (directory or file) with indentation based on depth,  
-///      including context menus for directory and file actions.
+///  Recursively renders a file tree node (directory or file) with indentation
+///  based on depth, including context menus for directory and file actions.
 fn render_node(
-    node: &FileNode, depth: usize, directory_row_size: u16, file_row_size: u16, sort_mode: LeftPanelSortMode,
-    flat_button_style: impl Fn(&iced::Theme, iced::widget::button::Status) -> iced::widget::button::Style + Copy + 'static,
-    ) -> Element<Message> {
-
+    node: &FileNode,
+    depth: usize,
+    directory_row_size: u16,
+    file_row_size: u16,
+    sort_mode: LeftPanelSortMode,
+    flat_button_style: impl Fn(
+        &iced::Theme,
+        iced::widget::button::Status,
+    ) -> iced::widget::button::Style
+    + Copy
+    + 'static,
+) -> Element<Message> {
     let indent = "  ".repeat(depth);
 
     let mut content = column![];
@@ -135,39 +172,47 @@ fn render_node(
             let dir_path = node.path.clone();
 
             let dir_label = container(
-                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name)).size(directory_row_size)
-            ).width(Length::Fill);
+                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
+                    .size(directory_row_size),
+            )
+            .width(Length::Fill);
 
             let dir_row = row![dir_label];
-
 
             let context_menu = ContextMenu::new(
                 button(dir_row)
                     .on_press(Message::ToggleExpansion(node.path.clone())),
                 move || {
-                    column![
-                        button("Add all files to right panel")
-                            .on_press(Message::AddDirectoryToRightPanel(dir_path.clone()))
-                    ]
+                    column![button("Add all files to right panel").on_press(
+                        Message::AddDirectoryToRightPanel(dir_path.clone())
+                    )]
                     .into()
                 },
             );
             content = content.push(context_menu);
 
             if node.is_expanded {
-                let mut indices: Vec<usize> = (0..node.children.len()).collect();
+                let mut indices: Vec<usize> =
+                    (0..node.children.len()).collect();
                 match sort_mode {
                     LeftPanelSortMode::Alphanumeric => {
                         indices.sort_by(|&i, &j| {
                             let a = &node.children[i];
                             let b = &node.children[j];
                             match (a.node_type.clone(), b.node_type.clone()) {
-                                (NodeType::Directory, NodeType::File) => std::cmp::Ordering::Less,
-                                (NodeType::File, NodeType::Directory) => std::cmp::Ordering::Greater,
-                                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                                (NodeType::Directory, NodeType::File) => {
+                                    std::cmp::Ordering::Less
+                                },
+                                (NodeType::File, NodeType::Directory) => {
+                                    std::cmp::Ordering::Greater
+                                },
+                                _ => a
+                                    .name
+                                    .to_lowercase()
+                                    .cmp(&b.name.to_lowercase()),
                             }
                         });
-                    }
+                    },
                     LeftPanelSortMode::ModifiedDate => {
                         indices.sort_by(|&i, &j| {
                             let a = &node.children[i];
@@ -179,98 +224,116 @@ fn render_node(
                                 .and_then(|m| m.modified())
                                 .ok();
                             match (a.node_type.clone(), b.node_type.clone()) {
-                                (NodeType::Directory, NodeType::File) => std::cmp::Ordering::Less,
-                                (NodeType::File, NodeType::Directory) => std::cmp::Ordering::Greater,
+                                (NodeType::Directory, NodeType::File) => {
+                                    std::cmp::Ordering::Less
+                                },
+                                (NodeType::File, NodeType::Directory) => {
+                                    std::cmp::Ordering::Greater
+                                },
                                 _ => b_time.cmp(&a_time), // newest first
                             }
                         });
-                    }
+                    },
                 }
                 for &i in &indices {
                     let child = &node.children[i];
-                    content = content.push(render_node(child, depth + 1, directory_row_size, file_row_size, sort_mode, flat_button_style));
+                    content = content.push(render_node(
+                        child,
+                        depth + 1,
+                        directory_row_size,
+                        file_row_size,
+                        sort_mode,
+                        flat_button_style,
+                    ));
                 }
             }
-        }
+        },
         NodeType::File => {
-            let file_row = text(format!("{} 📄 {}", indent, node.name)).size(file_row_size);
+            let file_row = text(format!("{} 📄 {}", indent, node.name))
+                .size(file_row_size);
 
             let file_path = node.path.clone();
 
-            let context_menu = ContextMenu::new(
-                button(file_row).style(flat_button_style),
-                move || {
-                    column![
-                        button("Add to right panel")
-                            .on_press(Message::AddToRightPanel(file_path.clone()))
-                    ]
-                    .into()
-                },
-            );
+            let context_menu =
+                ContextMenu::new(
+                    button(file_row).style(flat_button_style),
+                    move || {
+                        column![button("Add to right panel").on_press(
+                            Message::AddToRightPanel(file_path.clone())
+                        )]
+                        .into()
+                    },
+                );
 
             content = content.push(context_menu);
-        }
+        },
     }
 
     content.into()
 }
 
-
-/// Builds the column of directory trees for the left panel, including directory headers and file trees,
-///     with configurable spacing between rows and directory name text size.
-fn create_left_panel_tree_browser(app: &FileTreeApp, tree_browser_style: TreeBrowserStyle) -> iced::widget::Column<'_, Message> {
-
-    let flat_button_style = |_theme: &iced::Theme, _status: iced::widget::button::Status| iced::widget::button::Style {
-        background: None,
-        border: iced::Border::default(),
-        shadow: iced::Shadow::default(),
-        text_color: iced::Color::WHITE,
-    };
+/// Builds the column of directory trees for the left panel, including directory
+/// headers and file trees, with configurable spacing between rows and directory
+/// name text size.
+fn create_left_panel_tree_browser(
+    app: &FileTreeApp,
+    tree_browser_style: TreeBrowserStyle,
+) -> iced::widget::Column<'_, Message> {
+    let flat_button_style =
+        |_theme: &iced::Theme, _status: iced::widget::button::Status| {
+            iced::widget::button::Style {
+                background: None,
+                border: iced::Border::default(),
+                shadow: iced::Shadow::default(),
+                text_color: iced::Color::WHITE,
+            }
+        };
 
     let gap_width = tree_browser_style.remove_button_width / 4;
 
     let mut trees = column![];
     for (i, node_opt) in app.root_nodes.iter().enumerate() {
-
         let dir_path = app.top_dirs.get(i).cloned().unwrap_or_default();
 
         // Remove button (narrow column)
-        let remove_button = button(
-                text("X").size(tree_browser_style.directory_row_size)
-            )
-            .width(tree_browser_style.remove_button_width - gap_width)
-            .on_press(Message::RemoveTopDir(dir_path.clone()));
+        let remove_button =
+            button(text("X").size(tree_browser_style.directory_row_size))
+                .width(tree_browser_style.remove_button_width - gap_width)
+                .on_press(Message::RemoveTopDir(dir_path.clone()));
 
         let content = if let Some(node) = node_opt {
             // Directory tree
-            render_node(node, 0, tree_browser_style.directory_row_size, tree_browser_style.file_row_size, app.left_panel_sort_mode, flat_button_style)
+            render_node(
+                node,
+                0,
+                tree_browser_style.directory_row_size,
+                tree_browser_style.file_row_size,
+                app.left_panel_sort_mode,
+                flat_button_style,
+            )
         } else {
             text("No files found").into()
         };
 
         // Row: [X][directory tree]
-        let row = row![
-            content,
-            Space::with_width(gap_width),
-            remove_button,
-        ]
-        .align_y(iced::Alignment::Start);
+        let row = row![content, Space::with_width(gap_width), remove_button,]
+            .align_y(iced::Alignment::Start);
 
         trees = trees.push(row);
-        trees = trees.push(Space::with_height(tree_browser_style.tree_row_height));
+        trees =
+            trees.push(Space::with_height(tree_browser_style.tree_row_height));
     }
     trees
 }
 
-
-/// Creates a widget displaying the total number of items and the sum of durations
-///      for all files shown in the right panel.
-fn create_totals_display(displayed_files: &[RightPanelFile], menu_style: MenuStyle) -> Element<'static, Message> {
-
-    let total_duration_ms: u64 = displayed_files
-        .iter()
-        .filter_map(|f| f.duration_ms)
-        .sum();
+/// Creates a widget displaying the total number of items and the sum of
+/// durations for all files shown in the right panel.
+fn create_totals_display(
+    displayed_files: &[RightPanelFile],
+    menu_style: MenuStyle,
+) -> Element<'static, Message> {
+    let total_duration_ms: u64 =
+        displayed_files.iter().filter_map(|f| f.duration_ms).sum();
     let row_count = displayed_files.len();
     let total_duration_str = format!(
         " {} Item{}, Time: {}",
@@ -280,23 +343,26 @@ fn create_totals_display(displayed_files: &[RightPanelFile], menu_style: MenuSty
     );
     iced::widget::text(total_duration_str)
         .size(menu_style.text_size)
-        .style(move |_theme| iced::widget::text::Style { color: Some([1.0, 1.0, 1.0, 1.0].into()) })
+        .style(move |_theme| iced::widget::text::Style {
+            color: Some([1.0, 1.0, 1.0, 1.0].into()),
+        })
         .into()
 }
 
-
-///  Creates the right panel's menu row with "Shuffle", "Export to XSPF", and "Play in VLC" buttons,
-///      applying the specified text size, spacing, and color styling to each button.
+/// Creates the right panel's menu row with "Shuffle", "Export to XSPF", and
+/// "Play in VLC" buttons, applying the specified text size, spacing, and color
+/// styling to each button.
 fn create_right_panel_menu_row(
     menu_style: MenuStyle,
     extra_widget: Option<Element<'static, Message>>,
 ) -> Element<'static, Message> {
-
     let shuffle_button = iced::widget::button(
         iced::widget::text("Shuffle")
             .width(Length::Shrink)
             .size(menu_style.text_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
+            .style(move |_theme| iced::widget::text::Style {
+                color: Some(menu_style.text_color.into()),
+            }),
     )
     .on_press(Message::ShuffleRightPanel)
     .width(Length::Shrink);
@@ -305,7 +371,9 @@ fn create_right_panel_menu_row(
         iced::widget::text("Export to XSPF")
             .width(Length::Shrink)
             .size(menu_style.text_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
+            .style(move |_theme| iced::widget::text::Style {
+                color: Some(menu_style.text_color.into()),
+            }),
     )
     .on_press(Message::ExportRightPanelAsXspf)
     .width(Length::Shrink);
@@ -314,7 +382,9 @@ fn create_right_panel_menu_row(
         iced::widget::text("Play")
             .width(Length::Shrink)
             .size(menu_style.text_size)
-            .style(move |_theme| iced::widget::text::Style { color: Some(menu_style.text_color.into()) })
+            .style(move |_theme| iced::widget::text::Style {
+                color: Some(menu_style.text_color.into()),
+            }),
     )
     .on_press(Message::ExportAndPlayRightPanelAsXspf)
     .width(Length::Shrink);
@@ -332,55 +402,82 @@ fn create_right_panel_menu_row(
     row.into()
 }
 
-
-///  Builds the header row for the right panel table, including sortable column buttons for  
-///      directory, file, and optionally musician, album, title, and genre. Column spacing and  
-///      text size are configurable via parameters.
-fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnToggles, column_spacing: u16, header_text_size: u16, header_text_color: [f32; 4]) -> iced::widget::Row<'static, Message> {
-
+/// Builds the header row for the right panel table, including sortable column
+/// buttons for directory, file, and optionally musician, album, title, and
+/// genre. Column spacing and text size are configurable via parameters.
+fn right_panel_header_row(
+    app: &FileTreeApp,
+    audio_column_toggles: AudioColumnToggles,
+    column_spacing: u16,
+    header_text_size: u16,
+    header_text_color: [f32; 4],
+) -> iced::widget::Row<'static, Message> {
     // Sorting arrows
     let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else { "" };
+    } else {
+        ""
+    };
     let file_arrow = if app.right_panel_sort_column == SortColumn::File {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else { "" };
-    let musician_arrow = if audio_column_toggles.show_musician && app.right_panel_sort_column == SortColumn::Musician {
+    } else {
+        ""
+    };
+    let musician_arrow = if audio_column_toggles.show_musician
+        && app.right_panel_sort_column == SortColumn::Musician
+    {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else { "" };
-    let album_arrow = if audio_column_toggles.show_album && app.right_panel_sort_column == SortColumn::Album {
+    } else {
+        ""
+    };
+    let album_arrow = if audio_column_toggles.show_album
+        && app.right_panel_sort_column == SortColumn::Album
+    {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else { "" };
-    let title_arrow = if audio_column_toggles.show_title && app.right_panel_sort_column == SortColumn::Title {
+    } else {
+        ""
+    };
+    let title_arrow = if audio_column_toggles.show_title
+        && app.right_panel_sort_column == SortColumn::Title
+    {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else { "" };
-    let genre_arrow = if audio_column_toggles.show_genre && app.right_panel_sort_column == SortColumn::Genre {
+    } else {
+        ""
+    };
+    let genre_arrow = if audio_column_toggles.show_genre
+        && app.right_panel_sort_column == SortColumn::Genre
+    {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else { "" };
-    let duration_arrow = if app.right_panel_sort_column == SortColumn::Duration {
+    } else {
+        ""
+    };
+    let duration_arrow = if app.right_panel_sort_column == SortColumn::Duration
+    {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
             SortOrder::Asc => " ↓",
         }
-    } else { "" };
+    } else {
+        ""
+    };
 
     let mut header_row = iced::widget::Row::new()
         .push(
@@ -388,20 +485,24 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
                 iced::widget::text(format!("Directory{dir_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+                    .style(move |_theme| iced::widget::text::Style {
+                        color: Some(header_text_color.into()),
+                    }),
             )
             .on_press(Message::SortRightPanelByDirectory)
-            .width(Length::FillPortion(1))
+            .width(Length::FillPortion(1)),
         )
         .push(
             iced::widget::button(
                 iced::widget::text(format!("File{file_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+                    .style(move |_theme| iced::widget::text::Style {
+                        color: Some(header_text_color.into()),
+                    }),
             )
             .on_press(Message::SortRightPanelByFile)
-            .width(Length::FillPortion(1))
+            .width(Length::FillPortion(1)),
         );
 
     if audio_column_toggles.show_musician {
@@ -410,10 +511,12 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
                 iced::widget::text(format!("Musician{musician_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+                    .style(move |_theme| iced::widget::text::Style {
+                        color: Some(header_text_color.into()),
+                    }),
             )
             .on_press(Message::SortRightPanelByMusician)
-            .width(Length::FillPortion(1))
+            .width(Length::FillPortion(1)),
         );
     }
     if audio_column_toggles.show_album {
@@ -422,10 +525,12 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
                 iced::widget::text(format!("Album{album_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+                    .style(move |_theme| iced::widget::text::Style {
+                        color: Some(header_text_color.into()),
+                    }),
             )
             .on_press(Message::SortRightPanelByAlbum)
-            .width(Length::FillPortion(1))
+            .width(Length::FillPortion(1)),
         );
     }
     if audio_column_toggles.show_title {
@@ -434,10 +539,12 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
                 iced::widget::text(format!("Title{title_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+                    .style(move |_theme| iced::widget::text::Style {
+                        color: Some(header_text_color.into()),
+                    }),
             )
             .on_press(Message::SortRightPanelByTitle)
-            .width(Length::FillPortion(1))
+            .width(Length::FillPortion(1)),
         );
     }
     if audio_column_toggles.show_genre {
@@ -446,10 +553,12 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
                 iced::widget::text(format!("Genre{genre_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+                    .style(move |_theme| iced::widget::text::Style {
+                        color: Some(header_text_color.into()),
+                    }),
             )
             .on_press(Message::SortRightPanelByGenre)
-            .width(Length::FillPortion(1))
+            .width(Length::FillPortion(1)),
         );
     }
     if audio_column_toggles.show_duration {
@@ -458,10 +567,12 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
                 iced::widget::text(format!("Duration{duration_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style { color: Some(header_text_color.into()) })
+                    .style(move |_theme| iced::widget::text::Style {
+                        color: Some(header_text_color.into()),
+                    }),
             )
             .on_press(Message::SortRightPanelByDuration)
-            .width(Length::FillPortion(1))
+            .width(Length::FillPortion(1)),
         );
     }
 
@@ -469,12 +580,16 @@ fn right_panel_header_row(app: &FileTreeApp, audio_column_toggles: AudioColumnTo
     header_row
 }
 
-
-///  Creates the directory cell widget for a right panel row, displaying the parent directory  
-///      name with the specified text size and providing a context menu for directory actions.
-fn create_right_panel_dir_widget(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
-
-    let dirname = file.path.parent()
+/// Creates the directory cell widget for a right panel row, displaying the
+/// parent directory name with the specified text size and providing a context
+/// menu for directory actions.
+fn create_right_panel_dir_widget(
+    file: &RightPanelFile,
+    row_text_size: u16,
+) -> Element<'static, Message> {
+    let dirname = file
+        .path
+        .parent()
         .and_then(|p| p.file_name())
         .map(|d| d.to_string_lossy().to_string())
         .unwrap_or_default();
@@ -482,58 +597,86 @@ fn create_right_panel_dir_widget(file: &RightPanelFile, row_text_size: u16) -> E
     let dir_widget = if let Some(path) = dir_path {
         let dir_path = path.clone();
         iced_aw::widgets::ContextMenu::new(
-            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)).size(row_text_size),
+            iced::widget::text(dirname.clone())
+                .width(Length::FillPortion(1))
+                .size(row_text_size),
             Box::new(move || {
                 iced::widget::column![
-                    iced::widget::button("Delete All in Directory")
-                        .on_press(Message::RemoveDirectoryFromRightPanel(dir_path.clone()))
-                ].into()
-            }) as Box<dyn Fn() -> iced::Element<'static, Message>>
+                    iced::widget::button("Delete All in Directory").on_press(
+                        Message::RemoveDirectoryFromRightPanel(
+                            dir_path.clone()
+                        )
+                    )
+                ]
+                .into()
+            }) as Box<dyn Fn() -> iced::Element<'static, Message>>,
         )
     } else {
         iced_aw::widgets::ContextMenu::new(
-            iced::widget::text(dirname.clone()).width(Length::FillPortion(1)).size(row_text_size),
-            Box::new(|| iced::widget::column![].into()) as Box<dyn Fn() -> iced::Element<'static, Message>>
+            iced::widget::text(dirname.clone())
+                .width(Length::FillPortion(1))
+                .size(row_text_size),
+            Box::new(|| iced::widget::column![].into())
+                as Box<dyn Fn() -> iced::Element<'static, Message>>,
         )
     };
     dir_widget.into()
 }
 
-
-///  Creates the file cell widget for a right panel row, displaying the file name with the  
-///      specified text size and providing a context menu for file-specific actions.
-fn create_right_panel_file_context_menu(file: &RightPanelFile, row_text_size: u16) -> Element<'static, Message> {
-
-    let filename = file.path.file_name()
+/// Creates the file cell widget for a right panel row, displaying the file name
+/// with the  specified text size and providing a context menu for file-specific
+/// actions.
+fn create_right_panel_file_context_menu(
+    file: &RightPanelFile,
+    row_text_size: u16,
+) -> Element<'static, Message> {
+    let filename = file
+        .path
+        .file_name()
         .map(|f| f.to_string_lossy().to_string())
         .unwrap_or_default();
     let file_context_menu = iced_aw::widgets::ContextMenu::new(
-        iced::widget::text(filename.clone()).width(Length::FillPortion(1)).size(row_text_size),
+        iced::widget::text(filename.clone())
+            .width(Length::FillPortion(1))
+            .size(row_text_size),
         {
             let file_path = file.path.clone();
             Box::new(move || {
                 iced::widget::column![
-                    iced::widget::button("Delete")
-                        .on_press(Message::RemoveFromRightPanel(file_path.clone()))
-                ].into()
+                    iced::widget::button("Delete").on_press(
+                        Message::RemoveFromRightPanel(file_path.clone())
+                    )
+                ]
+                .into()
             }) as Box<dyn Fn() -> iced::Element<'static, Message>>
-        }
+        },
     );
     file_context_menu.into()
 }
 
-
-///  Assembles the entire right panel, including the menu row, header row, and all file rows,  
-///      applying the specified menu size, spacing, and text color to controls and table content.
-fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, item_list_style: ItemListStyle) -> Element<Message> {
-
+/// Assembles the entire right panel, including the menu row, header row, and
+/// all file rows,  applying the specified menu size, spacing, and text color to
+/// controls and table content.
+fn create_right_panel(
+    app: &FileTreeApp,
+    menu_style: MenuStyle,
+    item_list_style: ItemListStyle,
+) -> Element<Message> {
     let displayed_files = app.sorted_right_panel_files();
 
     // Determine which columns to show
-    let show_musician = displayed_files.iter().any(|f| f.musician.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_album    = displayed_files.iter().any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_title    = displayed_files.iter().any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_genre    = displayed_files.iter().any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_musician = displayed_files
+        .iter()
+        .any(|f| f.musician.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_album = displayed_files
+        .iter()
+        .any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_title = displayed_files
+        .iter()
+        .any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+    let show_genre = displayed_files
+        .iter()
+        .any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
     let show_duration = displayed_files.iter().any(|f| f.duration_ms.is_some());
 
     let audio_column_toggles = AudioColumnToggles {
@@ -544,38 +687,67 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, item_list_style:
         show_duration,
     };
 
-
     let totals_display = create_totals_display(&displayed_files, menu_style);
     let header_text_size = item_list_style.row_text_size + 4;
-    let menu_row = create_right_panel_menu_row(menu_style, Some(totals_display));
+    let menu_row =
+        create_right_panel_menu_row(menu_style, Some(totals_display));
 
-    let header_row = right_panel_header_row(app, audio_column_toggles, item_list_style.column_row_spacing, header_text_size, item_list_style.header_text_color);
+    let header_row = right_panel_header_row(
+        app,
+        audio_column_toggles,
+        item_list_style.column_row_spacing,
+        header_text_size,
+        item_list_style.header_text_color,
+    );
 
     let mut rows = Vec::new();
     for (i, file_ref) in displayed_files.iter().enumerate() {
         let file = file_ref.clone();
 
-        let dir_widget = create_right_panel_dir_widget(&file, item_list_style.row_text_size);
-        let file_context_menu = create_right_panel_file_context_menu(&file, item_list_style.row_text_size);
+        let dir_widget =
+            create_right_panel_dir_widget(&file, item_list_style.row_text_size);
+        let file_context_menu = create_right_panel_file_context_menu(
+            &file,
+            item_list_style.row_text_size,
+        );
 
-        let mut row = iced::widget::Row::new()
-            .push(dir_widget)
-            .push(file_context_menu);
+        let mut row =
+            iced::widget::Row::new().push(dir_widget).push(file_context_menu);
 
         if show_musician {
-            row = row.push(iced::widget::text(file.musician.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(item_list_style.row_text_size));
+            row = row.push(
+                iced::widget::text(file.musician.clone().unwrap_or_default())
+                    .width(Length::FillPortion(1))
+                    .size(item_list_style.row_text_size),
+            );
         }
         if show_album {
-            row = row.push(iced::widget::text(file.album.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(item_list_style.row_text_size));
+            row = row.push(
+                iced::widget::text(file.album.clone().unwrap_or_default())
+                    .width(Length::FillPortion(1))
+                    .size(item_list_style.row_text_size),
+            );
         }
         if show_title {
-            row = row.push(iced::widget::text(file.title.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(item_list_style.row_text_size));
+            row = row.push(
+                iced::widget::text(file.title.clone().unwrap_or_default())
+                    .width(Length::FillPortion(1))
+                    .size(item_list_style.row_text_size),
+            );
         }
         if show_genre {
-            row = row.push(iced::widget::text(file.genre.clone().unwrap_or_default()).width(Length::FillPortion(1)).size(item_list_style.row_text_size));
+            row = row.push(
+                iced::widget::text(file.genre.clone().unwrap_or_default())
+                    .width(Length::FillPortion(1))
+                    .size(item_list_style.row_text_size),
+            );
         }
         if show_duration {
-            row = row.push(iced::widget::text(format_duration(file.duration_ms)).width(Length::FillPortion(1)).size(item_list_style.row_text_size));
+            row = row.push(
+                iced::widget::text(format_duration(file.duration_ms))
+                    .width(Length::FillPortion(1))
+                    .size(item_list_style.row_text_size),
+            );
         }
         row = row.spacing(item_list_style.column_row_spacing);
 
@@ -583,10 +755,18 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, item_list_style:
         let pair = (i / 2) % 2;
         let bg_color = if pair == 0 {
             // iced::Color::from_rgb(0.13, 0.13, 0.13) // darker
-            iced::Color::from_rgb(item_list_style.dark_row_shade[0], item_list_style.dark_row_shade[1], item_list_style.dark_row_shade[2])
+            iced::Color::from_rgb(
+                item_list_style.dark_row_shade[0],
+                item_list_style.dark_row_shade[1],
+                item_list_style.dark_row_shade[2],
+            )
         } else {
             // iced::Color::from_rgb(0.18, 0.18, 0.18) // lighter
-            iced::Color::from_rgb(item_list_style.light_row_shade[0], item_list_style.light_row_shade[1], item_list_style.light_row_shade[2])
+            iced::Color::from_rgb(
+                item_list_style.light_row_shade[0],
+                item_list_style.light_row_shade[1],
+                item_list_style.light_row_shade[2],
+            )
         };
 
         let clickable_row = iced::widget::button(row)
@@ -611,11 +791,10 @@ fn create_right_panel(app: &FileTreeApp, menu_style: MenuStyle, item_list_style:
     col.into()
 }
 
-
-///  Composes the entire application UI, including the left and right panels, menus, and file trees,  
-///      using the current application state to determine layout and content.
+/// Composes the entire application UI, including the left and right panels,
+/// menus, and file trees, using the current application state to determine
+/// layout and content.
 pub fn view(app: &FileTreeApp) -> Element<Message> {
-
     let menu_style = MenuStyle {
         text_size: 20,
         spacing: 10,
@@ -634,12 +813,13 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         column_height_spacing: 10,
         row_text_size: 14,
         header_text_color: [1.0, 1.0, 0.0, 1.0],
-        right_panel_width: if app.left_panel_expanded {3} else {20},
+        right_panel_width: if app.left_panel_expanded { 3 } else { 20 },
         light_row_shade: [0.13, 0.13, 0.13],
         dark_row_shade: [0.16, 0.16, 0.16],
     };
     let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
-    let extension_menu = create_extension_menu(app, menu_style.text_size, menu_style.text_color);
+    let extension_menu =
+        create_extension_menu(app, menu_style.text_size, menu_style.text_color);
     let tree_browser = create_left_panel_tree_browser(app, tree_browser_style);
     let left_content = if app.left_panel_expanded {
         column![
@@ -652,31 +832,33 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     } else {
         column![create_toggle_left_panel_button(app, menu_style)]
     };
-    let left_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
-            scrollable(left_content)
-        )
+    let left_panel: Element<Message> =
+        container::<Message, iced::Theme, iced::Renderer>(scrollable(
+            left_content,
+        ))
         .width(Length::FillPortion(1))
         .padding(10)
         .into();
 
-    let right_panel: Element<Message> = container::<Message, iced::Theme, iced::Renderer>(
-            create_right_panel(app, menu_style, item_list_style)
-        )
+    let right_panel: Element<Message> =
+        container::<Message, iced::Theme, iced::Renderer>(create_right_panel(
+            app,
+            menu_style,
+            item_list_style,
+        ))
         .width(Length::FillPortion(item_list_style.right_panel_width))
         .into();
 
-    let split_row = row![
-        left_panel,
-        right_panel
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill);
+    let split_row =
+        row![left_panel, right_panel].width(Length::Fill).height(Length::Fill);
 
     container::<Message, iced::Theme, iced::Renderer>(split_row)
         .width(Length::Fill)
         .height(Length::Fill)
         .style(|_theme| iced::widget::container::Style {
-            background: Some(iced::Background::Color(iced::Color::from_rgb(0.15, 0.15, 0.15))),
+            background: Some(iced::Background::Color(iced::Color::from_rgb(
+                0.15, 0.15, 0.15,
+            ))),
             text_color: None,
             border: iced::Border::default(),
             shadow: iced::Shadow::default(),
@@ -687,37 +869,37 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
 #[cfg(test)]
 mod iced_tests {
     use super::*;
-    use std::path::PathBuf;
-    use tempfile::{tempdir, NamedTempFile};
-    use std::fs::File;
-    use crate::{update, view, FileTreeApp};
     use crate::gui::RightPanelFile;
+    use crate::{FileTreeApp, update, view};
+    use std::fs::File;
+    use std::path::PathBuf;
+    use tempfile::{NamedTempFile, tempdir};
 
     // Helper function to create a test file tree
     fn create_test_tree() -> FileNode {
         let mut root = FileNode::new_directory(
             "root".to_string(),
             PathBuf::from("/test/root"),
-            vec![]
+            vec![],
         );
-        
+
         let mut subdir = FileNode::new_directory(
             "subdir".to_string(),
             PathBuf::from("/test/root/subdir"),
-            vec![]
+            vec![],
         );
-        
+
         subdir.children.push(FileNode::new_file(
             "file1.txt".to_string(),
-            PathBuf::from("/test/root/subdir/file1.txt")
+            PathBuf::from("/test/root/subdir/file1.txt"),
         ));
-        
+
         root.children.push(subdir);
         root.children.push(FileNode::new_file(
             "file2.md".to_string(),
-            PathBuf::from("/test/root/file2.md")
+            PathBuf::from("/test/root/file2.md"),
         ));
-        
+
         root
     }
 
@@ -728,7 +910,6 @@ mod iced_tests {
 
         #[test]
         fn test_file_tree_app_new() {
-
             let root_node = create_test_tree();
             let dir = root_node.path.clone();
             let file_extensions = &["txt", "md"];
@@ -736,7 +917,8 @@ mod iced_tests {
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
 
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
             app.root_nodes[0] = Some(root_node); // manually set the test tree
 
             assert!(app.root_nodes[0].is_some());
@@ -749,7 +931,8 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
             assert!(app.root_nodes[0].is_none());
         }
 
@@ -759,9 +942,14 @@ mod iced_tests {
             let temp_dir = tempdir().unwrap();
             let dir = temp_dir.path().to_path_buf();
             let file_extensions = &["txt", "md"];
-            let persist_path = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
+            let persist_path =
+                tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
 
-            let app = FileTreeApp::new(vec![dir.clone()], file_extensions, persist_path.clone());
+            let app = FileTreeApp::new(
+                vec![dir.clone()],
+                file_extensions,
+                persist_path.clone(),
+            );
             let _ = app.persist_top_dirs();
 
             let app2 = FileTreeApp::load(file_extensions, Some(persist_path));
@@ -778,15 +966,21 @@ mod iced_tests {
             let persist_path = temp_file.path().to_path_buf();
 
             // Write corrupted data to the persistence file
-            let mut file = OpenOptions::new().write(true).open(&persist_path).unwrap();
+            let mut file =
+                OpenOptions::new().write(true).open(&persist_path).unwrap();
             writeln!(file, "corrupted data").unwrap();
 
             // Attempt to load top_dirs (should fallback to empty)
-            let app = FileTreeApp::new(vec![], file_extensions, persist_path.clone());
+            let app =
+                FileTreeApp::new(vec![], file_extensions, persist_path.clone());
             let _ = app.persist_top_dirs(); // Ensure file exists for load
 
-            let loaded_app = FileTreeApp::load(file_extensions, Some(persist_path));
-            assert!(loaded_app.top_dirs.is_empty(), "Should handle corrupted top_dirs state gracefully");
+            let loaded_app =
+                FileTreeApp::load(file_extensions, Some(persist_path));
+            assert!(
+                loaded_app.top_dirs.is_empty(),
+                "Should handle corrupted top_dirs state gracefully"
+            );
         }
 
         #[test]
@@ -795,7 +989,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             // Remove all selected extensions
             app.selected_extensions.clear();
@@ -811,7 +1006,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             // Try toggling an extension not in file_extensions
             let msg = Message::ToggleExtension("md".to_string());
@@ -822,24 +1018,37 @@ mod iced_tests {
 
         #[test]
         fn test_initial_top_leve_directory_expansion_behavior_one_directory() {
-
             let dir1 = PathBuf::from("/dir1");
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir1.clone()], file_extensions, persist_path.clone());
+            let mut app = FileTreeApp::new(
+                vec![dir1.clone()],
+                file_extensions,
+                persist_path.clone(),
+            );
             // Simulate a scanned directory node
-            let node1 = FileNode::new_directory("dir1".to_string(), dir1.clone(), vec![]);
+            let node1 = FileNode::new_directory(
+                "dir1".to_string(),
+                dir1.clone(),
+                vec![],
+            );
             app.root_nodes[0] = Some(node1);
             app.expanded_dirs.clear();
             app.expanded_dirs.insert(dir1.clone());
-            restore_expansion_state(app.root_nodes[0].as_mut().unwrap(), &app.expanded_dirs);
-            assert!(app.root_nodes[0].as_ref().unwrap().is_expanded, "Single top-level directory should be expanded");
+            restore_expansion_state(
+                app.root_nodes[0].as_mut().unwrap(),
+                &app.expanded_dirs,
+            );
+            assert!(
+                app.root_nodes[0].as_ref().unwrap().is_expanded,
+                "Single top-level directory should be expanded"
+            );
         }
 
         #[test]
-        fn test_initial_top_leve_directory_expansion_behavior_two_directories() {
-
+        fn test_initial_top_leve_directory_expansion_behavior_two_directories()
+        {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
@@ -847,16 +1056,40 @@ mod iced_tests {
             // Two top-level directories
             let dir1 = PathBuf::from("/dir1");
             let dir2 = PathBuf::from("/dir2");
-            let mut app2 = FileTreeApp::new(vec![dir1.clone(), dir2.clone()], file_extensions, persist_path.clone());
-            let node1 = FileNode::new_directory("dir1".to_string(), dir1.clone(), vec![]);
-            let node2 = FileNode::new_directory("dir2".to_string(), dir2.clone(), vec![]);
+            let mut app2 = FileTreeApp::new(
+                vec![dir1.clone(), dir2.clone()],
+                file_extensions,
+                persist_path.clone(),
+            );
+            let node1 = FileNode::new_directory(
+                "dir1".to_string(),
+                dir1.clone(),
+                vec![],
+            );
+            let node2 = FileNode::new_directory(
+                "dir2".to_string(),
+                dir2.clone(),
+                vec![],
+            );
             app2.root_nodes[0] = Some(node1);
             app2.root_nodes[1] = Some(node2);
             app2.expanded_dirs.clear();
-            restore_expansion_state(app2.root_nodes[0].as_mut().unwrap(), &app2.expanded_dirs);
-            restore_expansion_state(app2.root_nodes[1].as_mut().unwrap(), &app2.expanded_dirs);
-            assert!(!app2.root_nodes[0].as_ref().unwrap().is_expanded, "Multiple top-level directories should be collapsed");
-            assert!(!app2.root_nodes[1].as_ref().unwrap().is_expanded, "Multiple top-level directories should be collapsed");
+            restore_expansion_state(
+                app2.root_nodes[0].as_mut().unwrap(),
+                &app2.expanded_dirs,
+            );
+            restore_expansion_state(
+                app2.root_nodes[1].as_mut().unwrap(),
+                &app2.expanded_dirs,
+            );
+            assert!(
+                !app2.root_nodes[0].as_ref().unwrap().is_expanded,
+                "Multiple top-level directories should be collapsed"
+            );
+            assert!(
+                !app2.root_nodes[1].as_ref().unwrap().is_expanded,
+                "Multiple top-level directories should be collapsed"
+            );
         }
     }
 
@@ -875,7 +1108,8 @@ mod iced_tests {
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
             app.root_nodes[0] = Some(root_node); // manually set the test tree
 
             let subdir_path = PathBuf::from("/test/root/subdir");
@@ -884,7 +1118,9 @@ mod iced_tests {
             let _task = update(&mut app, message);
 
             // Should be expanded now
-            assert!(app.root_nodes[0].as_ref().unwrap().children[0].is_expanded);
+            assert!(
+                app.root_nodes[0].as_ref().unwrap().children[0].is_expanded
+            );
         }
 
         #[test]
@@ -895,7 +1131,8 @@ mod iced_tests {
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
             app.root_nodes[0] = Some(root_node); // manually set the test tree
 
             let subdir_path = PathBuf::from("/test/root/subdir");
@@ -903,12 +1140,16 @@ mod iced_tests {
             // Toggle once - should expand
             let message = Message::ToggleExpansion(subdir_path.clone());
             let _ = update(&mut app, message);
-            assert!(app.root_nodes[0].as_ref().unwrap().children[0].is_expanded);
+            assert!(
+                app.root_nodes[0].as_ref().unwrap().children[0].is_expanded
+            );
 
             // Toggle again - should collapse
             let message = Message::ToggleExpansion(subdir_path);
             let _ = update(&mut app, message);
-            assert!(!app.root_nodes[0].as_ref().unwrap().children[0].is_expanded);
+            assert!(
+                !app.root_nodes[0].as_ref().unwrap().children[0].is_expanded
+            );
         }
 
         #[test]
@@ -917,18 +1158,20 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
-            let message = Message::ToggleExpansion(PathBuf::from("/nonexistent"));
-            
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let message =
+                Message::ToggleExpansion(PathBuf::from("/nonexistent"));
+
             let _task = update(&mut app, message);
-            
+
             // Should not panic and app state should remain unchanged
             assert!(app.root_nodes[0].is_none());
         }
 
         #[test]
         fn test_update_with_invalid_message() {
-            use crate::gui::{update, FileTreeApp, Message};
+            use crate::gui::{FileTreeApp, Message, update};
             use std::path::PathBuf;
             use tempfile::NamedTempFile;
 
@@ -937,22 +1180,29 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             // Clone state before update
             let prev_state = app.clone();
 
             // Call update with a message that should have no effect
-            let _ = update(&mut app, Message::ToggleExtension("invalid_ext".to_string()));
+            let _ = update(
+                &mut app,
+                Message::ToggleExtension("invalid_ext".to_string()),
+            );
 
             // Assert that state is unchanged
             assert_eq!(app.selected_extensions, prev_state.selected_extensions);
-            assert_eq!(app.right_panel_shuffled, prev_state.right_panel_shuffled);
+            assert_eq!(
+                app.right_panel_shuffled,
+                prev_state.right_panel_shuffled
+            );
         }
 
         #[test]
         fn test_toggle_extension_duplicate_handling() {
-            use crate::gui::{update, FileTreeApp, Message};
+            use crate::gui::{FileTreeApp, Message, update};
             use std::path::PathBuf;
             use tempfile::NamedTempFile;
 
@@ -960,7 +1210,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             // Initially, "txt" is selected
             assert_eq!(app.selected_extensions, vec!["txt".to_string()]);
@@ -988,15 +1239,17 @@ mod iced_tests {
 
         #[test]
         fn test_update_performance_with_large_number_of_extensions() {
-
             let dir = PathBuf::from("/dummy");
             let num_ext = 1000;
-            let strings: Vec<String> = (0..num_ext).map(|i| format!("ext{i}")).collect();
-            let file_extensions: Vec<&str> = strings.iter().map(|s| s.as_str()).collect();
+            let strings: Vec<String> =
+                (0..num_ext).map(|i| format!("ext{i}")).collect();
+            let file_extensions: Vec<&str> =
+                strings.iter().map(|s| s.as_str()).collect();
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], &file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], &file_extensions, persist_path);
 
             // Toggle all extensions off
             for ext in &file_extensions {
@@ -1013,7 +1266,8 @@ mod iced_tests {
             assert_eq!(app.selected_extensions.len(), num_ext);
 
             // Ensure no duplicates
-            let unique: std::collections::HashSet<_> = app.selected_extensions.iter().collect();
+            let unique: std::collections::HashSet<_> =
+                app.selected_extensions.iter().collect();
             assert_eq!(unique.len(), num_ext);
         }
 
@@ -1023,7 +1277,8 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             let msg = Message::ToggleExtension("md".to_string());
             let _ = update(&mut app, msg);
@@ -1040,7 +1295,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             let msg = Message::ToggleExtensionsMenu;
             let _ = update(&mut app, msg);
@@ -1053,7 +1309,8 @@ mod iced_tests {
         #[test]
         fn test_add_to_right_panel() {
             let file_path = PathBuf::from("/file.txt");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             let msg = Message::AddToRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
             assert!(app.right_panel_files.iter().any(|f| f.path == file_path));
@@ -1064,11 +1321,25 @@ mod iced_tests {
             let dir_path = PathBuf::from("/dir");
             let file1 = PathBuf::from("/dir/file1.txt");
             let file2 = PathBuf::from("/dir/file2.txt");
-            let mut dir_node = FileNode::new_directory("dir".to_string(), dir_path.clone(), vec![]);
-            dir_node.children.push(FileNode::new_file("file1.txt".to_string(), file1.clone()));
-            dir_node.children.push(FileNode::new_file("file2.txt".to_string(), file2.clone()));
+            let mut dir_node = FileNode::new_directory(
+                "dir".to_string(),
+                dir_path.clone(),
+                vec![],
+            );
+            dir_node.children.push(FileNode::new_file(
+                "file1.txt".to_string(),
+                file1.clone(),
+            ));
+            dir_node.children.push(FileNode::new_file(
+                "file2.txt".to_string(),
+                file2.clone(),
+            ));
 
-            let mut app = FileTreeApp::new(vec![dir_path.clone()], &["txt"], PathBuf::from("/tmp"));
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                &["txt"],
+                PathBuf::from("/tmp"),
+            );
             app.root_nodes[0] = Some(dir_node);
 
             let msg = Message::AddDirectoryToRightPanel(dir_path.clone());
@@ -1080,7 +1351,8 @@ mod iced_tests {
         #[test]
         fn test_remove_from_right_panel() {
             let file_path = PathBuf::from("/file.txt");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             app.right_panel_files.push(RightPanelFile {
                 path: file_path.clone(),
                 musician: None,
@@ -1097,7 +1369,8 @@ mod iced_tests {
         #[test]
         fn test_remove_directory_from_right_panel() {
             let dir_path = PathBuf::from("/dir");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             let right_panel_file1 = RightPanelFile {
                 path: PathBuf::from("/dir/file1.txt"),
                 musician: None,
@@ -1122,19 +1395,36 @@ mod iced_tests {
                 genre: None,
                 duration_ms: None,
             };
-            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone(), right_panel_file3.clone()];
+            app.right_panel_files = vec![
+                right_panel_file1.clone(),
+                right_panel_file2.clone(),
+                right_panel_file3.clone(),
+            ];
             let msg = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
             let _ = update(&mut app, msg);
-            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file1.path));
-            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file2.path));
-            assert!(app.right_panel_files.iter().any(|f| f.path == right_panel_file3.path));
+            assert!(
+                !app.right_panel_files
+                    .iter()
+                    .any(|f| f.path == right_panel_file1.path)
+            );
+            assert!(
+                !app.right_panel_files
+                    .iter()
+                    .any(|f| f.path == right_panel_file2.path)
+            );
+            assert!(
+                app.right_panel_files
+                    .iter()
+                    .any(|f| f.path == right_panel_file3.path)
+            );
         }
 
         #[test]
         fn test_sort_right_panel_by_directory_and_file() {
             let file_a = PathBuf::from("/dir_a/file.txt");
             let file_b = PathBuf::from("/dir_b/file.txt");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             let right_panel_file_a = RightPanelFile {
                 path: file_a.clone(),
                 musician: None,
@@ -1151,7 +1441,8 @@ mod iced_tests {
                 genre: None,
                 duration_ms: None,
             };
-            app.right_panel_files = vec![right_panel_file_b.clone(), right_panel_file_a.clone()];
+            app.right_panel_files =
+                vec![right_panel_file_b.clone(), right_panel_file_a.clone()];
 
             let msg = Message::SortRightPanelByDirectory;
             let _ = update(&mut app, msg);
@@ -1171,7 +1462,8 @@ mod iced_tests {
         fn test_shuffle_right_panel() {
             let file1 = PathBuf::from("/dir/file1.txt");
             let file2 = PathBuf::from("/dir/file2.txt");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             let right_panel_file1 = RightPanelFile {
                 path: file1.clone(),
                 musician: None,
@@ -1188,7 +1480,8 @@ mod iced_tests {
                 genre: None,
                 duration_ms: None,
             };
-            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
+            app.right_panel_files =
+                vec![right_panel_file1.clone(), right_panel_file2.clone()];
             let msg = Message::ShuffleRightPanel;
             let _ = update(&mut app, msg);
             assert!(app.right_panel_shuffled);
@@ -1197,7 +1490,8 @@ mod iced_tests {
         #[test]
         fn test_add_duplicate_to_right_panel() {
             let file_path = PathBuf::from("/file.txt");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             let right_panel_file = RightPanelFile {
                 path: file_path.clone(),
                 musician: None,
@@ -1210,13 +1504,20 @@ mod iced_tests {
             let msg = Message::AddToRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
             // Should not add duplicate
-            assert_eq!(app.right_panel_files.iter().filter(|p| **p == right_panel_file).count(), 1);
+            assert_eq!(
+                app.right_panel_files
+                    .iter()
+                    .filter(|p| **p == right_panel_file)
+                    .count(),
+                1
+            );
         }
 
         #[test]
         fn test_remove_nonexistent_from_right_panel() {
             let file_path = PathBuf::from("/file.txt");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             // Try to remove a file that's not present
             let msg = Message::RemoveFromRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
@@ -1227,7 +1528,8 @@ mod iced_tests {
         #[test]
         fn test_remove_nonexistent_directory_from_right_panel() {
             let dir_path = PathBuf::from("/dir");
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             let right_panel_file = RightPanelFile {
                 path: PathBuf::from("/other/file.txt"),
                 musician: None,
@@ -1245,7 +1547,8 @@ mod iced_tests {
 
         #[test]
         fn test_sort_right_panel_empty_and_single() {
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             // Empty list
             let _ = update(&mut app, Message::SortRightPanelByDirectory);
             assert!(app.right_panel_files.is_empty());
@@ -1267,7 +1570,8 @@ mod iced_tests {
 
         #[test]
         fn test_shuffle_right_panel_empty_and_single() {
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
             // Empty list
             let _ = update(&mut app, Message::ShuffleRightPanel);
             assert!(app.right_panel_shuffled);
@@ -1306,8 +1610,10 @@ mod iced_tests {
                 genre: None,
                 duration_ms: None,
             };
-            let mut app = FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
-            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+            app.right_panel_files =
+                vec![right_panel_file1.clone(), right_panel_file2.clone()];
 
             // Sort
             let _ = update(&mut app, Message::SortRightPanelByDirectory);
@@ -1328,7 +1634,8 @@ mod iced_tests {
             let file_extensions: &[&str] = &[];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             // Try toggling a non-existent extension
             let msg = Message::ToggleExtension("md".to_string());
@@ -1343,7 +1650,8 @@ mod iced_tests {
             let file_extensions: &[&str] = &[];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             // Toggle menu open and closed
             let msg = Message::ToggleExtensionsMenu;
@@ -1356,7 +1664,7 @@ mod iced_tests {
 
         #[test]
         fn test_toggle_extension_with_empty_string() {
-            use crate::gui::{update, FileTreeApp, Message};
+            use crate::gui::{FileTreeApp, Message, update};
             use std::path::PathBuf;
             use tempfile::NamedTempFile;
 
@@ -1364,7 +1672,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             let msg = Message::ToggleExtension("".to_string());
             let _ = update(&mut app, msg);
@@ -1373,7 +1682,7 @@ mod iced_tests {
 
         #[test]
         fn test_toggle_extension_with_nonexistent_extension() {
-            use crate::gui::{update, FileTreeApp, Message};
+            use crate::gui::{FileTreeApp, Message, update};
             use std::path::PathBuf;
             use tempfile::NamedTempFile;
 
@@ -1381,16 +1690,19 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             let msg = Message::ToggleExtension("nonexistent".to_string());
             let _ = update(&mut app, msg);
-            assert!(!app.selected_extensions.contains(&"nonexistent".to_string()));
+            assert!(
+                !app.selected_extensions.contains(&"nonexistent".to_string())
+            );
         }
 
         #[test]
         fn test_toggle_extension_with_special_characters() {
-            use crate::gui::{update, FileTreeApp, Message};
+            use crate::gui::{FileTreeApp, Message, update};
             use std::path::PathBuf;
             use tempfile::NamedTempFile;
 
@@ -1398,7 +1710,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             let msg = Message::ToggleExtension("💥".to_string());
             let _ = update(&mut app, msg);
@@ -1417,7 +1730,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
             // Simulate adding a file path
             let message = Message::DirectoryAdded(Some(file_path.clone()));
@@ -1431,18 +1745,34 @@ mod iced_tests {
         #[test]
         fn test_deeply_nested_expansion() {
             let dir = PathBuf::from("/dummy");
-            let mut root = FileNode::new_directory("root".to_string(), PathBuf::from("/root"), vec![]);
-            let mut level1 = FileNode::new_directory("level1".to_string(), PathBuf::from("/root/level1"), vec![]);
-            let mut level2 = FileNode::new_directory("level2".to_string(), PathBuf::from("/root/level1/level2"), vec![]);
+            let mut root = FileNode::new_directory(
+                "root".to_string(),
+                PathBuf::from("/root"),
+                vec![],
+            );
+            let mut level1 = FileNode::new_directory(
+                "level1".to_string(),
+                PathBuf::from("/root/level1"),
+                vec![],
+            );
+            let mut level2 = FileNode::new_directory(
+                "level2".to_string(),
+                PathBuf::from("/root/level1/level2"),
+                vec![],
+            );
             let file_extensions = &["txt", "md"];
 
-            level2.children.push(FileNode::new_file("deep.txt".to_string(), PathBuf::from("/root/level1/level2/deep.txt")));
+            level2.children.push(FileNode::new_file(
+                "deep.txt".to_string(),
+                PathBuf::from("/root/level1/level2/deep.txt"),
+            ));
             level1.children.push(level2);
             root.children.push(level1);
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
             app.root_nodes[0] = Some(root); // manually set the test tree
 
             // Test expanding deeply nested directory
@@ -1451,13 +1781,14 @@ mod iced_tests {
             let _task = update(&mut app, message);
 
             // Verify the deep directory was expanded
-            let level2_node = &app.root_nodes[0].as_ref().unwrap().children[0].children[0];
+            let level2_node =
+                &app.root_nodes[0].as_ref().unwrap().children[0].children[0];
             assert!(level2_node.is_expanded);
         }
 
         #[test]
         fn test_toggle_left_panel_sort_mode() {
-            use crate::gui::{update, FileTreeApp, Message, LeftPanelSortMode};
+            use crate::gui::{FileTreeApp, LeftPanelSortMode, Message, update};
             use std::path::PathBuf;
             use tempfile::NamedTempFile;
 
@@ -1465,18 +1796,28 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
 
             // Default should be Alphanumeric
-            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::Alphanumeric);
+            assert_eq!(
+                app.left_panel_sort_mode,
+                LeftPanelSortMode::Alphanumeric
+            );
 
             // Toggle once
             let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
-            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::ModifiedDate);
+            assert_eq!(
+                app.left_panel_sort_mode,
+                LeftPanelSortMode::ModifiedDate
+            );
 
             // Toggle again
             let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
-            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::Alphanumeric);
+            assert_eq!(
+                app.left_panel_sort_mode,
+                LeftPanelSortMode::Alphanumeric
+            );
         }
     }
 
@@ -1491,10 +1832,11 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
-            
+            let app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+
             let _element = view(&app);
-            
+
             // Test passes if view() doesn't panic
             // We can't easily inspect Element content without custom renderer
         }
@@ -1505,10 +1847,11 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
-            
+            let app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+
             let _element = view(&app);
-            
+
             // Test passes if view() doesn't panic when rendering empty state
         }
 
@@ -1522,11 +1865,17 @@ mod iced_tests {
         #[test]
         fn test_view_renders_with_many_extensions() {
             let num_ext = 1000;
-            let strings: Vec<String> = (0..num_ext).map(|i| format!("ext{i}")).collect();
-            let file_extensions: Vec<&str> = strings.iter().map(|s| s.as_str()).collect();
+            let strings: Vec<String> =
+                (0..num_ext).map(|i| format!("ext{i}")).collect();
+            let file_extensions: Vec<&str> =
+                strings.iter().map(|s| s.as_str()).collect();
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let app = FileTreeApp::new(vec![PathBuf::from("/dummy")], &file_extensions, persist_path);
+            let app = FileTreeApp::new(
+                vec![PathBuf::from("/dummy")],
+                &file_extensions,
+                persist_path,
+            );
 
             let _element = view(&app);
             // Test passes if view() does not panic
@@ -1535,23 +1884,36 @@ mod iced_tests {
         #[test]
         fn test_extension_menu_labels_with_many_extensions() {
             let num_ext = 1000;
-            let strings: Vec<String> = (0..num_ext).map(|i| format!("ext{i}")).collect();
-            let file_extensions: Vec<&str> = strings.iter().map(|s| s.as_str()).collect();
+            let strings: Vec<String> =
+                (0..num_ext).map(|i| format!("ext{i}")).collect();
+            let file_extensions: Vec<&str> =
+                strings.iter().map(|s| s.as_str()).collect();
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![std::path::PathBuf::from("/dummy")], &file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![std::path::PathBuf::from("/dummy")],
+                &file_extensions,
+                persist_path,
+            );
 
             // Expand the menu to render all extensions
             app.extensions_menu_expanded = true;
 
             // Generate expected labels
-            let expected_labels: Vec<String> = file_extensions.iter().map(|ext| format!("[x] .{ext}")).collect();
+            let expected_labels: Vec<String> = file_extensions
+                .iter()
+                .map(|ext| format!("[x] .{ext}"))
+                .collect();
 
             // Collect actual labels from extension_menu
             let mut actual_labels = Vec::new();
             for ext in &app.all_extensions {
                 let checked = app.selected_extensions.contains(ext);
-                let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+                let label = if checked {
+                    format!("[x] .{ext}")
+                } else {
+                    format!("[ ] .{ext}")
+                };
                 actual_labels.push(label);
             }
 
@@ -1568,7 +1930,11 @@ mod iced_tests {
             let file_extensions = &["foo", "bar"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![std::path::PathBuf::from("/dummy")], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![std::path::PathBuf::from("/dummy")],
+                file_extensions,
+                persist_path,
+            );
 
             app.extensions_menu_expanded = true;
 
@@ -1579,8 +1945,13 @@ mod iced_tests {
                 .collect();
 
             for ext in file_extensions {
-                let checked = app.selected_extensions.contains(&ext.to_string());
-                let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+                let checked =
+                    app.selected_extensions.contains(&ext.to_string());
+                let label = if checked {
+                    format!("[x] .{ext}")
+                } else {
+                    format!("[ ] .{ext}")
+                };
                 assert!(labels_before.contains(&label));
             }
 
@@ -1592,8 +1963,13 @@ mod iced_tests {
             let labels_after: Vec<String> = file_extensions
                 .iter()
                 .map(|ext| {
-                    let checked = app.selected_extensions.contains(&ext.to_string());
-                    if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
+                    let checked =
+                        app.selected_extensions.contains(&ext.to_string());
+                    if checked {
+                        format!("[x] .{ext}")
+                    } else {
+                        format!("[ ] .{ext}")
+                    }
                 })
                 .collect();
 
@@ -1608,8 +1984,13 @@ mod iced_tests {
             let labels_final: Vec<String> = file_extensions
                 .iter()
                 .map(|ext| {
-                    let checked = app.selected_extensions.contains(&ext.to_string());
-                    if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
+                    let checked =
+                        app.selected_extensions.contains(&ext.to_string());
+                    if checked {
+                        format!("[x] .{ext}")
+                    } else {
+                        format!("[ ] .{ext}")
+                    }
                 })
                 .collect();
 
@@ -1620,19 +2001,28 @@ mod iced_tests {
         #[test]
         fn test_directory_expansion_ui_feedback() {
             let dir_path = std::path::PathBuf::from("/root");
-            let mut dir_node = FileNode::new_directory("root".to_string(), dir_path.clone(), vec![]);
+            let mut dir_node = FileNode::new_directory(
+                "root".to_string(),
+                dir_path.clone(),
+                vec![],
+            );
             dir_node.is_expanded = false;
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir_path.clone()], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                file_extensions,
+                persist_path,
+            );
             app.root_nodes[0] = Some(dir_node);
 
             // Helper to get expansion symbol from rendered label
             fn get_expansion_symbol(app: &FileTreeApp) -> String {
                 let node = app.root_nodes[0].as_ref().unwrap();
                 let indent = "  ".repeat(0);
-                let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+                let expand_symbol =
+                    if node.is_expanded { "▼" } else { "▶" };
                 format!("{}{} 📁 {}", indent, expand_symbol, node.name)
             }
 
@@ -1653,7 +2043,10 @@ mod iced_tests {
             let _ = update(&mut app, msg);
 
             let label_final = get_expansion_symbol(&app);
-            assert!(label_final.contains("▶"), "Expected collapsed symbol again");
+            assert!(
+                label_final.contains("▶"),
+                "Expected collapsed symbol again"
+            );
         }
 
         #[test]
@@ -1662,17 +2055,24 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
             // Add file to right panel
             let msg_add = Message::AddToRightPanel(file_path.clone());
             let _ = update(&mut app, msg_add);
-            assert!(app.right_panel_files.iter().any(|f| f.path == file_path), "File should be in right panel after adding");
+            assert!(
+                app.right_panel_files.iter().any(|f| f.path == file_path),
+                "File should be in right panel after adding"
+            );
 
             // Remove file from right panel
             let msg_remove = Message::RemoveFromRightPanel(file_path.clone());
             let _ = update(&mut app, msg_remove);
-            assert!(!app.right_panel_files.iter().any(|f| f.path == file_path), "File should not be in right panel after removing");
+            assert!(
+                !app.right_panel_files.iter().any(|f| f.path == file_path),
+                "File should not be in right panel after removing"
+            );
         }
 
         #[test]
@@ -1705,17 +2105,38 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
-            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone(), right_panel_file3.clone()];
+            app.right_panel_files = vec![
+                right_panel_file1.clone(),
+                right_panel_file2.clone(),
+                right_panel_file3.clone(),
+            ];
 
             // Remove all files in /dir
-            let msg_remove_dir = Message::RemoveDirectoryFromRightPanel(dir_path.clone());
+            let msg_remove_dir =
+                Message::RemoveDirectoryFromRightPanel(dir_path.clone());
             let _ = update(&mut app, msg_remove_dir);
 
-            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file1.path), "file1 should be removed from right panel");
-            assert!(!app.right_panel_files.iter().any(|f| f.path == right_panel_file2.path), "file2 should be removed from right panel");
-            assert!(app.right_panel_files.iter().any(|f| f.path == right_panel_file3.path), "file3 should be removed from right panel");
+            assert!(
+                !app.right_panel_files
+                    .iter()
+                    .any(|f| f.path == right_panel_file1.path),
+                "file1 should be removed from right panel"
+            );
+            assert!(
+                !app.right_panel_files
+                    .iter()
+                    .any(|f| f.path == right_panel_file2.path),
+                "file2 should be removed from right panel"
+            );
+            assert!(
+                app.right_panel_files
+                    .iter()
+                    .any(|f| f.path == right_panel_file3.path),
+                "file3 should be removed from right panel"
+            );
         }
 
         #[test]
@@ -1739,20 +2160,32 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
-            app.right_panel_files = vec![right_panel_file1.clone(), right_panel_file2.clone()];
+            app.right_panel_files =
+                vec![right_panel_file1.clone(), right_panel_file2.clone()];
 
             // Shuffle right panel
             let msg_shuffle = Message::ShuffleRightPanel;
             let _ = update(&mut app, msg_shuffle);
-            assert!(app.right_panel_shuffled, "Right panel should be marked as shuffled");
+            assert!(
+                app.right_panel_shuffled,
+                "Right panel should be marked as shuffled"
+            );
 
             // Sort right panel by directory
             let msg_sort = Message::SortRightPanelByDirectory;
             let _ = update(&mut app, msg_sort);
-            assert!(!app.right_panel_shuffled, "Right panel should not be marked as shuffled after sorting");
-            assert_eq!(app.right_panel_sort_column, SortColumn::Directory, "Sort column should be Directory");
+            assert!(
+                !app.right_panel_shuffled,
+                "Right panel should not be marked as shuffled after sorting"
+            );
+            assert_eq!(
+                app.right_panel_sort_column,
+                SortColumn::Directory,
+                "Sort column should be Directory"
+            );
         }
 
         #[test]
@@ -1760,20 +2193,40 @@ mod iced_tests {
             let dir_path = std::path::PathBuf::from("/dir");
             let file1 = dir_path.join("file1.txt");
             let file2 = dir_path.join("file2.txt");
-            let mut dir_node = FileNode::new_directory("dir".to_string(), dir_path.clone(), vec![]);
-            dir_node.children.push(FileNode::new_file("file1.txt".to_string(), file1.clone()));
-            dir_node.children.push(FileNode::new_file("file2.txt".to_string(), file2.clone()));
+            let mut dir_node = FileNode::new_directory(
+                "dir".to_string(),
+                dir_path.clone(),
+                vec![],
+            );
+            dir_node.children.push(FileNode::new_file(
+                "file1.txt".to_string(),
+                file1.clone(),
+            ));
+            dir_node.children.push(FileNode::new_file(
+                "file2.txt".to_string(),
+                file2.clone(),
+            ));
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir_path.clone()], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                file_extensions,
+                persist_path,
+            );
             app.root_nodes[0] = Some(dir_node);
 
             let msg = Message::AddDirectoryToRightPanel(dir_path.clone());
             let _ = update(&mut app, msg);
 
-            assert!(app.right_panel_files.iter().any(|f| f.path == file1), "file1 should be removed from right panel");
-            assert!(app.right_panel_files.iter().any(|f| f.path == file2), "file2 should be removed from right panel");
+            assert!(
+                app.right_panel_files.iter().any(|f| f.path == file1),
+                "file1 should be removed from right panel"
+            );
+            assert!(
+                app.right_panel_files.iter().any(|f| f.path == file2),
+                "file2 should be removed from right panel"
+            );
         }
 
         #[test]
@@ -1782,14 +2235,24 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir_path.clone()], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                file_extensions,
+                persist_path,
+            );
 
-            assert!(app.top_dirs.contains(&dir_path), "Top dir should be present before removal");
+            assert!(
+                app.top_dirs.contains(&dir_path),
+                "Top dir should be present before removal"
+            );
 
             let msg = Message::RemoveTopDir(dir_path.clone());
             let _ = update(&mut app, msg);
 
-            assert!(!app.top_dirs.contains(&dir_path), "Top dir should be removed after action");
+            assert!(
+                !app.top_dirs.contains(&dir_path),
+                "Top dir should be removed after action"
+            );
         }
 
         #[test]
@@ -1798,16 +2261,29 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir_path.clone()], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                file_extensions,
+                persist_path,
+            );
 
-            assert!(!app.extensions_menu_expanded, "Menu should be collapsed initially");
+            assert!(
+                !app.extensions_menu_expanded,
+                "Menu should be collapsed initially"
+            );
 
             let msg = Message::ToggleExtensionsMenu;
             let _ = update(&mut app, msg);
-            assert!(app.extensions_menu_expanded, "Menu should be expanded after toggle");
+            assert!(
+                app.extensions_menu_expanded,
+                "Menu should be expanded after toggle"
+            );
 
             let _ = update(&mut app, Message::ToggleExtensionsMenu);
-            assert!(!app.extensions_menu_expanded, "Menu should be collapsed after second toggle");
+            assert!(
+                !app.extensions_menu_expanded,
+                "Menu should be collapsed after second toggle"
+            );
         }
 
         #[test]
@@ -1816,14 +2292,18 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
             // Try to remove a file that's not present
             let msg = Message::RemoveFromRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
 
             // Should not panic and list remains empty
-            assert!(app.right_panel_files.is_empty(), "Right panel should remain empty");
+            assert!(
+                app.right_panel_files.is_empty(),
+                "Right panel should remain empty"
+            );
         }
 
         #[test]
@@ -1840,7 +2320,8 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
             app.right_panel_files = vec![right_panel_file.clone()];
 
@@ -1848,8 +2329,17 @@ mod iced_tests {
             let _ = update(&mut app, msg);
 
             // Should not remove unrelated files
-            assert_eq!(app.right_panel_files.len(), 1, "Unrelated file should remain");
-            assert!(app.right_panel_files.iter().any(|f| f.path == right_panel_file.path), "Unrelated file should remain");
+            assert_eq!(
+                app.right_panel_files.len(),
+                1,
+                "Unrelated file should remain"
+            );
+            assert!(
+                app.right_panel_files
+                    .iter()
+                    .any(|f| f.path == right_panel_file.path),
+                "Unrelated file should remain"
+            );
         }
 
         #[test]
@@ -1858,7 +2348,11 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir_path.clone()], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                file_extensions,
+                persist_path,
+            );
 
             let prev_selected = app.selected_extensions.clone();
 
@@ -1867,7 +2361,10 @@ mod iced_tests {
             let _ = update(&mut app, msg);
 
             // Should not add "md" to selected_extensions
-            assert_eq!(app.selected_extensions, prev_selected, "Selected extensions should not change");
+            assert_eq!(
+                app.selected_extensions, prev_selected,
+                "Selected extensions should not change"
+            );
         }
 
         #[test]
@@ -1875,34 +2372,66 @@ mod iced_tests {
             let file_extensions = &["foo", "bar"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![std::path::PathBuf::from("/dummy")], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![std::path::PathBuf::from("/dummy")],
+                file_extensions,
+                persist_path,
+            );
             app.extensions_menu_expanded = true;
 
             // Initial: all checked
-            let labels = file_extensions.iter().map(|ext| format!("[x] .{ext}")).collect::<Vec<_>>();
+            let labels = file_extensions
+                .iter()
+                .map(|ext| format!("[x] .{ext}"))
+                .collect::<Vec<_>>();
             for ext in file_extensions {
-                let checked = app.selected_extensions.contains(&ext.to_string());
-                let label = if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") };
+                let checked =
+                    app.selected_extensions.contains(&ext.to_string());
+                let label = if checked {
+                    format!("[x] .{ext}")
+                } else {
+                    format!("[ ] .{ext}")
+                };
                 assert!(labels.contains(&label));
             }
 
             // Toggle "foo" off, then "bar" off
-            let _ = update(&mut app, Message::ToggleExtension("foo".to_string()));
-            let _ = update(&mut app, Message::ToggleExtension("bar".to_string()));
-            let labels = file_extensions.iter().map(|ext| {
-                let checked = app.selected_extensions.contains(&ext.to_string());
-                if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
-            }).collect::<Vec<_>>();
+            let _ =
+                update(&mut app, Message::ToggleExtension("foo".to_string()));
+            let _ =
+                update(&mut app, Message::ToggleExtension("bar".to_string()));
+            let labels = file_extensions
+                .iter()
+                .map(|ext| {
+                    let checked =
+                        app.selected_extensions.contains(&ext.to_string());
+                    if checked {
+                        format!("[x] .{ext}")
+                    } else {
+                        format!("[ ] .{ext}")
+                    }
+                })
+                .collect::<Vec<_>>();
             assert!(labels.contains(&"[ ] .foo".to_string()));
             assert!(labels.contains(&"[ ] .bar".to_string()));
 
             // Toggle both on again
-            let _ = update(&mut app, Message::ToggleExtension("foo".to_string()));
-            let _ = update(&mut app, Message::ToggleExtension("bar".to_string()));
-            let labels = file_extensions.iter().map(|ext| {
-                let checked = app.selected_extensions.contains(&ext.to_string());
-                if checked { format!("[x] .{ext}") } else { format!("[ ] .{ext}") }
-            }).collect::<Vec<_>>();
+            let _ =
+                update(&mut app, Message::ToggleExtension("foo".to_string()));
+            let _ =
+                update(&mut app, Message::ToggleExtension("bar".to_string()));
+            let labels = file_extensions
+                .iter()
+                .map(|ext| {
+                    let checked =
+                        app.selected_extensions.contains(&ext.to_string());
+                    if checked {
+                        format!("[x] .{ext}")
+                    } else {
+                        format!("[ ] .{ext}")
+                    }
+                })
+                .collect::<Vec<_>>();
             assert!(labels.contains(&"[x] .foo".to_string()));
             assert!(labels.contains(&"[x] .bar".to_string()));
         }
@@ -1910,17 +2439,26 @@ mod iced_tests {
         #[test]
         fn test_directory_expansion_visual_consistency_after_toggle() {
             let dir_path = std::path::PathBuf::from("/root");
-            let mut dir_node = FileNode::new_directory("root".to_string(), dir_path.clone(), vec![]);
+            let mut dir_node = FileNode::new_directory(
+                "root".to_string(),
+                dir_path.clone(),
+                vec![],
+            );
             dir_node.is_expanded = false;
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir_path.clone()], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                file_extensions,
+                persist_path,
+            );
             app.root_nodes[0] = Some(dir_node);
 
             fn get_expansion_symbol(app: &FileTreeApp) -> String {
                 let node = app.root_nodes[0].as_ref().unwrap();
-                let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
+                let expand_symbol =
+                    if node.is_expanded { "▼" } else { "▶" };
                 expand_symbol.to_string()
                 // format!("{expand_symbol}")
             }
@@ -1929,11 +2467,13 @@ mod iced_tests {
             assert_eq!(get_expansion_symbol(&app), "▶");
 
             // Expand
-            let _ = update(&mut app, Message::ToggleExpansion(dir_path.clone()));
+            let _ =
+                update(&mut app, Message::ToggleExpansion(dir_path.clone()));
             assert_eq!(get_expansion_symbol(&app), "▼");
 
             // Collapse
-            let _ = update(&mut app, Message::ToggleExpansion(dir_path.clone()));
+            let _ =
+                update(&mut app, Message::ToggleExpansion(dir_path.clone()));
             assert_eq!(get_expansion_symbol(&app), "▶");
         }
 
@@ -1943,18 +2483,24 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
             // Add file
-            let _ = update(&mut app, Message::AddToRightPanel(file_path.clone()));
+            let _ =
+                update(&mut app, Message::AddToRightPanel(file_path.clone()));
             assert!(app.right_panel_files.iter().any(|f| f.path == file_path));
 
             // Remove file
-            let _ = update(&mut app, Message::RemoveFromRightPanel(file_path.clone()));
+            let _ = update(
+                &mut app,
+                Message::RemoveFromRightPanel(file_path.clone()),
+            );
             assert!(!app.right_panel_files.iter().any(|f| f.path == file_path));
 
             // Add again
-            let _ = update(&mut app, Message::AddToRightPanel(file_path.clone()));
+            let _ =
+                update(&mut app, Message::AddToRightPanel(file_path.clone()));
             assert!(app.right_panel_files.iter().any(|f| f.path == file_path));
         }
 
@@ -1965,15 +2511,34 @@ mod iced_tests {
             let level2_path = level1_path.join("level2");
             let file_path = level2_path.join("deep.txt");
 
-            let mut level2 = FileNode::new_directory("level2".to_string(), level2_path.clone(), vec![]);
-            level2.children.push(FileNode::new_file("deep.txt".to_string(), file_path.clone()));
-            let level1 = FileNode::new_directory("level1".to_string(), level1_path.clone(), vec![level2]);
-            let root = FileNode::new_directory("root".to_string(), root_path.clone(), vec![level1]);
+            let mut level2 = FileNode::new_directory(
+                "level2".to_string(),
+                level2_path.clone(),
+                vec![],
+            );
+            level2.children.push(FileNode::new_file(
+                "deep.txt".to_string(),
+                file_path.clone(),
+            ));
+            let level1 = FileNode::new_directory(
+                "level1".to_string(),
+                level1_path.clone(),
+                vec![level2],
+            );
+            let root = FileNode::new_directory(
+                "root".to_string(),
+                root_path.clone(),
+                vec![level1],
+            );
 
             let file_extensions = &["txt"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![root_path.clone()], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![root_path.clone()],
+                file_extensions,
+                persist_path,
+            );
             app.root_nodes[0] = Some(root);
 
             // Helper to get expansion symbol for a given depth
@@ -1985,27 +2550,40 @@ mod iced_tests {
             let root_node = app.root_nodes[0].as_ref().unwrap();
             assert_eq!(get_expansion_symbol(root_node), "▶");
             assert_eq!(get_expansion_symbol(&root_node.children[0]), "▶");
-            assert_eq!(get_expansion_symbol(&root_node.children[0].children[0]), "▶");
+            assert_eq!(
+                get_expansion_symbol(&root_node.children[0].children[0]),
+                "▶"
+            );
 
             // Expand root
-            let _ = update(&mut app, Message::ToggleExpansion(root_path.clone()));
+            let _ =
+                update(&mut app, Message::ToggleExpansion(root_path.clone()));
             let root_node = app.root_nodes[0].as_ref().unwrap();
             assert_eq!(get_expansion_symbol(root_node), "▼");
 
             // Expand level1
-            let _ = update(&mut app, Message::ToggleExpansion(level1_path.clone()));
+            let _ =
+                update(&mut app, Message::ToggleExpansion(level1_path.clone()));
             let root_node = app.root_nodes[0].as_ref().unwrap();
             assert_eq!(get_expansion_symbol(&root_node.children[0]), "▼");
 
             // Expand level2
-            let _ = update(&mut app, Message::ToggleExpansion(level2_path.clone()));
+            let _ =
+                update(&mut app, Message::ToggleExpansion(level2_path.clone()));
             let root_node = app.root_nodes[0].as_ref().unwrap();
-            assert_eq!(get_expansion_symbol(&root_node.children[0].children[0]), "▼");
+            assert_eq!(
+                get_expansion_symbol(&root_node.children[0].children[0]),
+                "▼"
+            );
 
             // Collapse level2
-            let _ = update(&mut app, Message::ToggleExpansion(level2_path.clone()));
+            let _ =
+                update(&mut app, Message::ToggleExpansion(level2_path.clone()));
             let root_node = app.root_nodes[0].as_ref().unwrap();
-            assert_eq!(get_expansion_symbol(&root_node.children[0].children[0]), "▶");
+            assert_eq!(
+                get_expansion_symbol(&root_node.children[0].children[0]),
+                "▶"
+            );
         }
 
         #[test]
@@ -2015,7 +2593,8 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![], file_extensions, persist_path);
+            let mut app =
+                FileTreeApp::new(vec![], file_extensions, persist_path);
 
             // Add both files
             let _ = update(&mut app, Message::AddToRightPanel(file1.clone()));
@@ -2024,61 +2603,86 @@ mod iced_tests {
             assert!(app.right_panel_files.iter().any(|f| f.path == file2));
 
             // Toggle extensions off
-            let _ = update(&mut app, Message::ToggleExtension("txt".to_string()));
-            let _ = update(&mut app, Message::ToggleExtension("md".to_string()));
+            let _ =
+                update(&mut app, Message::ToggleExtension("txt".to_string()));
+            let _ =
+                update(&mut app, Message::ToggleExtension("md".to_string()));
             assert!(!app.selected_extensions.contains(&"txt".to_string()));
             assert!(!app.selected_extensions.contains(&"md".to_string()));
 
             // Remove one file
-            let _ = update(&mut app, Message::RemoveFromRightPanel(file1.clone()));
+            let _ =
+                update(&mut app, Message::RemoveFromRightPanel(file1.clone()));
             assert!(!app.right_panel_files.iter().any(|f| f.path == file1));
             assert!(app.right_panel_files.iter().any(|f| f.path == file2));
 
             // Toggle extensions on again
-            let _ = update(&mut app, Message::ToggleExtension("txt".to_string()));
-            let _ = update(&mut app, Message::ToggleExtension("md".to_string()));
+            let _ =
+                update(&mut app, Message::ToggleExtension("txt".to_string()));
+            let _ =
+                update(&mut app, Message::ToggleExtension("md".to_string()));
             assert!(app.selected_extensions.contains(&"txt".to_string()));
             assert!(app.selected_extensions.contains(&"md".to_string()));
         }
 
         #[test]
         fn test_render_node_file() {
-
-            let flat_button_style = |_theme: &iced::Theme, _status: iced::widget::button::Status| iced::widget::button::Style {
-                background: None,
-                border: iced::Border::default(),
-                shadow: iced::Shadow::default(),
-                text_color: iced::Color::WHITE,
-            };
+            let flat_button_style =
+                |_theme: &iced::Theme,
+                 _status: iced::widget::button::Status| {
+                    iced::widget::button::Style {
+                        background: None,
+                        border: iced::Border::default(),
+                        shadow: iced::Shadow::default(),
+                        text_color: iced::Color::WHITE,
+                    }
+                };
 
             let file_node = FileNode::new_file(
                 "test.txt".to_string(),
-                PathBuf::from("/test.txt")
+                PathBuf::from("/test.txt"),
             );
-            
+
             let row_size = 12;
-            let _element = render_node(&file_node, 0, row_size, row_size, LeftPanelSortMode::Alphanumeric, flat_button_style);
+            let _element = render_node(
+                &file_node,
+                0,
+                row_size,
+                row_size,
+                LeftPanelSortMode::Alphanumeric,
+                flat_button_style,
+            );
             // Test passes if render_node() doesn't panic
         }
 
         #[test]
         fn test_render_node_directory() {
-
-            let flat_button_style = |_theme: &iced::Theme, _status: iced::widget::button::Status| iced::widget::button::Style {
-                background: None,
-                border: iced::Border::default(),
-                shadow: iced::Shadow::default(),
-                text_color: iced::Color::WHITE,
-            };
+            let flat_button_style =
+                |_theme: &iced::Theme,
+                 _status: iced::widget::button::Status| {
+                    iced::widget::button::Style {
+                        background: None,
+                        border: iced::Border::default(),
+                        shadow: iced::Shadow::default(),
+                        text_color: iced::Color::WHITE,
+                    }
+                };
 
             let dir_node = FileNode::new_directory(
                 "testdir".to_string(),
                 PathBuf::from("/testdir"),
-                vec![]
+                vec![],
             );
-            
+
             let row_size = 12;
-            let _element = render_node(&dir_node, 1, row_size, row_size, LeftPanelSortMode::Alphanumeric, flat_button_style);
+            let _element = render_node(
+                &dir_node,
+                1,
+                row_size,
+                row_size,
+                LeftPanelSortMode::Alphanumeric,
+                flat_button_style,
+            );
             // Test passes if render_node() doesn't panic
         }
 
@@ -2089,37 +2693,37 @@ mod iced_tests {
             // Create a temporary directory structure for testing
             let temp_dir = tempdir().unwrap();
             let root = temp_dir.path();
-            
+
             // Create test files
             File::create(root.join("test.txt")).unwrap();
             File::create(root.join("test.rs")).unwrap();
             File::create(root.join("ignored.doc")).unwrap();
-            
+
             // Create subdirectory with files
             let subdir = root.join("subdir");
             std::fs::create_dir(&subdir).unwrap();
             File::create(subdir.join("nested.txt")).unwrap();
-            
+
             let allowed = ["txt", "rs"];
             let root_node = scan_directory(root, &allowed);
-            
+
             assert!(root_node.is_some());
-            
+
             // Test that the app can be created and updated
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app = FileTreeApp::new(vec![dir], file_extensions, persist_path);
-            
+            let mut app =
+                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+
             // Test expanding the subdirectory
             let subdir_path = subdir.to_path_buf();
             let message = Message::ToggleExpansion(subdir_path);
             let _task = update(&mut app, message);
-            
+
             // Test view rendering doesn't panic
             let _element = view(&app);
-            
+
             // Test passes if all operations complete without panicking
         }
-
     }
 }

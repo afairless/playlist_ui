@@ -1,4 +1,3 @@
-
 /// Formats an optional duration in milliseconds as a human-readable string,
 ///     using `H:MM:SS` for durations of one hour or more, and `M:SS` otherwise.
 ///     Returns an empty string if the input is `None`.
@@ -14,26 +13,22 @@ pub(crate) fn format_duration(duration_ms: Option<u64>) -> String {
             } else {
                 format!("{minutes}:{seconds:02}")
             }
-        }
+        },
         None => "".to_string(),
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::format_duration;
-
 
     #[test]
     fn test_format_duration_cases_empty_input() {
         assert_eq!(format_duration(None), "");
     }
 
-
     #[test]
     fn test_format_duration_cases_subsecond() {
-
         // should floor to 0:00
         assert_eq!(format_duration(Some(0)), "0:00");
         assert_eq!(format_duration(Some(1)), "0:00");
@@ -44,7 +39,6 @@ mod tests {
         assert_eq!(format_duration(Some(900)), "0:00");
         assert_eq!(format_duration(Some(999)), "0:00");
     }
-
 
     #[test]
     fn test_format_duration_cases_second_to_minute() {
@@ -73,7 +67,6 @@ mod tests {
         // 601 seconds = 601000 ms = 10:01
         assert_eq!(format_duration(Some(601000)), "10:01");
     }
-
 
     #[test]
     fn test_format_duration_cases_suprahour() {
