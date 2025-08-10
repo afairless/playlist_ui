@@ -293,17 +293,13 @@ fn render_node(
 fn create_left_panel_tree_browser(
     app: &FileTreeApp,
     tree_browser_style: TreeBrowserStyle,
+    flat_button_style: impl Fn(
+        &iced::Theme,
+        iced::widget::button::Status,
+    ) -> iced::widget::button::Style
+    + Copy
+    + 'static,
 ) -> iced::widget::Column<'_, Message> {
-    let flat_button_style =
-        |_theme: &iced::Theme, _status: iced::widget::button::Status| {
-            iced::widget::button::Style {
-                background: None,
-                border: iced::Border::default(),
-                shadow: iced::Shadow::default(),
-                text_color: iced::Color::WHITE,
-            }
-        };
-
     let gap_width = tree_browser_style.remove_button_width / 4;
 
     let mut trees = column![];
@@ -354,6 +350,12 @@ fn render_tag_node(
     depth: usize,
     path: Vec<String>,
     directory_row_size: u16,
+    flat_button_style: impl Fn(
+        &iced::Theme,
+        iced::widget::button::Status,
+    ) -> iced::widget::button::Style
+    + Copy
+    + 'static,
 ) -> Element<'_, Message> {
     let indent = "  ".repeat(depth);
     let mut content = column![];
@@ -373,7 +375,8 @@ fn render_tag_node(
         // Track node (leaf): right-click to add this track only
         let file_path = node.file_paths.first().cloned();
         let context_menu = iced_aw::widgets::ContextMenu::new(
-            button(text(label).size(directory_row_size)),
+            button(text(label).size(directory_row_size))
+                .style(flat_button_style),
             move || {
                 if let Some(path) = file_path.clone() {
                     column![
@@ -414,6 +417,7 @@ fn render_tag_node(
                 depth + 1,
                 new_path.clone(),
                 directory_row_size,
+                flat_button_style,
             ));
         }
     }
@@ -430,6 +434,12 @@ fn render_tag_node(
 fn create_left_panel_tag_tree_browser(
     app: &FileTreeApp,
     tree_browser_style: TreeBrowserStyle,
+    flat_button_style: impl Fn(
+        &iced::Theme,
+        iced::widget::button::Status,
+    ) -> iced::widget::button::Style
+    + Copy
+    + 'static,
 ) -> iced::widget::Column<'_, Message> {
     let mut trees = column![];
     for node in &app.tag_tree_roots {
@@ -438,6 +448,7 @@ fn create_left_panel_tag_tree_browser(
             0,
             vec![],
             tree_browser_style.directory_row_size,
+            flat_button_style,
         ));
         trees =
             trees.push(Space::with_height(tree_browser_style.tree_row_height));
@@ -926,6 +937,15 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         directory_row_size: 16,
         file_row_size: 14,
     };
+    let flat_button_style =
+        |_theme: &iced::Theme, _status: iced::widget::button::Status| {
+            iced::widget::button::Style {
+                background: None,
+                border: iced::Border::default(),
+                shadow: iced::Shadow::default(),
+                text_color: iced::Color::WHITE,
+            }
+        };
 
     let item_list_style = ItemListStyle {
         column_row_spacing: 14,
@@ -939,14 +959,17 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
     let extension_menu =
         create_extension_menu(app, menu_style.text_size, menu_style.text_color);
-    // let tree_browser = create_left_panel_tree_browser(app, tree_browser_style);
     let tree_browser = match app.left_panel_nav_mode {
-        LeftPanelNavMode::Directory => {
-            create_left_panel_tree_browser(app, tree_browser_style)
-        },
-        LeftPanelNavMode::Tag => {
-            create_left_panel_tag_tree_browser(app, tree_browser_style)
-        },
+        LeftPanelNavMode::Directory => create_left_panel_tree_browser(
+            app,
+            tree_browser_style,
+            flat_button_style,
+        ),
+        LeftPanelNavMode::Tag => create_left_panel_tag_tree_browser(
+            app,
+            tree_browser_style,
+            flat_button_style,
+        ),
     };
     let left_content = if app.left_panel_expanded {
         column![
