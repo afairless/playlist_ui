@@ -1,10 +1,13 @@
+use crate::gui::TagTreeNode;
 use lofty::{
     file::{AudioFile, TaggedFileExt},
     prelude::ItemKey,
     read_from_path,
     tag::Accessor,
 };
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 #[derive(Default)]
 pub(crate) struct MediaMetadata {
@@ -71,4 +74,87 @@ pub(crate) fn extract_media_metadata(path: &Path) -> MediaMetadata {
     } else {
         MediaMetadata::default()
     }
+}
+
+pub(crate) fn build_tag_tree(
+    top_dirs: &[PathBuf],
+    allowed_extensions: &[String],
+) -> Vec<TagTreeNode> {
+    let mut genre_map: BTreeMap<
+        String,
+        BTreeMap<String, BTreeMap<String, Vec<(String, PathBuf)>>>,
+    > = BTreeMap::new();
+
+    for dir in top_dirs {
+        for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    if allowed_extensions.iter().any(|ae| ae == ext) {
+                        let meta = extract_media_metadata(path);
+                        let genre =
+                            meta.genre.unwrap_or_else(|| "Unknown".to_string());
+                        let artist = meta
+                            .musician
+                            .unwrap_or_else(|| "Unknown".to_string());
+                        let album =
+                            meta.album.unwrap_or_else(|| "Unknown".to_string());
+                        let title = meta.title.clone().unwrap_or_else(|| {
+                            path.file_name()
+                                .unwrap()
+                                .to_string_lossy()
+                                .to_string()
+                        });
+                        genre_map
+                            .entry(genre)
+                            .or_default()
+                            .entry(artist)
+                            .or_default()
+                            .entry(album)
+                            .or_default()
+                            .push((title, path.to_path_buf()));
+                    }
+                }
+            }
+        }
+    }
+
+    // Convert to TagTreeNode hierarchy
+    let mut roots = Vec::new();
+    for (genre, artists) in genre_map {
+        let mut artist_nodes = Vec::new();
+        for (artist, albums) in artists {
+            let mut album_nodes = Vec::new();
+            for (album, tracks) in albums {
+                let mut track_nodes = Vec::new();
+                for (title, path) in tracks {
+                    track_nodes.push(TagTreeNode {
+                        label: title,
+                        children: vec![],
+                        file_paths: vec![path],
+                        is_expanded: false,
+                    });
+                }
+                album_nodes.push(TagTreeNode {
+                    label: album,
+                    children: track_nodes,
+                    file_paths: vec![],
+                    is_expanded: false,
+                });
+            }
+            artist_nodes.push(TagTreeNode {
+                label: artist,
+                children: album_nodes,
+                file_paths: vec![],
+                is_expanded: false,
+            });
+        }
+        roots.push(TagTreeNode {
+            label: genre,
+            children: artist_nodes,
+            file_paths: vec![],
+            is_expanded: false,
+        });
+    }
+    roots
 }

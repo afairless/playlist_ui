@@ -13,7 +13,10 @@ fn get_persist_path() -> PathBuf {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    ToggleLeftPanelNavMode,
     ToggleLeftPanel,
+    ToggleTagExpansion(Vec<String>),
+    AddTagNodeToRightPanel(Vec<String>),
     ToggleExpansion(PathBuf),
     ToggleExtension(String),
     ToggleExtensionsMenu,
@@ -37,6 +40,21 @@ pub enum Message {
     ExportRightPanelAsXspfTo(PathBuf),
     ExportAndPlayRightPanelAsXspf,
     OpenRightPanelFile(PathBuf),
+}
+
+#[derive(Default, Debug, Clone, PartialEq)]
+pub enum LeftPanelNavMode {
+    #[default]
+    Directory,
+    Tag,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TagTreeNode {
+    pub label: String,
+    pub children: Vec<TagTreeNode>,
+    pub file_paths: Vec<std::path::PathBuf>,
+    pub is_expanded: bool,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +93,10 @@ pub struct RightPanelFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileTreeApp {
+    #[serde(skip)]
+    pub left_panel_nav_mode: LeftPanelNavMode,
+    #[serde(skip)]
+    pub tag_tree_roots: Vec<TagTreeNode>,
     #[serde(skip)]
     pub left_panel_expanded: bool,
     #[serde(skip)]
@@ -134,6 +156,8 @@ impl FileTreeApp {
             restore_expansion_state(root, &expanded_dirs);
         }
         FileTreeApp {
+            left_panel_nav_mode: LeftPanelNavMode::Directory,
+            tag_tree_roots: Vec::new(),
             left_panel_expanded: true,
             left_panel_sort_mode: LeftPanelSortMode::Alphanumeric,
             root_nodes,

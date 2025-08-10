@@ -3,8 +3,8 @@ mod update;
 mod view;
 
 pub use state::{
-    FileTreeApp, LeftPanelSortMode, Message, RightPanelFile, SortColumn,
-    SortOrder,
+    FileTreeApp, LeftPanelNavMode, LeftPanelSortMode, Message, RightPanelFile,
+    SortColumn, SortOrder, TagTreeNode,
 };
 pub use update::update;
 pub use view::view;

@@ -1,7 +1,7 @@
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{
-    FileTreeApp, LeftPanelSortMode, Message, RightPanelFile, SortColumn,
-    SortOrder,
+    FileTreeApp, LeftPanelNavMode, LeftPanelSortMode, Message, RightPanelFile,
+    SortColumn, SortOrder, TagTreeNode,
 };
 use crate::utils::format_duration;
 use iced::{
@@ -138,10 +138,25 @@ fn create_left_panel_menu_row<'a>(
         )
         .on_press(Message::ToggleLeftPanelSortMode);
 
+    let nav_mode_label = match app.left_panel_nav_mode {
+        LeftPanelNavMode::Directory => "Nav: Directory",
+        LeftPanelNavMode::Tag => "Nav: Tag",
+    };
+    let nav_mode_button =
+        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+            iced::widget::text(nav_mode_label)
+                .size(menu_style.text_size)
+                .style(move |_theme| iced::widget::text::Style {
+                    color: Some(menu_style.text_color.into()),
+                }),
+        )
+        .on_press(Message::ToggleLeftPanelNavMode);
+
     iced::widget::row![
         toggle_left_panel_button,
         directory_button,
-        sort_mode_button
+        sort_mode_button,
+        nav_mode_button
     ]
     .spacing(menu_style.spacing)
     .into()
@@ -320,6 +335,133 @@ fn create_left_panel_tree_browser(
             .align_y(iced::Alignment::Start);
 
         trees = trees.push(row);
+        trees =
+            trees.push(Space::with_height(tree_browser_style.tree_row_height));
+    }
+    trees
+}
+
+//fn render_tag_node<'a>(
+//    node: &'a TagTreeNode,
+//    depth: usize,
+//    path: &'a [String],
+//    directory_row_size: u16,
+//) -> Element<'a, Message> {
+//    let indent = "  ".repeat(depth);
+//    let mut content = column![];
+//    let mut new_path = path.to_vec();
+//    new_path.push(node.label.clone());
+//
+//    let is_leaf = node.children.is_empty();
+//    let expand_symbol = if !is_leaf {
+//        if node.is_expanded { "▼" } else { "▶" }
+//    } else {
+//        ""
+//    };
+//
+//    let label = format!("{}{} {}", indent, expand_symbol, node.label);
+//
+//    let row = if is_leaf {
+//        // Track node (leaf)
+//        iced::widget::row![text(label).size(directory_row_size)]
+//    } else {
+//        // Non-leaf: context menu for "Add all files"
+//        let context_menu = iced_aw::widgets::ContextMenu::new(
+//            button(text(label).size(directory_row_size))
+//                .on_press(Message::ToggleTagExpansion(new_path.clone())),
+//            {
+//                let path = new_path.clone();
+//                move || {
+//                    column![button("Add all files to right panel").on_press(
+//                        Message::AddTagNodeToRightPanel(path.clone())
+//                    )]
+//                    .into()
+//                }
+//            },
+//        );
+//        iced::widget::row![context_menu]
+//    };
+//
+//    content = content.push(row);
+//
+//    if node.is_expanded {
+//        for child in &node.children {
+//            content = content.push(render_tag_node(
+//                child,
+//                depth + 1,
+//                &new_path,
+//                directory_row_size,
+//            ));
+//        }
+//    }
+//    content.into()
+//}
+fn render_tag_node(
+    node: &TagTreeNode,
+    depth: usize,
+    path: Vec<String>,
+    directory_row_size: u16,
+) -> Element<'_, Message> {
+    let indent = "  ".repeat(depth);
+    let mut content = column![];
+    let mut new_path = path;
+    new_path.push(node.label.clone());
+
+    let is_leaf = node.children.is_empty();
+    let expand_symbol = if !is_leaf {
+        if node.is_expanded { "▼" } else { "▶" }
+    } else {
+        ""
+    };
+
+    let label = format!("{}{} {}", indent, expand_symbol, node.label);
+
+    let row = if is_leaf {
+        iced::widget::row![text(label).size(directory_row_size)]
+    } else {
+        let context_menu = iced_aw::widgets::ContextMenu::new(
+            button(text(label).size(directory_row_size))
+                .on_press(Message::ToggleTagExpansion(new_path.clone())),
+            {
+                let path = new_path.clone();
+                move || {
+                    column![button("Add all files to right panel").on_press(
+                        Message::AddTagNodeToRightPanel(path.clone())
+                    )]
+                    .into()
+                }
+            },
+        );
+        iced::widget::row![context_menu]
+    };
+
+    content = content.push(row);
+
+    if node.is_expanded {
+        for child in &node.children {
+            content = content.push(render_tag_node(
+                child,
+                depth + 1,
+                new_path.clone(),
+                directory_row_size,
+            ));
+        }
+    }
+    content.into()
+}
+
+fn create_left_panel_tag_tree_browser(
+    app: &FileTreeApp,
+    tree_browser_style: TreeBrowserStyle,
+) -> iced::widget::Column<'_, Message> {
+    let mut trees = column![];
+    for node in &app.tag_tree_roots {
+        trees = trees.push(render_tag_node(
+            node,
+            0,
+            vec![],
+            tree_browser_style.directory_row_size,
+        ));
         trees =
             trees.push(Space::with_height(tree_browser_style.tree_row_height));
     }
@@ -820,7 +962,15 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
     let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
     let extension_menu =
         create_extension_menu(app, menu_style.text_size, menu_style.text_color);
-    let tree_browser = create_left_panel_tree_browser(app, tree_browser_style);
+    // let tree_browser = create_left_panel_tree_browser(app, tree_browser_style);
+    let tree_browser = match app.left_panel_nav_mode {
+        LeftPanelNavMode::Directory => {
+            create_left_panel_tree_browser(app, tree_browser_style)
+        },
+        LeftPanelNavMode::Tag => {
+            create_left_panel_tag_tree_browser(app, tree_browser_style)
+        },
+    };
     let left_content = if app.left_panel_expanded {
         column![
             left_panel_menu_row,

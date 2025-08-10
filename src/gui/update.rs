@@ -1,8 +1,8 @@
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
-use crate::fs::media_metadata::extract_media_metadata;
+use crate::fs::media_metadata::{build_tag_tree, extract_media_metadata};
 use crate::gui::{
-    FileTreeApp, LeftPanelSortMode, Message, RightPanelFile, SortColumn,
-    SortOrder,
+    FileTreeApp, LeftPanelNavMode, LeftPanelSortMode, Message, RightPanelFile,
+    SortColumn, SortOrder, TagTreeNode,
 };
 use iced::Task;
 use rfd::FileDialog;
@@ -49,6 +49,29 @@ fn find_node_by_path<'a>(
         }
     }
     None
+}
+
+pub fn find_tag_node_mut<'a>(
+    nodes: &'a mut [TagTreeNode],
+    path: &[String],
+) -> Option<&'a mut TagTreeNode> {
+    let mut current_nodes = nodes;
+
+    for (i, label) in path.iter().enumerate() {
+        let found = current_nodes.iter_mut().find(|n| &n.label == label)?;
+        if i == path.len() - 1 {
+            return Some(found);
+        }
+        current_nodes = &mut found.children;
+    }
+    None
+}
+
+pub fn collect_tag_node_files(node: &TagTreeNode, files: &mut Vec<PathBuf>) {
+    files.extend(node.file_paths.iter().cloned());
+    for child in &node.children {
+        collect_tag_node_files(child, files);
+    }
 }
 
 /// Handles all application state updates in response to user actions or
@@ -368,6 +391,48 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     LeftPanelSortMode::Alphanumeric
                 },
             };
+            Task::none()
+        },
+        Message::ToggleLeftPanelNavMode => {
+            if app.left_panel_nav_mode == LeftPanelNavMode::Directory {
+                // Switch to tag mode: build tag tree
+                let tag_tree =
+                    build_tag_tree(&app.top_dirs, &app.selected_extensions);
+                app.tag_tree_roots = tag_tree;
+                app.left_panel_nav_mode = LeftPanelNavMode::Tag;
+            } else {
+                app.left_panel_nav_mode = LeftPanelNavMode::Directory;
+            }
+            Task::none()
+        },
+        Message::ToggleTagExpansion(path) => {
+            if let Some(node) =
+                find_tag_node_mut(&mut app.tag_tree_roots, &path)
+            {
+                node.is_expanded = !node.is_expanded;
+            }
+            Task::none()
+        },
+        Message::AddTagNodeToRightPanel(path) => {
+            if let Some(node) =
+                find_tag_node_mut(&mut app.tag_tree_roots, &path)
+            {
+                let mut files = Vec::new();
+                collect_tag_node_files(node, &mut files);
+                for file in files {
+                    if !app.right_panel_files.iter().any(|f| f.path == file) {
+                        let meta = extract_media_metadata(&file);
+                        app.right_panel_files.push(RightPanelFile {
+                            path: file,
+                            musician: meta.musician,
+                            album: meta.album,
+                            title: meta.title,
+                            genre: meta.genre,
+                            duration_ms: meta.duration_ms,
+                        });
+                    }
+                }
+            }
             Task::none()
         },
     }
