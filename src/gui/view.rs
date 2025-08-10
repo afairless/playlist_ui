@@ -2878,5 +2878,40 @@ mod iced_tests {
 
             // Test passes if all operations complete without panicking
         }
+
+        #[test]
+        fn test_left_panel_nav_mode_cycling() {
+            use crate::gui::{FileTreeApp, LeftPanelNavMode, Message, update};
+            use std::path::PathBuf;
+            use tempfile::NamedTempFile;
+
+            let file_extensions = &["txt"];
+            let temp_file = NamedTempFile::new().unwrap();
+            let persist_path = temp_file.path().to_path_buf();
+            let mut app = FileTreeApp::new(
+                vec![PathBuf::from("/dummy")],
+                file_extensions,
+                persist_path,
+            );
+
+            // Initial state
+            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Directory);
+
+            // Directory -> Tag
+            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
+            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Tag);
+
+            // Tag -> Musician
+            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
+            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Musician);
+
+            // Musician -> Directory
+            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
+            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Directory);
+
+            // Directory -> Tag (again, to check cycling)
+            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
+            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Tag);
+        }
     }
 }
