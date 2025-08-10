@@ -341,59 +341,14 @@ fn create_left_panel_tree_browser(
     trees
 }
 
-//fn render_tag_node(
-//    node: &TagTreeNode,
-//    depth: usize,
-//    path: Vec<String>,
-//    directory_row_size: u16,
-//) -> Element<'_, Message> {
-//    let indent = "  ".repeat(depth);
-//    let mut content = column![];
-//    let mut new_path = path;
-//    new_path.push(node.label.clone());
-//
-//    let is_leaf = node.children.is_empty();
-//    let expand_symbol = if !is_leaf {
-//        if node.is_expanded { "▼" } else { "▶" }
-//    } else {
-//        ""
-//    };
-//
-//    let label = format!("{}{} {}", indent, expand_symbol, node.label);
-//
-//    let row = if is_leaf {
-//        iced::widget::row![text(label).size(directory_row_size)]
-//    } else {
-//        let context_menu = iced_aw::widgets::ContextMenu::new(
-//            button(text(label).size(directory_row_size))
-//                .on_press(Message::ToggleTagExpansion(new_path.clone())),
-//            {
-//                let path = new_path.clone();
-//                move || {
-//                    column![button("Add all files to right panel").on_press(
-//                        Message::AddTagNodeToRightPanel(path.clone())
-//                    )]
-//                    .into()
-//                }
-//            },
-//        );
-//        iced::widget::row![context_menu]
-//    };
-//
-//    content = content.push(row);
-//
-//    if node.is_expanded {
-//        for child in &node.children {
-//            content = content.push(render_tag_node(
-//                child,
-//                depth + 1,
-//                new_path.clone(),
-//                directory_row_size,
-//            ));
-//        }
-//    }
-//    content.into()
-//}
+/// Recursively renders a tag-based navigation tree node for the left panel UI.
+///
+/// Displays the given `TagTreeNode` with indentation based on `depth`, and
+/// provides context menus for both category nodes (genre, artist, album) and
+/// track nodes. Non-leaf nodes allow adding all contained tracks to the right
+/// panel, while leaf nodes (tracks) allow adding the individual track. Handles
+/// expansion/collapse of nodes and passes the navigation path for context menu
+/// actions.
 fn render_tag_node(
     node: &TagTreeNode,
     depth: usize,
@@ -465,6 +420,13 @@ fn render_tag_node(
     content.into()
 }
 
+/// Builds the left panel's tag-based navigation tree UI.
+///
+/// Iterates over the root nodes of the tag tree in the application state and
+/// recursively renders each node using `render_tag_node`. Applies the specified
+/// tree browser style for row sizing and spacing. This function is used when
+/// the left panel is in tag navigation mode to display the genre → artist →
+/// album → track hierarchy.
 fn create_left_panel_tag_tree_browser(
     app: &FileTreeApp,
     tree_browser_style: TreeBrowserStyle,

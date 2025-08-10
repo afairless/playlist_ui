@@ -76,6 +76,14 @@ pub(crate) fn extract_media_metadata(path: &Path) -> MediaMetadata {
     }
 }
 
+/// Builds a tag-based navigation tree from the given top-level directories.
+///
+/// Recursively scans all files in `top_dirs` whose extensions match
+/// `allowed_extensions`,
+/// extracts media metadata, and organizes the files into a hierarchy of
+/// genre → musician/artist → album → track. Each node in the resulting tree
+/// represents a tag category or a track, and can be used for tag-based
+/// navigation in the UI.
 pub(crate) fn build_tag_tree(
     top_dirs: &[PathBuf],
     allowed_extensions: &[String],

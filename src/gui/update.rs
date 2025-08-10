@@ -51,6 +51,12 @@ fn find_node_by_path<'a>(
     None
 }
 
+/// Recursively searches for a mutable reference to a tag tree node by path.
+///
+/// Traverses the `TagTreeNode` hierarchy using the provided sequence of labels
+/// in `path`.
+/// Returns a mutable reference to the node at the end of the path if found, or
+/// `None` if any label in the path does not exist at the corresponding level.
 pub fn find_tag_node_mut<'a>(
     nodes: &'a mut [TagTreeNode],
     path: &[String],
@@ -67,6 +73,13 @@ pub fn find_tag_node_mut<'a>(
     None
 }
 
+/// Recursively collects all file paths from a tag tree node and its
+/// descendants.
+///
+/// Traverses the given `TagTreeNode` and all of its children, appending any
+/// file paths found in each node's `file_paths` field to the provided `files`
+/// vector. This is used to gather all media files under a specific tag node
+/// (e.g., genre, artist, album, or track).
 pub fn collect_tag_node_files(node: &TagTreeNode, files: &mut Vec<PathBuf>) {
     files.extend(node.file_paths.iter().cloned());
     for child in &node.children {
