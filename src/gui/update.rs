@@ -1,5 +1,7 @@
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
-use crate::fs::media_metadata::{build_tag_tree, extract_media_metadata};
+use crate::fs::media_metadata::{
+    build_musician_tree, build_tag_tree, extract_media_metadata,
+};
 use crate::gui::{
     FileTreeApp, LeftPanelNavMode, LeftPanelSortMode, Message, RightPanelFile,
     SortColumn, SortOrder, TagTreeNode,
@@ -407,15 +409,23 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         },
         Message::ToggleLeftPanelNavMode => {
-            if app.left_panel_nav_mode == LeftPanelNavMode::Directory {
-                // Switch to tag mode: build tag tree
-                let tag_tree =
-                    build_tag_tree(&app.top_dirs, &app.selected_extensions);
-                app.tag_tree_roots = tag_tree;
-                app.left_panel_nav_mode = LeftPanelNavMode::Tag;
-            } else {
-                app.left_panel_nav_mode = LeftPanelNavMode::Directory;
-            }
+            app.left_panel_nav_mode = match app.left_panel_nav_mode {
+                LeftPanelNavMode::Directory => {
+                    // Switch to tag mode: build tag tree
+                    app.tag_tree_roots =
+                        build_tag_tree(&app.top_dirs, &app.selected_extensions);
+                    LeftPanelNavMode::Tag
+                },
+                LeftPanelNavMode::Tag => {
+                    // Switch to musician mode: build musician tree
+                    app.tag_tree_roots = build_musician_tree(
+                        &app.top_dirs,
+                        &app.selected_extensions,
+                    );
+                    LeftPanelNavMode::Musician
+                },
+                LeftPanelNavMode::Musician => LeftPanelNavMode::Directory,
+            };
             Task::none()
         },
         Message::ToggleTagExpansion(path) => {

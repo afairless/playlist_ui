@@ -17,6 +17,10 @@ pub(crate) struct FileNode {
 }
 
 impl FileNode {
+    /// Creates a new `FileNode` representing a file with the given name and
+    /// path.
+    /// The node type is set to `File`, and it has no children. The node is not
+    /// expanded by default.
     pub(crate) fn new_file(name: String, path: PathBuf) -> Self {
         FileNode {
             name,
@@ -26,7 +30,9 @@ impl FileNode {
             is_expanded: false,
         }
     }
-
+    /// Creates a new `FileNode` representing a directory with the given name,
+    /// path, and children. The node type is set to `Directory`. The node is not
+    /// expanded by default.
     pub(crate) fn new_directory(
         name: String,
         path: PathBuf,
@@ -42,6 +48,10 @@ impl FileNode {
     }
 }
 
+/// Recursively scans a directory for files matching the allowed extensions,
+/// building a tree of `FileNode` objects. Only files whose extensions are
+/// present in `allowed_extensions` are included. The root node is marked as
+/// expanded by default.
 pub(crate) fn scan_directory(
     dir: &Path,
     allowed_extensions: &[&str],

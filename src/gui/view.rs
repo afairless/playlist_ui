@@ -141,6 +141,7 @@ fn create_left_panel_menu_row<'a>(
     let nav_mode_label = match app.left_panel_nav_mode {
         LeftPanelNavMode::Directory => "Nav: Directory",
         LeftPanelNavMode::Tag => "Nav: Tag",
+        LeftPanelNavMode::Musician => "Nav: Creator",
     };
     let nav_mode_button =
         iced::widget::button::<Message, iced::Theme, iced::Renderer>(
@@ -164,7 +165,7 @@ fn create_left_panel_menu_row<'a>(
 
 ///  Recursively renders a file tree node (directory or file) with indentation
 ///  based on depth, including context menus for directory and file actions.
-fn render_node(
+fn render_file_node(
     node: &FileNode,
     depth: usize,
     directory_row_size: u16,
@@ -252,7 +253,7 @@ fn render_node(
                 }
                 for &i in &indices {
                     let child = &node.children[i];
-                    content = content.push(render_node(
+                    content = content.push(render_file_node(
                         child,
                         depth + 1,
                         directory_row_size,
@@ -314,7 +315,7 @@ fn create_left_panel_tree_browser(
 
         let content = if let Some(node) = node_opt {
             // Directory tree
-            render_node(
+            render_file_node(
                 node,
                 0,
                 tree_browser_style.directory_row_size,
@@ -965,11 +966,13 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
             tree_browser_style,
             flat_button_style,
         ),
-        LeftPanelNavMode::Tag => create_left_panel_tag_tree_browser(
-            app,
-            tree_browser_style,
-            flat_button_style,
-        ),
+        LeftPanelNavMode::Tag | LeftPanelNavMode::Musician => {
+            create_left_panel_tag_tree_browser(
+                app,
+                tree_browser_style,
+                flat_button_style,
+            )
+        },
     };
     let left_content = if app.left_panel_expanded {
         column![
@@ -2794,7 +2797,7 @@ mod iced_tests {
             );
 
             let row_size = 12;
-            let _element = render_node(
+            let _element = render_file_node(
                 &file_node,
                 0,
                 row_size,
@@ -2802,7 +2805,7 @@ mod iced_tests {
                 LeftPanelSortMode::Alphanumeric,
                 flat_button_style,
             );
-            // Test passes if render_node() doesn't panic
+            // Test passes if render_file_node() doesn't panic
         }
 
         #[test]
@@ -2825,7 +2828,7 @@ mod iced_tests {
             );
 
             let row_size = 12;
-            let _element = render_node(
+            let _element = render_file_node(
                 &dir_node,
                 1,
                 row_size,
@@ -2833,7 +2836,7 @@ mod iced_tests {
                 LeftPanelSortMode::Alphanumeric,
                 flat_button_style,
             );
-            // Test passes if render_node() doesn't panic
+            // Test passes if render_file_node() doesn't panic
         }
 
         #[test]

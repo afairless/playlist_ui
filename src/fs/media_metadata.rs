@@ -166,3 +166,80 @@ pub(crate) fn build_tag_tree(
     }
     roots
 }
+
+/// Builds a tag-based navigation tree using musician/creator as the top-level
+/// category.
+///
+/// Recursively scans all files in `top_dirs` whose extensions match
+/// `allowed_extensions`, extracts media metadata, and organizes the files into
+/// a hierarchy of musician/creator → album → track. Each node in the resulting
+/// tree represents a musician/creator, album, or track, and can be used for
+/// tag-based navigation in the UI without including genre as a category.
+pub(crate) fn build_musician_tree(
+    top_dirs: &[PathBuf],
+    allowed_extensions: &[String],
+) -> Vec<TagTreeNode> {
+    let mut musician_map: BTreeMap<
+        String,
+        BTreeMap<String, Vec<(String, PathBuf)>>,
+    > = BTreeMap::new();
+
+    for dir in top_dirs {
+        for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    if allowed_extensions.iter().any(|ae| ae == ext) {
+                        let meta = extract_media_metadata(path);
+                        let artist = meta
+                            .musician
+                            .unwrap_or_else(|| "Unknown".to_string());
+                        let album =
+                            meta.album.unwrap_or_else(|| "Unknown".to_string());
+                        let title = meta.title.clone().unwrap_or_else(|| {
+                            path.file_name()
+                                .unwrap()
+                                .to_string_lossy()
+                                .to_string()
+                        });
+                        musician_map
+                            .entry(artist)
+                            .or_default()
+                            .entry(album)
+                            .or_default()
+                            .push((title, path.to_path_buf()));
+                    }
+                }
+            }
+        }
+    }
+
+    let mut roots = Vec::new();
+    for (artist, albums) in musician_map {
+        let mut album_nodes = Vec::new();
+        for (album, tracks) in albums {
+            let mut track_nodes = Vec::new();
+            for (title, path) in tracks {
+                track_nodes.push(TagTreeNode {
+                    label: title,
+                    children: vec![],
+                    file_paths: vec![path],
+                    is_expanded: false,
+                });
+            }
+            album_nodes.push(TagTreeNode {
+                label: album,
+                children: track_nodes,
+                file_paths: vec![],
+                is_expanded: false,
+            });
+        }
+        roots.push(TagTreeNode {
+            label: artist,
+            children: album_nodes,
+            file_paths: vec![],
+            is_expanded: false,
+        });
+    }
+    roots
+}

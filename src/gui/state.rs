@@ -47,6 +47,7 @@ pub enum LeftPanelNavMode {
     #[default]
     Directory,
     Tag,
+    Musician,
 }
 
 #[derive(Debug, Clone, PartialEq)]
