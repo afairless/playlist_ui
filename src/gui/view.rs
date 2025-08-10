@@ -341,15 +341,15 @@ fn create_left_panel_tree_browser(
     trees
 }
 
-//fn render_tag_node<'a>(
-//    node: &'a TagTreeNode,
+//fn render_tag_node(
+//    node: &TagTreeNode,
 //    depth: usize,
-//    path: &'a [String],
+//    path: Vec<String>,
 //    directory_row_size: u16,
-//) -> Element<'a, Message> {
+//) -> Element<'_, Message> {
 //    let indent = "  ".repeat(depth);
 //    let mut content = column![];
-//    let mut new_path = path.to_vec();
+//    let mut new_path = path;
 //    new_path.push(node.label.clone());
 //
 //    let is_leaf = node.children.is_empty();
@@ -362,10 +362,8 @@ fn create_left_panel_tree_browser(
 //    let label = format!("{}{} {}", indent, expand_symbol, node.label);
 //
 //    let row = if is_leaf {
-//        // Track node (leaf)
 //        iced::widget::row![text(label).size(directory_row_size)]
 //    } else {
-//        // Non-leaf: context menu for "Add all files"
 //        let context_menu = iced_aw::widgets::ContextMenu::new(
 //            button(text(label).size(directory_row_size))
 //                .on_press(Message::ToggleTagExpansion(new_path.clone())),
@@ -389,7 +387,7 @@ fn create_left_panel_tree_browser(
 //            content = content.push(render_tag_node(
 //                child,
 //                depth + 1,
-//                &new_path,
+//                new_path.clone(),
 //                directory_row_size,
 //            ));
 //        }
@@ -417,8 +415,25 @@ fn render_tag_node(
     let label = format!("{}{} {}", indent, expand_symbol, node.label);
 
     let row = if is_leaf {
-        iced::widget::row![text(label).size(directory_row_size)]
+        // Track node (leaf): right-click to add this track only
+        let file_path = node.file_paths.first().cloned();
+        let context_menu = iced_aw::widgets::ContextMenu::new(
+            button(text(label).size(directory_row_size)),
+            move || {
+                if let Some(path) = file_path.clone() {
+                    column![
+                        button("Add to right panel")
+                            .on_press(Message::AddToRightPanel(path))
+                    ]
+                    .into()
+                } else {
+                    column![].into()
+                }
+            },
+        );
+        iced::widget::row![context_menu]
     } else {
+        // Non-leaf: context menu for "Add all files"
         let context_menu = iced_aw::widgets::ContextMenu::new(
             button(text(label).size(directory_row_size))
                 .on_press(Message::ToggleTagExpansion(new_path.clone())),
