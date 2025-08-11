@@ -1,711 +1,35 @@
-use crate::gui::render_node::{render_file_node, render_tag_node};
-use crate::gui::{
-    FileTreeApp, LeftPanelNavMode, LeftPanelSortMode, Message, RightPanelFile,
-    SortColumn, SortOrder,
-};
-use crate::utils::format_duration;
+use crate::gui::left_panel::create_left_panel;
+use crate::gui::right_panel::create_right_panel;
+use crate::gui::{FileTreeApp, Message};
 use iced::{
     Element, Length,
-    widget::{
-        Scrollable, Space, button, column, container, row, scrollable, text,
-    },
+    widget::{container, row, scrollable},
 };
 
-#[derive(Default)]
-struct AudioColumnToggles {
-    show_musician: bool,
-    show_album: bool,
-    show_title: bool,
-    show_genre: bool,
-    show_duration: bool,
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct MenuStyle {
+    pub text_size: u16,
+    pub spacing: u16,
+    pub text_color: [f32; 4],
 }
 
 #[derive(Debug, Clone, Copy)]
-struct MenuStyle {
-    text_size: u16,
-    spacing: u16,
-    text_color: [f32; 4],
+pub(crate) struct TreeBrowserStyle {
+    pub tree_row_height: u16,
+    pub remove_button_width: u16,
+    pub directory_row_size: u16,
+    pub file_row_size: u16,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct TreeBrowserStyle {
-    tree_row_height: u16,
-    remove_button_width: u16,
-    directory_row_size: u16,
-    file_row_size: u16,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct ItemListStyle {
-    column_row_spacing: u16,
-    column_height_spacing: u16,
-    row_text_size: u16,
-    header_text_color: [f32; 4],
-    right_panel_width: u16,
-    light_row_shade: [f32; 3],
-    dark_row_shade: [f32; 3],
-}
-
-/// Creates the file extension filter menu for the left panel, including a
-/// styled header button that toggles the menu and a list of extension toggle
-/// buttons. The menu appearance is controlled by the given text size and color.
-fn create_extension_menu(
-    app: &FileTreeApp,
-    menu_size: u16,
-    menu_text_color: [f32; 4],
-) -> Element<Message> {
-    let header = button(
-        text(if app.extensions_menu_expanded {
-            "▼ File Extensions"
-        } else {
-            "▶ File Extensions"
-        })
-        .size(menu_size)
-        .style(move |_theme| iced::widget::text::Style {
-            color: Some(menu_text_color.into()),
-        }),
-    )
-    .on_press(Message::ToggleExtensionsMenu);
-
-    if app.extensions_menu_expanded {
-        let mut menu = column![];
-        for ext in &app.all_extensions {
-            let checked = app.selected_extensions.contains(ext);
-            let label = if checked {
-                format!("[x] .{ext}")
-            } else {
-                format!("[ ] .{ext}")
-            };
-            menu = menu.push(
-                button(text(label))
-                    .on_press(Message::ToggleExtension(ext.clone())),
-            );
-        }
-        column![header, menu].into()
-    } else {
-        column![header].into()
-    }
-}
-
-/// Creates the toggle button for the left panel, displaying either a left or
-/// right arrow depending on the current expansion state. The button uses the
-/// specified menu style for text size and triggers the `ToggleLeftPanel`
-/// message when pressed.
-fn create_toggle_left_panel_button(
-    app: &FileTreeApp,
-    menu_style: MenuStyle,
-) -> iced::widget::Button<Message> {
-    // toggle appearance of left panel
-    button(
-        text(if app.left_panel_expanded { "←" } else { "→" })
-            .size(menu_style.text_size),
-    )
-    .on_press(Message::ToggleLeftPanel)
-}
-
-/// Constructs the left panel's menu row containing the "Add Directory" button
-/// and the file extension menu, applying the specified text size, spacing, and
-/// color styling to both buttons.
-fn create_left_panel_menu_row<'a>(
-    app: &'a FileTreeApp,
-    menu_style: MenuStyle,
-) -> Element<'a, Message> {
-    let toggle_left_panel_button =
-        create_toggle_left_panel_button(app, menu_style);
-    let directory_button =
-        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-            iced::widget::text("Add Directory")
-                .size(menu_style.text_size)
-                .style(move |_theme| iced::widget::text::Style {
-                    color: Some(menu_style.text_color.into()),
-                }),
-        )
-        .on_press(Message::AddDirectory);
-
-    let sort_mode_label = match app.left_panel_sort_mode {
-        LeftPanelSortMode::Alphanumeric => "Sort: Name",
-        LeftPanelSortMode::ModifiedDate => "Sort: Date Modified",
-    };
-    let sort_mode_button =
-        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-            iced::widget::text(sort_mode_label)
-                .size(menu_style.text_size)
-                .style(move |_theme: &iced::Theme| iced::widget::text::Style {
-                    color: Some(menu_style.text_color.into()),
-                }),
-        )
-        .on_press(Message::ToggleLeftPanelSortMode);
-
-    let nav_mode_label = match app.left_panel_nav_mode {
-        LeftPanelNavMode::Directory => "Nav: Directory",
-        LeftPanelNavMode::Tag => "Nav: Tag",
-        LeftPanelNavMode::Musician => "Nav: Creator",
-    };
-    let nav_mode_button =
-        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-            iced::widget::text(nav_mode_label)
-                .size(menu_style.text_size)
-                .style(move |_theme| iced::widget::text::Style {
-                    color: Some(menu_style.text_color.into()),
-                }),
-        )
-        .on_press(Message::ToggleLeftPanelNavMode);
-
-    iced::widget::row![
-        toggle_left_panel_button,
-        directory_button,
-        sort_mode_button,
-        nav_mode_button
-    ]
-    .spacing(menu_style.spacing)
-    .into()
-}
-
-/// Builds the column of directory trees for the left panel, including directory
-/// headers and file trees, with configurable spacing between rows and directory
-/// name text size.
-fn create_left_panel_tree_browser(
-    app: &FileTreeApp,
-    tree_browser_style: TreeBrowserStyle,
-    flat_button_style: impl Fn(
-        &iced::Theme,
-        iced::widget::button::Status,
-    ) -> iced::widget::button::Style
-    + Copy
-    + 'static,
-) -> iced::widget::Column<'_, Message> {
-    let gap_width = tree_browser_style.remove_button_width / 4;
-
-    let mut trees = column![];
-    for (i, node_opt) in app.root_nodes.iter().enumerate() {
-        let dir_path = app.top_dirs.get(i).cloned().unwrap_or_default();
-
-        // Remove button (narrow column)
-        let remove_button =
-            button(text("X").size(tree_browser_style.directory_row_size))
-                .width(tree_browser_style.remove_button_width - gap_width)
-                .on_press(Message::RemoveTopDir(dir_path.clone()));
-
-        let content = if let Some(node) = node_opt {
-            // Directory tree
-            render_file_node(
-                node,
-                0,
-                tree_browser_style.directory_row_size,
-                tree_browser_style.file_row_size,
-                app.left_panel_sort_mode,
-                flat_button_style,
-            )
-        } else {
-            text("No files found").into()
-        };
-
-        // Row: [X][directory tree]
-        let row = row![content, Space::with_width(gap_width), remove_button,]
-            .align_y(iced::Alignment::Start);
-
-        trees = trees.push(row);
-        trees =
-            trees.push(Space::with_height(tree_browser_style.tree_row_height));
-    }
-    trees
-}
-
-/// Builds the left panel's tag-based navigation tree UI.
-///
-/// Iterates over the root nodes of the tag tree in the application state and
-/// recursively renders each node using `render_tag_node`. Applies the specified
-/// tree browser style for row sizing and spacing. This function is used when
-/// the left panel is in tag navigation mode to display the genre → artist →
-/// album → track hierarchy.
-fn create_left_panel_tag_tree_browser(
-    app: &FileTreeApp,
-    tree_browser_style: TreeBrowserStyle,
-    flat_button_style: impl Fn(
-        &iced::Theme,
-        iced::widget::button::Status,
-    ) -> iced::widget::button::Style
-    + Copy
-    + 'static,
-) -> iced::widget::Column<'_, Message> {
-    let mut trees = column![];
-    for node in &app.tag_tree_roots {
-        trees = trees.push(render_tag_node(
-            node,
-            0,
-            vec![],
-            tree_browser_style.directory_row_size,
-            flat_button_style,
-        ));
-        trees =
-            trees.push(Space::with_height(tree_browser_style.tree_row_height));
-    }
-    trees
-}
-
-/// Creates a widget displaying the total number of items and the sum of
-/// durations for all files shown in the right panel.
-fn create_totals_display(
-    displayed_files: &[RightPanelFile],
-    menu_style: MenuStyle,
-) -> Element<'static, Message> {
-    let total_duration_ms: u64 =
-        displayed_files.iter().filter_map(|f| f.duration_ms).sum();
-    let row_count = displayed_files.len();
-    let total_duration_str = format!(
-        " {} Item{}, Time: {}",
-        row_count,
-        if row_count == 1 { "" } else { "s" },
-        format_duration(Some(total_duration_ms)),
-    );
-    iced::widget::text(total_duration_str)
-        .size(menu_style.text_size)
-        .style(move |_theme| iced::widget::text::Style {
-            color: Some([1.0, 1.0, 1.0, 1.0].into()),
-        })
-        .into()
-}
-
-/// Creates the right panel's menu row with "Shuffle", "Export to XSPF", and
-/// "Play in VLC" buttons, applying the specified text size, spacing, and color
-/// styling to each button.
-fn create_right_panel_menu_row(
-    menu_style: MenuStyle,
-    extra_widget: Option<Element<'static, Message>>,
-) -> Element<'static, Message> {
-    let shuffle_button = iced::widget::button(
-        iced::widget::text("Shuffle")
-            .width(Length::Shrink)
-            .size(menu_style.text_size)
-            .style(move |_theme| iced::widget::text::Style {
-                color: Some(menu_style.text_color.into()),
-            }),
-    )
-    .on_press(Message::ShuffleRightPanel)
-    .width(Length::Shrink);
-
-    let export_button = iced::widget::button(
-        iced::widget::text("Export to XSPF")
-            .width(Length::Shrink)
-            .size(menu_style.text_size)
-            .style(move |_theme| iced::widget::text::Style {
-                color: Some(menu_style.text_color.into()),
-            }),
-    )
-    .on_press(Message::ExportRightPanelAsXspf)
-    .width(Length::Shrink);
-
-    let play_button = iced::widget::button(
-        iced::widget::text("Play")
-            .width(Length::Shrink)
-            .size(menu_style.text_size)
-            .style(move |_theme| iced::widget::text::Style {
-                color: Some(menu_style.text_color.into()),
-            }),
-    )
-    .on_press(Message::ExportAndPlayRightPanelAsXspf)
-    .width(Length::Shrink);
-
-    let mut row = iced::widget::Row::new()
-        .push(shuffle_button)
-        .push(export_button)
-        .push(play_button)
-        .spacing(menu_style.spacing);
-
-    if let Some(widget) = extra_widget {
-        row = row.push(Space::with_width(Length::Fill)).push(widget);
-    }
-
-    row.into()
-}
-
-/// Builds the header row for the right panel table, including sortable column
-/// buttons for directory, file, and optionally musician, album, title, and
-/// genre. Column spacing and text size are configurable via parameters.
-fn right_panel_header_row(
-    app: &FileTreeApp,
-    audio_column_toggles: AudioColumnToggles,
-    column_spacing: u16,
-    header_text_size: u16,
-    header_text_color: [f32; 4],
-) -> iced::widget::Row<'static, Message> {
-    // Sorting arrows
-    let dir_arrow = if app.right_panel_sort_column == SortColumn::Directory {
-        match app.right_panel_sort_order {
-            SortOrder::Desc => " ↑",
-            SortOrder::Asc => " ↓",
-        }
-    } else {
-        ""
-    };
-    let file_arrow = if app.right_panel_sort_column == SortColumn::File {
-        match app.right_panel_sort_order {
-            SortOrder::Desc => " ↑",
-            SortOrder::Asc => " ↓",
-        }
-    } else {
-        ""
-    };
-    let musician_arrow = if audio_column_toggles.show_musician
-        && app.right_panel_sort_column == SortColumn::Musician
-    {
-        match app.right_panel_sort_order {
-            SortOrder::Desc => " ↑",
-            SortOrder::Asc => " ↓",
-        }
-    } else {
-        ""
-    };
-    let album_arrow = if audio_column_toggles.show_album
-        && app.right_panel_sort_column == SortColumn::Album
-    {
-        match app.right_panel_sort_order {
-            SortOrder::Desc => " ↑",
-            SortOrder::Asc => " ↓",
-        }
-    } else {
-        ""
-    };
-    let title_arrow = if audio_column_toggles.show_title
-        && app.right_panel_sort_column == SortColumn::Title
-    {
-        match app.right_panel_sort_order {
-            SortOrder::Desc => " ↑",
-            SortOrder::Asc => " ↓",
-        }
-    } else {
-        ""
-    };
-    let genre_arrow = if audio_column_toggles.show_genre
-        && app.right_panel_sort_column == SortColumn::Genre
-    {
-        match app.right_panel_sort_order {
-            SortOrder::Desc => " ↑",
-            SortOrder::Asc => " ↓",
-        }
-    } else {
-        ""
-    };
-    let duration_arrow = if app.right_panel_sort_column == SortColumn::Duration
-    {
-        match app.right_panel_sort_order {
-            SortOrder::Desc => " ↑",
-            SortOrder::Asc => " ↓",
-        }
-    } else {
-        ""
-    };
-
-    let mut header_row = iced::widget::Row::new()
-        .push(
-            iced::widget::button(
-                iced::widget::text(format!("Directory{dir_arrow}"))
-                    .width(Length::FillPortion(1))
-                    .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style {
-                        color: Some(header_text_color.into()),
-                    }),
-            )
-            .on_press(Message::SortRightPanelByDirectory)
-            .width(Length::FillPortion(1)),
-        )
-        .push(
-            iced::widget::button(
-                iced::widget::text(format!("File{file_arrow}"))
-                    .width(Length::FillPortion(1))
-                    .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style {
-                        color: Some(header_text_color.into()),
-                    }),
-            )
-            .on_press(Message::SortRightPanelByFile)
-            .width(Length::FillPortion(1)),
-        );
-
-    if audio_column_toggles.show_musician {
-        header_row = header_row.push(
-            iced::widget::button(
-                iced::widget::text(format!("Musician{musician_arrow}"))
-                    .width(Length::FillPortion(1))
-                    .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style {
-                        color: Some(header_text_color.into()),
-                    }),
-            )
-            .on_press(Message::SortRightPanelByMusician)
-            .width(Length::FillPortion(1)),
-        );
-    }
-    if audio_column_toggles.show_album {
-        header_row = header_row.push(
-            iced::widget::button(
-                iced::widget::text(format!("Album{album_arrow}"))
-                    .width(Length::FillPortion(1))
-                    .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style {
-                        color: Some(header_text_color.into()),
-                    }),
-            )
-            .on_press(Message::SortRightPanelByAlbum)
-            .width(Length::FillPortion(1)),
-        );
-    }
-    if audio_column_toggles.show_title {
-        header_row = header_row.push(
-            iced::widget::button(
-                iced::widget::text(format!("Title{title_arrow}"))
-                    .width(Length::FillPortion(1))
-                    .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style {
-                        color: Some(header_text_color.into()),
-                    }),
-            )
-            .on_press(Message::SortRightPanelByTitle)
-            .width(Length::FillPortion(1)),
-        );
-    }
-    if audio_column_toggles.show_genre {
-        header_row = header_row.push(
-            iced::widget::button(
-                iced::widget::text(format!("Genre{genre_arrow}"))
-                    .width(Length::FillPortion(1))
-                    .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style {
-                        color: Some(header_text_color.into()),
-                    }),
-            )
-            .on_press(Message::SortRightPanelByGenre)
-            .width(Length::FillPortion(1)),
-        );
-    }
-    if audio_column_toggles.show_duration {
-        header_row = header_row.push(
-            iced::widget::button(
-                iced::widget::text(format!("Duration{duration_arrow}"))
-                    .width(Length::FillPortion(1))
-                    .size(header_text_size)
-                    .style(move |_theme| iced::widget::text::Style {
-                        color: Some(header_text_color.into()),
-                    }),
-            )
-            .on_press(Message::SortRightPanelByDuration)
-            .width(Length::FillPortion(1)),
-        );
-    }
-
-    header_row = header_row.spacing(column_spacing);
-    header_row
-}
-
-/// Creates the directory cell widget for a right panel row, displaying the
-/// parent directory name with the specified text size and providing a context
-/// menu for directory actions.
-fn create_right_panel_dir_widget(
-    file: &RightPanelFile,
-    row_text_size: u16,
-) -> Element<'static, Message> {
-    let dirname = file
-        .path
-        .parent()
-        .and_then(|p| p.file_name())
-        .map(|d| d.to_string_lossy().to_string())
-        .unwrap_or_default();
-    let dir_path = file.path.parent().map(|p| p.to_path_buf());
-    let dir_widget = if let Some(path) = dir_path {
-        let dir_path = path.clone();
-        iced_aw::widgets::ContextMenu::new(
-            iced::widget::text(dirname.clone())
-                .width(Length::FillPortion(1))
-                .size(row_text_size),
-            Box::new(move || {
-                iced::widget::column![
-                    iced::widget::button("Delete All in Directory").on_press(
-                        Message::RemoveDirectoryFromRightPanel(
-                            dir_path.clone()
-                        )
-                    )
-                ]
-                .into()
-            }) as Box<dyn Fn() -> iced::Element<'static, Message>>,
-        )
-    } else {
-        iced_aw::widgets::ContextMenu::new(
-            iced::widget::text(dirname.clone())
-                .width(Length::FillPortion(1))
-                .size(row_text_size),
-            Box::new(|| iced::widget::column![].into())
-                as Box<dyn Fn() -> iced::Element<'static, Message>>,
-        )
-    };
-    dir_widget.into()
-}
-
-/// Creates the file cell widget for a right panel row, displaying the file name
-/// with the  specified text size and providing a context menu for file-specific
-/// actions.
-fn create_right_panel_file_context_menu(
-    file: &RightPanelFile,
-    row_text_size: u16,
-) -> Element<'static, Message> {
-    let filename = file
-        .path
-        .file_name()
-        .map(|f| f.to_string_lossy().to_string())
-        .unwrap_or_default();
-    let file_context_menu = iced_aw::widgets::ContextMenu::new(
-        iced::widget::text(filename.clone())
-            .width(Length::FillPortion(1))
-            .size(row_text_size),
-        {
-            let file_path = file.path.clone();
-            Box::new(move || {
-                iced::widget::column![
-                    iced::widget::button("Delete").on_press(
-                        Message::RemoveFromRightPanel(file_path.clone())
-                    )
-                ]
-                .into()
-            }) as Box<dyn Fn() -> iced::Element<'static, Message>>
-        },
-    );
-    file_context_menu.into()
-}
-
-/// Assembles the entire right panel, including the menu row, header row, and
-/// all file rows,  applying the specified menu size, spacing, and text color to
-/// controls and table content.
-fn create_right_panel(
-    app: &FileTreeApp,
-    menu_style: MenuStyle,
-    item_list_style: ItemListStyle,
-) -> Element<Message> {
-    let displayed_files = app.sorted_right_panel_files();
-
-    // Determine which columns to show
-    let show_musician = displayed_files
-        .iter()
-        .any(|f| f.musician.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_album = displayed_files
-        .iter()
-        .any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_title = displayed_files
-        .iter()
-        .any(|f| f.title.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_genre = displayed_files
-        .iter()
-        .any(|f| f.genre.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
-    let show_duration = displayed_files.iter().any(|f| f.duration_ms.is_some());
-
-    let audio_column_toggles = AudioColumnToggles {
-        show_musician,
-        show_album,
-        show_title,
-        show_genre,
-        show_duration,
-    };
-
-    let totals_display = create_totals_display(&displayed_files, menu_style);
-    let header_text_size = item_list_style.row_text_size + 4;
-    let menu_row =
-        create_right_panel_menu_row(menu_style, Some(totals_display));
-
-    let header_row = right_panel_header_row(
-        app,
-        audio_column_toggles,
-        item_list_style.column_row_spacing,
-        header_text_size,
-        item_list_style.header_text_color,
-    );
-
-    let mut rows = Vec::new();
-    for (i, file_ref) in displayed_files.iter().enumerate() {
-        let file = file_ref.clone();
-
-        let dir_widget =
-            create_right_panel_dir_widget(&file, item_list_style.row_text_size);
-        let file_context_menu = create_right_panel_file_context_menu(
-            &file,
-            item_list_style.row_text_size,
-        );
-
-        let mut row =
-            iced::widget::Row::new().push(dir_widget).push(file_context_menu);
-
-        if show_musician {
-            row = row.push(
-                iced::widget::text(file.musician.clone().unwrap_or_default())
-                    .width(Length::FillPortion(1))
-                    .size(item_list_style.row_text_size),
-            );
-        }
-        if show_album {
-            row = row.push(
-                iced::widget::text(file.album.clone().unwrap_or_default())
-                    .width(Length::FillPortion(1))
-                    .size(item_list_style.row_text_size),
-            );
-        }
-        if show_title {
-            row = row.push(
-                iced::widget::text(file.title.clone().unwrap_or_default())
-                    .width(Length::FillPortion(1))
-                    .size(item_list_style.row_text_size),
-            );
-        }
-        if show_genre {
-            row = row.push(
-                iced::widget::text(file.genre.clone().unwrap_or_default())
-                    .width(Length::FillPortion(1))
-                    .size(item_list_style.row_text_size),
-            );
-        }
-        if show_duration {
-            row = row.push(
-                iced::widget::text(format_duration(file.duration_ms))
-                    .width(Length::FillPortion(1))
-                    .size(item_list_style.row_text_size),
-            );
-        }
-        row = row.spacing(item_list_style.column_row_spacing);
-
-        // Shade alternating pairs of rows
-        let pair = (i / 2) % 2;
-        let bg_color = if pair == 0 {
-            // iced::Color::from_rgb(0.13, 0.13, 0.13) // darker
-            iced::Color::from_rgb(
-                item_list_style.dark_row_shade[0],
-                item_list_style.dark_row_shade[1],
-                item_list_style.dark_row_shade[2],
-            )
-        } else {
-            // iced::Color::from_rgb(0.18, 0.18, 0.18) // lighter
-            iced::Color::from_rgb(
-                item_list_style.light_row_shade[0],
-                item_list_style.light_row_shade[1],
-                item_list_style.light_row_shade[2],
-            )
-        };
-
-        let clickable_row = iced::widget::button(row)
-            .on_press(Message::OpenRightPanelFile(file.path.clone()))
-            .style(move |_theme, _style| iced::widget::button::Style {
-                background: Some(iced::Background::Color(bg_color)),
-                border: iced::Border::default(),
-                shadow: iced::Shadow::default(),
-                text_color: iced::Color::WHITE,
-            });
-
-        rows.push(clickable_row.into());
-    }
-
-    let col = iced::widget::Column::new()
-        .push(Space::with_height(item_list_style.column_height_spacing))
-        .push(menu_row)
-        .push(Space::with_height(item_list_style.column_height_spacing))
-        .push(header_row)
-        .push(Scrollable::new(iced::widget::column(rows)));
-
-    col.into()
+pub(crate) struct ItemListStyle {
+    pub column_row_spacing: u16,
+    pub column_height_spacing: u16,
+    pub row_text_size: u16,
+    pub header_text_color: [f32; 4],
+    pub right_panel_width: u16,
+    pub light_row_shade: [f32; 3],
+    pub dark_row_shade: [f32; 3],
 }
 
 /// Composes the entire application UI, including the left and right panels,
@@ -724,6 +48,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         directory_row_size: 16,
         file_row_size: 14,
     };
+
     let flat_button_style =
         |_theme: &iced::Theme, _status: iced::widget::button::Status| {
             iced::widget::button::Style {
@@ -743,35 +68,15 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         light_row_shade: [0.13, 0.13, 0.13],
         dark_row_shade: [0.16, 0.16, 0.16],
     };
-    let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
-    let extension_menu =
-        create_extension_menu(app, menu_style.text_size, menu_style.text_color);
-    let tree_browser = match app.left_panel_nav_mode {
-        LeftPanelNavMode::Directory => create_left_panel_tree_browser(
-            app,
-            tree_browser_style,
-            flat_button_style,
-        ),
-        LeftPanelNavMode::Tag | LeftPanelNavMode::Musician => {
-            create_left_panel_tag_tree_browser(
-                app,
-                tree_browser_style,
-                flat_button_style,
-            )
-        },
-    };
-    let left_content = if app.left_panel_expanded {
-        column![
-            left_panel_menu_row,
-            Space::with_height(10),
-            extension_menu,
-            Space::with_height(10),
-            tree_browser,
-        ]
-    } else {
-        column![create_toggle_left_panel_button(app, menu_style)]
-    };
-    let left_panel: Element<Message> =
+
+    let left_content = create_left_panel(
+        app,
+        menu_style,
+        tree_browser_style,
+        flat_button_style,
+    );
+
+    let left_panel_container: Element<Message> =
         container::<Message, iced::Theme, iced::Renderer>(scrollable(
             left_content,
         ))
@@ -779,7 +84,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .padding(10)
         .into();
 
-    let right_panel: Element<Message> =
+    let right_panel_container: Element<Message> =
         container::<Message, iced::Theme, iced::Renderer>(create_right_panel(
             app,
             menu_style,
@@ -788,8 +93,9 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
         .width(Length::FillPortion(item_list_style.right_panel_width))
         .into();
 
-    let split_row =
-        row![left_panel, right_panel].width(Length::Fill).height(Length::Fill);
+    let split_row = row![left_panel_container, right_panel_container]
+        .width(Length::Fill)
+        .height(Length::Fill);
 
     container::<Message, iced::Theme, iced::Renderer>(split_row)
         .width(Length::Fill)
@@ -809,7 +115,7 @@ pub fn view(app: &FileTreeApp) -> Element<Message> {
 mod iced_tests {
     use super::*;
     use crate::fs::file_tree::FileNode;
-    use crate::gui::RightPanelFile;
+    use crate::gui::{RightPanelFile, SortColumn, SortOrder};
     use crate::{FileTreeApp, update, view};
     use std::fs::File;
     use std::path::PathBuf;
@@ -1765,6 +1071,8 @@ mod iced_tests {
         // View/rendering/UI feedback tests here
         use super::*;
         use crate::fs::file_tree::scan_directory;
+        use crate::gui::LeftPanelSortMode;
+        use crate::gui::render_node::render_file_node;
 
         #[test]
         fn test_view_with_root_node() {

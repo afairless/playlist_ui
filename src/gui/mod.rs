@@ -1,4 +1,6 @@
+mod left_panel;
 mod render_node;
+mod right_panel;
 mod state;
 mod update;
 mod view;
