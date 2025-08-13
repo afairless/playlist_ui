@@ -55,26 +55,10 @@ fn create_left_panel_menu_row<'a>(
         )
         .on_press(Message::ToggleLeftPanelSortMode);
 
-    let nav_mode_label = match app.left_panel_nav_mode {
-        LeftPanelNavMode::Directory => "Nav: Directory",
-        LeftPanelNavMode::Tag => "Nav: Tag",
-        LeftPanelNavMode::Musician => "Nav: Creator",
-    };
-    let nav_mode_button =
-        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-            iced::widget::text(nav_mode_label)
-                .size(menu_style.text_size)
-                .style(move |_theme| iced::widget::text::Style {
-                    color: Some(menu_style.text_color.into()),
-                }),
-        )
-        .on_press(Message::ToggleLeftPanelNavMode);
-
     iced::widget::row![
         toggle_left_panel_button,
         directory_button,
         sort_mode_button,
-        nav_mode_button
     ]
     .spacing(menu_style.spacing)
     .into()
@@ -220,9 +204,41 @@ pub(crate) fn create_left_panel(
     + Copy
     + 'static,
 ) -> Element<Message> {
-    let left_panel_menu_row = create_left_panel_menu_row(app, menu_style);
+    //
+    // left_panel_menu_row_1
+    // --------------------------------------------------
+
+    let left_panel_menu_row_1 = create_left_panel_menu_row(app, menu_style);
+
+    let nav_mode_label = match app.left_panel_nav_mode {
+        LeftPanelNavMode::Directory => "Select by: Directory",
+        LeftPanelNavMode::Tag => "Select by: Genre",
+        LeftPanelNavMode::Musician => "Select by: Creator",
+    };
+    let nav_mode_button =
+        iced::widget::button::<Message, iced::Theme, iced::Renderer>(
+            iced::widget::text(nav_mode_label)
+                .size(menu_style.text_size)
+                .style(move |_theme| iced::widget::text::Style {
+                    color: Some(menu_style.text_color.into()),
+                }),
+        )
+        .on_press(Message::ToggleLeftPanelNavMode);
+
+    //
+    // left_panel_menu_row_2
+    // --------------------------------------------------
+
     let extension_menu =
         create_extension_menu(app, menu_style.text_size, menu_style.text_color);
+    let left_panel_menu_row_2 =
+        iced::widget::row![nav_mode_button, extension_menu]
+            .spacing(menu_style.spacing);
+
+    //
+    // tree_browser
+    // --------------------------------------------------
+
     let tree_browser = match app.left_panel_nav_mode {
         LeftPanelNavMode::Directory => create_left_panel_file_tree_browser(
             app,
@@ -237,11 +253,16 @@ pub(crate) fn create_left_panel(
             )
         },
     };
+
+    //
+    // assemble components into panel
+    // --------------------------------------------------
+
     let left_content = if app.left_panel_expanded {
         column![
-            left_panel_menu_row,
+            left_panel_menu_row_1,
             Space::with_height(10),
-            extension_menu,
+            left_panel_menu_row_2,
             Space::with_height(10),
             tree_browser,
         ]
