@@ -1,3 +1,4 @@
+use crate::db::sled_store::SledStore;
 use crate::fs::file_tree::{FileNode, scan_directory};
 use crate::gui::update::restore_expansion_state;
 use serde::{Deserialize, Serialize};
@@ -50,7 +51,16 @@ pub enum LeftPanelNavMode {
     Musician,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+// #[derive(Debug, Clone, PartialEq)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    bincode::Encode,
+    bincode::Decode,
+    PartialEq,
+)]
 pub struct TagTreeNode {
     pub label: String,
     pub children: Vec<TagTreeNode>,
@@ -95,6 +105,8 @@ pub struct RightPanelFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileTreeApp {
     #[serde(skip)]
+    pub sled_store: Option<SledStore>,
+    #[serde(skip)]
     pub left_panel_nav_mode: LeftPanelNavMode,
     #[serde(skip)]
     pub tag_tree_roots: Vec<TagTreeNode>,
@@ -131,6 +143,7 @@ impl FileTreeApp {
         top_dirs: Vec<PathBuf>,
         all_extensions: &[&str],
         persist_path: PathBuf,
+        sled_store: Option<SledStore>,
     ) -> Self {
         let all_extensions_vec: Vec<String> =
             all_extensions.iter().map(|s| s.to_string()).collect();
@@ -157,6 +170,7 @@ impl FileTreeApp {
             restore_expansion_state(root, &expanded_dirs);
         }
         FileTreeApp {
+            sled_store,
             left_panel_nav_mode: LeftPanelNavMode::Directory,
             tag_tree_roots: Vec::new(),
             left_panel_expanded: true,
@@ -181,6 +195,7 @@ impl FileTreeApp {
     pub(crate) fn load(
         all_extensions: &[&str],
         persist_path: Option<PathBuf>,
+        sled_store: Option<SledStore>,
     ) -> Self {
         let persist_path = persist_path.unwrap_or_else(get_persist_path);
         let top_dirs = if persist_path.exists() {
@@ -194,7 +209,7 @@ impl FileTreeApp {
         } else {
             Vec::new()
         };
-        FileTreeApp::new(top_dirs, all_extensions, persist_path)
+        FileTreeApp::new(top_dirs, all_extensions, persist_path, sled_store)
     }
 
     /// Persists the current list of top-level directories to disk as JSON,

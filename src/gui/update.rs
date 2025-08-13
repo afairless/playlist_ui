@@ -411,17 +411,45 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::ToggleLeftPanelNavMode => {
             app.left_panel_nav_mode = match app.left_panel_nav_mode {
                 LeftPanelNavMode::Directory => {
-                    // Switch to tag mode: build tag tree
-                    app.tag_tree_roots =
-                        build_tag_tree(&app.top_dirs, &app.selected_extensions);
+                    // Switch to tag mode: load from sled if possible
+                    if let Some(ref sled_store) = app.sled_store {
+                        if let Some(tree) = sled_store.load_tag_tree() {
+                            app.tag_tree_roots = tree;
+                        } else {
+                            let tree = build_tag_tree(
+                                &app.top_dirs,
+                                &app.selected_extensions,
+                            );
+                            sled_store.save_tag_tree(&tree).ok();
+                            app.tag_tree_roots = tree;
+                        }
+                    } else {
+                        app.tag_tree_roots = build_tag_tree(
+                            &app.top_dirs,
+                            &app.selected_extensions,
+                        );
+                    }
                     LeftPanelNavMode::Tag
                 },
                 LeftPanelNavMode::Tag => {
-                    // Switch to musician mode: build musician tree
-                    app.tag_tree_roots = build_musician_tree(
-                        &app.top_dirs,
-                        &app.selected_extensions,
-                    );
+                    // Switch to musician mode: load from sled if possible
+                    if let Some(ref sled_store) = app.sled_store {
+                        if let Some(tree) = sled_store.load_musician_tree() {
+                            app.tag_tree_roots = tree;
+                        } else {
+                            let tree = build_musician_tree(
+                                &app.top_dirs,
+                                &app.selected_extensions,
+                            );
+                            sled_store.save_musician_tree(&tree).ok();
+                            app.tag_tree_roots = tree;
+                        }
+                    } else {
+                        app.tag_tree_roots = build_musician_tree(
+                            &app.top_dirs,
+                            &app.selected_extensions,
+                        );
+                    }
                     LeftPanelNavMode::Musician
                 },
                 LeftPanelNavMode::Musician => LeftPanelNavMode::Directory,

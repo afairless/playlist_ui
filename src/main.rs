@@ -1,8 +1,21 @@
+mod db;
 mod fs;
 mod gui;
 mod utils;
 
+use crate::db::sled_store::SledStore;
+use crate::fs::media_metadata::{build_musician_tree, build_tag_tree};
 use gui::{FileTreeApp, update, view};
+use std::path::PathBuf;
+
+// Currently, Sled database is not incrementally updated when tags from media
+// files metadata are changed; instead, the database must be deleted and
+// completely rebuilt to include any such changes
+fn get_sled_db_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".playlist_ui_db")
+}
 
 fn main() -> iced::Result {
     env_logger::init();
@@ -12,7 +25,34 @@ fn main() -> iced::Result {
         "m4b", "m4p", "mpc", "opus", "ogg", "oga", "spx", "wav", "wv",
     ];
 
+    let sled_store = SledStore::new(get_sled_db_path().to_str().unwrap())
+        .expect("Failed to open sled db");
+
     iced::application("File Tree Viewer", update, view).run_with(move || {
-        (FileTreeApp::load(AUDIO_EXPORT_EXTENSIONS, None), iced::Task::none())
+        let mut app = FileTreeApp::load(
+            AUDIO_EXPORT_EXTENSIONS,
+            None,
+            Some(sled_store.clone()),
+        );
+
+        // Ensure genre tag tree is present in sled
+        if sled_store.load_tag_tree().is_none() {
+            let tree = build_tag_tree(&app.top_dirs, &app.selected_extensions);
+            sled_store.save_tag_tree(&tree).ok();
+        }
+
+        // Ensure musician tree is present in sled
+        if sled_store.load_musician_tree().is_none() {
+            let tree =
+                build_musician_tree(&app.top_dirs, &app.selected_extensions);
+            sled_store.save_musician_tree(&tree).ok();
+        }
+
+        // Optionally, load the genre tree into app.tag_tree_roots if you want to start in tag mode
+        if let Some(tree) = sled_store.load_tag_tree() {
+            app.tag_tree_roots = tree;
+        }
+
+        (app, iced::Task::none())
     })
 }

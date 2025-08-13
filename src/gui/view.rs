@@ -163,8 +163,12 @@ mod iced_tests {
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
 
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
             app.root_nodes[0] = Some(root_node); // manually set the test tree
 
             assert!(app.root_nodes[0].is_some());
@@ -177,8 +181,12 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
             assert!(app.root_nodes[0].is_none());
         }
 
@@ -195,10 +203,12 @@ mod iced_tests {
                 vec![dir.clone()],
                 file_extensions,
                 persist_path.clone(),
+                None,
             );
             let _ = app.persist_top_dirs();
 
-            let app2 = FileTreeApp::load(file_extensions, Some(persist_path));
+            let app2 =
+                FileTreeApp::load(file_extensions, Some(persist_path), None);
             assert!(app2.top_dirs.contains(&dir));
         }
 
@@ -217,12 +227,16 @@ mod iced_tests {
             writeln!(file, "corrupted data").unwrap();
 
             // Attempt to load top_dirs (should fallback to empty)
-            let app =
-                FileTreeApp::new(vec![], file_extensions, persist_path.clone());
+            let app = FileTreeApp::new(
+                vec![],
+                file_extensions,
+                persist_path.clone(),
+                None,
+            );
             let _ = app.persist_top_dirs(); // Ensure file exists for load
 
             let loaded_app =
-                FileTreeApp::load(file_extensions, Some(persist_path));
+                FileTreeApp::load(file_extensions, Some(persist_path), None);
             assert!(
                 loaded_app.top_dirs.is_empty(),
                 "Should handle corrupted top_dirs state gracefully"
@@ -235,8 +249,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Remove all selected extensions
             app.selected_extensions.clear();
@@ -252,8 +270,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Try toggling an extension not in file_extensions
             let msg = Message::ToggleExtension("md".to_string());
@@ -272,6 +294,7 @@ mod iced_tests {
                 vec![dir1.clone()],
                 file_extensions,
                 persist_path.clone(),
+                None,
             );
             // Simulate a scanned directory node
             let node1 = FileNode::new_directory(
@@ -306,6 +329,7 @@ mod iced_tests {
                 vec![dir1.clone(), dir2.clone()],
                 file_extensions,
                 persist_path.clone(),
+                None,
             );
             let node1 = FileNode::new_directory(
                 "dir1".to_string(),
@@ -354,8 +378,12 @@ mod iced_tests {
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
             app.root_nodes[0] = Some(root_node); // manually set the test tree
 
             let subdir_path = PathBuf::from("/test/root/subdir");
@@ -377,8 +405,12 @@ mod iced_tests {
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
             app.root_nodes[0] = Some(root_node); // manually set the test tree
 
             let subdir_path = PathBuf::from("/test/root/subdir");
@@ -404,8 +436,12 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
             let message =
                 Message::ToggleExpansion(PathBuf::from("/nonexistent"));
 
@@ -426,8 +462,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Clone state before update
             let prev_state = app.clone();
@@ -456,8 +496,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Initially, "txt" is selected
             assert_eq!(app.selected_extensions, vec!["txt".to_string()]);
@@ -494,8 +538,12 @@ mod iced_tests {
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], &file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                &file_extensions,
+                persist_path,
+                None,
+            );
 
             // Toggle all extensions off
             for ext in &file_extensions {
@@ -523,8 +571,12 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             let msg = Message::ToggleExtension("md".to_string());
             let _ = update(&mut app, msg);
@@ -541,8 +593,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             let msg = Message::ToggleExtensionsMenu;
             let _ = update(&mut app, msg);
@@ -556,7 +612,7 @@ mod iced_tests {
         fn test_add_to_right_panel() {
             let file_path = PathBuf::from("/file.txt");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let msg = Message::AddToRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
             assert!(app.right_panel_files.iter().any(|f| f.path == file_path));
@@ -585,6 +641,7 @@ mod iced_tests {
                 vec![dir_path.clone()],
                 &["txt"],
                 PathBuf::from("/tmp"),
+                None,
             );
             app.root_nodes[0] = Some(dir_node);
 
@@ -598,7 +655,7 @@ mod iced_tests {
         fn test_remove_from_right_panel() {
             let file_path = PathBuf::from("/file.txt");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             app.right_panel_files.push(RightPanelFile {
                 path: file_path.clone(),
                 musician: None,
@@ -616,7 +673,7 @@ mod iced_tests {
         fn test_remove_directory_from_right_panel() {
             let dir_path = PathBuf::from("/dir");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file1 = RightPanelFile {
                 path: PathBuf::from("/dir/file1.txt"),
                 musician: None,
@@ -670,7 +727,7 @@ mod iced_tests {
             let file_a = PathBuf::from("/dir_a/file.txt");
             let file_b = PathBuf::from("/dir_b/file.txt");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file_a = RightPanelFile {
                 path: file_a.clone(),
                 musician: None,
@@ -709,7 +766,7 @@ mod iced_tests {
             let file1 = PathBuf::from("/dir/file1.txt");
             let file2 = PathBuf::from("/dir/file2.txt");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file1 = RightPanelFile {
                 path: file1.clone(),
                 musician: None,
@@ -737,7 +794,7 @@ mod iced_tests {
         fn test_add_duplicate_to_right_panel() {
             let file_path = PathBuf::from("/file.txt");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file = RightPanelFile {
                 path: file_path.clone(),
                 musician: None,
@@ -763,7 +820,7 @@ mod iced_tests {
         fn test_remove_nonexistent_from_right_panel() {
             let file_path = PathBuf::from("/file.txt");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             // Try to remove a file that's not present
             let msg = Message::RemoveFromRightPanel(file_path.clone());
             let _ = update(&mut app, msg);
@@ -775,7 +832,7 @@ mod iced_tests {
         fn test_remove_nonexistent_directory_from_right_panel() {
             let dir_path = PathBuf::from("/dir");
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file = RightPanelFile {
                 path: PathBuf::from("/other/file.txt"),
                 musician: None,
@@ -794,7 +851,7 @@ mod iced_tests {
         #[test]
         fn test_sort_right_panel_empty_and_single() {
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             // Empty list
             let _ = update(&mut app, Message::SortRightPanelByDirectory);
             assert!(app.right_panel_files.is_empty());
@@ -817,7 +874,7 @@ mod iced_tests {
         #[test]
         fn test_shuffle_right_panel_empty_and_single() {
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             // Empty list
             let _ = update(&mut app, Message::ShuffleRightPanel);
             assert!(app.right_panel_shuffled);
@@ -857,7 +914,7 @@ mod iced_tests {
                 duration_ms: None,
             };
             let mut app =
-                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"));
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             app.right_panel_files =
                 vec![right_panel_file1.clone(), right_panel_file2.clone()];
 
@@ -880,8 +937,12 @@ mod iced_tests {
             let file_extensions: &[&str] = &[];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Try toggling a non-existent extension
             let msg = Message::ToggleExtension("md".to_string());
@@ -896,8 +957,12 @@ mod iced_tests {
             let file_extensions: &[&str] = &[];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Toggle menu open and closed
             let msg = Message::ToggleExtensionsMenu;
@@ -918,8 +983,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             let msg = Message::ToggleExtension("".to_string());
             let _ = update(&mut app, msg);
@@ -936,8 +1005,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             let msg = Message::ToggleExtension("nonexistent".to_string());
             let _ = update(&mut app, msg);
@@ -956,8 +1029,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             let msg = Message::ToggleExtension("💥".to_string());
             let _ = update(&mut app, msg);
@@ -977,7 +1054,7 @@ mod iced_tests {
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             // Simulate adding a file path
             let message = Message::DirectoryAdded(Some(file_path.clone()));
@@ -1017,8 +1094,12 @@ mod iced_tests {
 
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
             app.root_nodes[0] = Some(root); // manually set the test tree
 
             // Test expanding deeply nested directory
@@ -1042,8 +1123,12 @@ mod iced_tests {
             let file_extensions = &["txt"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Default should be Alphanumeric
             assert_eq!(
@@ -1080,8 +1165,12 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             let _element = view(&app);
 
@@ -1095,8 +1184,12 @@ mod iced_tests {
             let file_extensions = &["txt", "md"];
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             let _element = view(&app);
 
@@ -1105,7 +1198,8 @@ mod iced_tests {
 
         #[test]
         fn test_view_renders_with_empty_state() {
-            let app = FileTreeApp::new(vec![], &[], PathBuf::from("/tmp"));
+            let app =
+                FileTreeApp::new(vec![], &[], PathBuf::from("/tmp"), None);
             let _element = view(&app);
             // Test passes if view() does not panic
         }
@@ -1123,6 +1217,7 @@ mod iced_tests {
                 vec![PathBuf::from("/dummy")],
                 &file_extensions,
                 persist_path,
+                None,
             );
 
             let _element = view(&app);
@@ -1142,6 +1237,7 @@ mod iced_tests {
                 vec![std::path::PathBuf::from("/dummy")],
                 &file_extensions,
                 persist_path,
+                None,
             );
 
             // Expand the menu to render all extensions
@@ -1182,6 +1278,7 @@ mod iced_tests {
                 vec![std::path::PathBuf::from("/dummy")],
                 file_extensions,
                 persist_path,
+                None,
             );
 
             app.extensions_menu_expanded = true;
@@ -1262,6 +1359,7 @@ mod iced_tests {
                 vec![dir_path.clone()],
                 file_extensions,
                 persist_path,
+                None,
             );
             app.root_nodes[0] = Some(dir_node);
 
@@ -1304,7 +1402,7 @@ mod iced_tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             // Add file to right panel
             let msg_add = Message::AddToRightPanel(file_path.clone());
@@ -1354,7 +1452,7 @@ mod iced_tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             app.right_panel_files = vec![
                 right_panel_file1.clone(),
@@ -1409,7 +1507,7 @@ mod iced_tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             app.right_panel_files =
                 vec![right_panel_file1.clone(), right_panel_file2.clone()];
@@ -1461,6 +1559,7 @@ mod iced_tests {
                 vec![dir_path.clone()],
                 file_extensions,
                 persist_path,
+                None,
             );
             app.root_nodes[0] = Some(dir_node);
 
@@ -1487,6 +1586,7 @@ mod iced_tests {
                 vec![dir_path.clone()],
                 file_extensions,
                 persist_path,
+                None,
             );
 
             assert!(
@@ -1513,6 +1613,7 @@ mod iced_tests {
                 vec![dir_path.clone()],
                 file_extensions,
                 persist_path,
+                None,
             );
 
             assert!(
@@ -1541,7 +1642,7 @@ mod iced_tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             // Try to remove a file that's not present
             let msg = Message::RemoveFromRightPanel(file_path.clone());
@@ -1569,7 +1670,7 @@ mod iced_tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             app.right_panel_files = vec![right_panel_file.clone()];
 
@@ -1600,6 +1701,7 @@ mod iced_tests {
                 vec![dir_path.clone()],
                 file_extensions,
                 persist_path,
+                None,
             );
 
             let prev_selected = app.selected_extensions.clone();
@@ -1624,6 +1726,7 @@ mod iced_tests {
                 vec![std::path::PathBuf::from("/dummy")],
                 file_extensions,
                 persist_path,
+                None,
             );
             app.extensions_menu_expanded = true;
 
@@ -1700,6 +1803,7 @@ mod iced_tests {
                 vec![dir_path.clone()],
                 file_extensions,
                 persist_path,
+                None,
             );
             app.root_nodes[0] = Some(dir_node);
 
@@ -1732,7 +1836,7 @@ mod iced_tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             // Add file
             let _ =
@@ -1786,6 +1890,7 @@ mod iced_tests {
                 vec![root_path.clone()],
                 file_extensions,
                 persist_path,
+                None,
             );
             app.root_nodes[0] = Some(root);
 
@@ -1842,7 +1947,7 @@ mod iced_tests {
             let temp_file = tempfile::NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
             let mut app =
-                FileTreeApp::new(vec![], file_extensions, persist_path);
+                FileTreeApp::new(vec![], file_extensions, persist_path, None);
 
             // Add both files
             let _ = update(&mut app, Message::AddToRightPanel(file1.clone()));
@@ -1960,8 +2065,12 @@ mod iced_tests {
             // Test that the app can be created and updated
             let temp_file = NamedTempFile::new().unwrap();
             let persist_path = temp_file.path().to_path_buf();
-            let mut app =
-                FileTreeApp::new(vec![dir], file_extensions, persist_path);
+            let mut app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
 
             // Test expanding the subdirectory
             let subdir_path = subdir.to_path_buf();
@@ -1987,6 +2096,7 @@ mod iced_tests {
                 vec![PathBuf::from("/dummy")],
                 file_extensions,
                 persist_path,
+                None,
             );
 
             // Initial state
