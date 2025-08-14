@@ -9,7 +9,7 @@ jobs:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: moonrepo/setup-rust@v1.2.2
         with:
           components: rustfmt
@@ -19,7 +19,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: moonrepo/setup-rust@v1.2.2
         with:
           bins: cargo-make, cargo-nextest
