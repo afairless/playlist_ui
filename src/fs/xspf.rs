@@ -10,58 +10,101 @@ pub(crate) fn export_xspf_playlist(
     files: &[RightPanelFile],
     output_path: &std::path::Path,
 ) -> std::io::Result<()> {
-    let mut xml = String::from(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
-    xml.push_str(
-        r#"<playlist version="1" xmlns="http://xspf.org/ns/0/"><trackList>"#,
+    fn push_line(xml: &mut String, indent: usize, line: &str) {
+        for _ in 0..indent {
+            xml.push_str("    ");
+        }
+        xml.push_str(line);
+        xml.push('\n');
+    }
+
+    let mut xml = String::new();
+    push_line(&mut xml, 0, r#"<?xml version="1.0" encoding="UTF-8"?>"#);
+    push_line(
+        &mut xml,
+        0,
+        r#"<playlist version="1" xmlns="http://xspf.org/ns/0/">"#,
     );
+    push_line(&mut xml, 1, "<trackList>");
 
     for file in files {
         let meta = extract_media_metadata(&file.path);
-        xml.push_str("<track>");
-        xml.push_str(&format!(
-            "<location>file://{}</location>",
-            file.path.display()
-        ));
+        push_line(&mut xml, 2, "<track>");
+        push_line(
+            &mut xml,
+            3,
+            &format!("<location>file://{}</location>", file.path.display()),
+        );
         if let Some(title) = meta.title {
-            xml.push_str(&format!("<title>{}</title>", xml_escape(&title)));
+            push_line(
+                &mut xml,
+                3,
+                &format!("<title>{}</title>", xml_escape(&title)),
+            );
         }
         if let Some(creator) = meta.creator {
-            xml.push_str(&format!(
-                "<creator>{}</creator>",
-                xml_escape(&creator)
-            ));
+            push_line(
+                &mut xml,
+                3,
+                &format!("<creator>{}</creator>", xml_escape(&creator)),
+            );
         }
         if let Some(album) = meta.album {
-            xml.push_str(&format!("<album>{}</album>", xml_escape(&album)));
+            push_line(
+                &mut xml,
+                3,
+                &format!("<album>{}</album>", xml_escape(&album)),
+            );
         }
         if let Some(duration) = meta.duration_ms {
-            xml.push_str(&format!("<duration>{duration}</duration>"));
+            push_line(&mut xml, 3, &format!("<duration>{duration}</duration>"));
         }
         if let Some(genre) = meta.genre {
-            xml.push_str(&format!("<genre>{}</genre>", xml_escape(&genre)));
+            push_line(
+                &mut xml,
+                3,
+                &format!("<genre>{}</genre>", xml_escape(&genre)),
+            );
         }
         if let Some(identifier) = meta.identifier {
-            xml.push_str(&format!(
-                "<identifier>{}</identifier>",
-                xml_escape(&identifier)
-            ));
+            push_line(
+                &mut xml,
+                3,
+                &format!(
+                    "<identifier>{}</identifier>",
+                    xml_escape(&identifier)
+                ),
+            );
         }
         if let Some(annotation) = meta.annotation {
-            xml.push_str(&format!(
-                "<annotation>{}</annotation>",
-                xml_escape(&annotation)
-            ));
+            push_line(
+                &mut xml,
+                3,
+                &format!(
+                    "<annotation>{}</annotation>",
+                    xml_escape(&annotation)
+                ),
+            );
         }
         if let Some(track_num) = meta.track_num {
-            xml.push_str(&format!("<trackNum>{track_num}</trackNum>"));
+            push_line(
+                &mut xml,
+                3,
+                &format!("<trackNum>{track_num}</trackNum>"),
+            );
         }
         if let Some(image_uri) = meta.image_uri {
-            xml.push_str(&format!("<image>{}</image>", xml_escape(&image_uri)));
+            push_line(
+                &mut xml,
+                3,
+                &format!("<image>{}</image>", xml_escape(&image_uri)),
+            );
         }
-        xml.push_str("</track>");
+        push_line(&mut xml, 2, "</track>");
     }
 
-    xml.push_str("</trackList></playlist>");
+    push_line(&mut xml, 1, "</trackList>");
+    push_line(&mut xml, 0, "</playlist>");
 
     let mut file = File::create(output_path)?;
     file.write_all(xml.as_bytes())?;
