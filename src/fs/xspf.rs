@@ -3,6 +3,15 @@ use crate::gui::RightPanelFile;
 use std::fs::File;
 use std::io::Write;
 
+// Simple XML escape for special characters
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 /// Exports a playlist of the given files to an XSPF (XML Shareable Playlist
 /// Format) file at the specified output path, including metadata such as title,
 /// artist, album, duration, genre, and more for each track.
@@ -33,7 +42,10 @@ pub(crate) fn export_xspf_playlist(
         push_line(
             &mut xml,
             3,
-            &format!("<location>file://{}</location>", file.path.display()),
+            &format!(
+                "<location>file://{}</location>",
+                xml_escape(&file.path.display().to_string())
+            ),
         );
         if let Some(title) = meta.title {
             push_line(
@@ -109,15 +121,6 @@ pub(crate) fn export_xspf_playlist(
     let mut file = File::create(output_path)?;
     file.write_all(xml.as_bytes())?;
     Ok(())
-}
-
-// Simple XML escape for special characters
-fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]
