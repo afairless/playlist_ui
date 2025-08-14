@@ -14,7 +14,7 @@ fn get_persist_path() -> PathBuf {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    ToggleLeftPanelNavMode,
+    ToggleLeftPanelSelectMode,
     ToggleLeftPanel,
     ToggleTagExpansion(Vec<String>),
     AddTagNodeToRightPanel(Vec<String>),
@@ -31,7 +31,7 @@ pub enum Message {
     RemoveDirectoryFromRightPanel(PathBuf),
     SortRightPanelByDirectory,
     SortRightPanelByFile,
-    SortRightPanelByMusician,
+    SortRightPanelByCreator,
     SortRightPanelByAlbum,
     SortRightPanelByTitle,
     SortRightPanelByGenre,
@@ -44,14 +44,13 @@ pub enum Message {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub enum LeftPanelNavMode {
+pub enum LeftPanelSelectMode {
     #[default]
     Directory,
-    Tag,
-    Musician,
+    GenreTag,
+    CreatorTag,
 }
 
-// #[derive(Debug, Clone, PartialEq)]
 #[derive(
     Debug,
     Clone,
@@ -79,7 +78,7 @@ pub enum LeftPanelSortMode {
 pub enum SortColumn {
     Directory,
     File,
-    Musician,
+    Creator,
     Album,
     Title,
     Genre,
@@ -95,7 +94,7 @@ pub enum SortOrder {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RightPanelFile {
     pub path: PathBuf,
-    pub musician: Option<String>,
+    pub creator: Option<String>,
     pub album: Option<String>,
     pub title: Option<String>,
     pub genre: Option<String>,
@@ -107,7 +106,7 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub sled_store: Option<SledStore>,
     #[serde(skip)]
-    pub left_panel_nav_mode: LeftPanelNavMode,
+    pub left_panel_selection_mode: LeftPanelSelectMode,
     #[serde(skip)]
     pub tag_tree_roots: Vec<TagTreeNode>,
     #[serde(skip)]
@@ -171,7 +170,7 @@ impl FileTreeApp {
         }
         FileTreeApp {
             sled_store,
-            left_panel_nav_mode: LeftPanelNavMode::Directory,
+            left_panel_selection_mode: LeftPanelSelectMode::Directory,
             tag_tree_roots: Vec::new(),
             left_panel_expanded: true,
             left_panel_sort_mode: LeftPanelSortMode::Alphanumeric,
@@ -269,21 +268,21 @@ impl FileTreeApp {
                         b_file.cmp(&a_file)
                     }
                 },
-                SortColumn::Musician => {
-                    let a_musician = a
-                        .musician
+                SortColumn::Creator => {
+                    let a_creator = a
+                        .creator
                         .as_deref()
                         .unwrap_or_default()
                         .to_ascii_lowercase();
-                    let b_musician = b
-                        .musician
+                    let b_creator = b
+                        .creator
                         .as_deref()
                         .unwrap_or_default()
                         .to_ascii_lowercase();
                     if self.right_panel_sort_order == SortOrder::Asc {
-                        a_musician.cmp(&b_musician)
+                        a_creator.cmp(&b_creator)
                     } else {
-                        b_musician.cmp(&a_musician)
+                        b_creator.cmp(&a_creator)
                     }
                 },
                 SortColumn::Album => {

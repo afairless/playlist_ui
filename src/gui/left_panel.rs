@@ -1,6 +1,8 @@
 use crate::gui::render_node::{render_file_node, render_tag_node};
 use crate::gui::view::{MenuStyle, TreeBrowserStyle};
-use crate::gui::{FileTreeApp, LeftPanelNavMode, LeftPanelSortMode, Message};
+use crate::gui::{
+    FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
+};
 use iced::{
     Element,
     widget::{Space, button, column, row, text},
@@ -155,13 +157,13 @@ fn create_left_panel_file_tree_browser(
     trees
 }
 
-/// Builds the left panel's tag-based navigation tree UI.
+/// Builds the left panel's tag-based navigation/selection tree UI.
 ///
 /// Iterates over the root nodes of the tag tree in the application state and
 /// recursively renders each node using `render_tag_node`. Applies the specified
 /// tree browser style for row sizing and spacing. This function is used when
-/// the left panel is in tag navigation mode to display the genre → artist →
-/// album → track hierarchy.
+/// the left panel is in tag navigation/selection  mode to display the genre →
+/// creator/musician/artist → album → track hierarchy.
 fn create_left_panel_tag_tree_browser(
     app: &FileTreeApp,
     tree_browser_style: TreeBrowserStyle,
@@ -189,10 +191,10 @@ fn create_left_panel_tag_tree_browser(
 
 /// Constructs the left panel UI for the application, including the menu row,
 /// file extension filter menu, and either the directory or tag tree browser
-/// depending on the current navigation mode. The panel's appearance and
-/// behavior are controlled by the provided style parameters and button style
-/// function. Returns an `Element<Message>` representing the left panel's
-/// content, which adapts to the expansion state and navigation mode.
+/// depending on the current navigation/selection mode. The panel's appearance
+/// and behavior are controlled by the provided style parameters and button
+/// style function. Returns an `Element<Message>` representing the left panel's
+/// content, which adapts to the expansion state and navigation/selection mode.
 pub(crate) fn create_left_panel(
     app: &FileTreeApp,
     menu_style: MenuStyle,
@@ -210,20 +212,20 @@ pub(crate) fn create_left_panel(
 
     let left_panel_menu_row_1 = create_left_panel_menu_row(app, menu_style);
 
-    let nav_mode_label = match app.left_panel_nav_mode {
-        LeftPanelNavMode::Directory => "Select by: Directory",
-        LeftPanelNavMode::Tag => "Select by: Genre",
-        LeftPanelNavMode::Musician => "Select by: Creator",
+    let selection_mode_label = match app.left_panel_selection_mode {
+        LeftPanelSelectMode::Directory => "Select by: Directory",
+        LeftPanelSelectMode::GenreTag => "Select by: Genre",
+        LeftPanelSelectMode::CreatorTag => "Select by: Creator",
     };
-    let nav_mode_button =
+    let selection_mode_button =
         iced::widget::button::<Message, iced::Theme, iced::Renderer>(
-            iced::widget::text(nav_mode_label)
+            iced::widget::text(selection_mode_label)
                 .size(menu_style.text_size)
                 .style(move |_theme| iced::widget::text::Style {
                     color: Some(menu_style.text_color.into()),
                 }),
         )
-        .on_press(Message::ToggleLeftPanelNavMode);
+        .on_press(Message::ToggleLeftPanelSelectMode);
 
     //
     // left_panel_menu_row_2
@@ -232,20 +234,20 @@ pub(crate) fn create_left_panel(
     let extension_menu =
         create_extension_menu(app, menu_style.text_size, menu_style.text_color);
     let left_panel_menu_row_2 =
-        iced::widget::row![nav_mode_button, extension_menu]
+        iced::widget::row![selection_mode_button, extension_menu]
             .spacing(menu_style.spacing);
 
     //
     // tree_browser
     // --------------------------------------------------
 
-    let tree_browser = match app.left_panel_nav_mode {
-        LeftPanelNavMode::Directory => create_left_panel_file_tree_browser(
+    let tree_browser = match app.left_panel_selection_mode {
+        LeftPanelSelectMode::Directory => create_left_panel_file_tree_browser(
             app,
             tree_browser_style,
             flat_button_style,
         ),
-        LeftPanelNavMode::Tag | LeftPanelNavMode::Musician => {
+        LeftPanelSelectMode::GenreTag | LeftPanelSelectMode::CreatorTag => {
             create_left_panel_tag_tree_browser(
                 app,
                 tree_browser_style,

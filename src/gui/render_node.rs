@@ -132,14 +132,15 @@ pub(crate) fn render_file_node(
     content.into()
 }
 
-/// Recursively renders a tag-based navigation tree node for the left panel UI.
+/// Recursively renders a tag-based navigation/selection tree node for the left
+/// panel UI.
 ///
 /// Displays the given `TagTreeNode` with indentation based on `depth`, and
 /// provides context menus for both category nodes (genre, artist, album) and
 /// track nodes. Non-leaf nodes allow adding all contained tracks to the right
 /// panel, while leaf nodes (tracks) allow adding the individual track. Handles
-/// expansion/collapse of nodes and passes the navigation path for context menu
-/// actions.
+/// expansion/collapse of nodes and passes the navigation/selection path for
+/// context menu actions.
 pub(crate) fn render_tag_node(
     node: &TagTreeNode,
     depth: usize,

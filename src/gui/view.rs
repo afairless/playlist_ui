@@ -658,7 +658,7 @@ mod iced_tests {
                 FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             app.right_panel_files.push(RightPanelFile {
                 path: file_path.clone(),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -676,7 +676,7 @@ mod iced_tests {
                 FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file1 = RightPanelFile {
                 path: PathBuf::from("/dir/file1.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -684,7 +684,7 @@ mod iced_tests {
             };
             let right_panel_file2 = RightPanelFile {
                 path: PathBuf::from("/dir/file2.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -692,7 +692,7 @@ mod iced_tests {
             };
             let right_panel_file3 = RightPanelFile {
                 path: PathBuf::from("/other/file3.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -730,7 +730,7 @@ mod iced_tests {
                 FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file_a = RightPanelFile {
                 path: file_a.clone(),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -738,7 +738,7 @@ mod iced_tests {
             };
             let right_panel_file_b = RightPanelFile {
                 path: file_b.clone(),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -769,7 +769,7 @@ mod iced_tests {
                 FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file1 = RightPanelFile {
                 path: file1.clone(),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -777,7 +777,7 @@ mod iced_tests {
             };
             let right_panel_file2 = RightPanelFile {
                 path: file2.clone(),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -797,7 +797,7 @@ mod iced_tests {
                 FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file = RightPanelFile {
                 path: file_path.clone(),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -835,7 +835,7 @@ mod iced_tests {
                 FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
             let right_panel_file = RightPanelFile {
                 path: PathBuf::from("/other/file.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -859,7 +859,7 @@ mod iced_tests {
             // Single item
             let right_panel_file = RightPanelFile {
                 path: PathBuf::from("/dir/file.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -882,7 +882,7 @@ mod iced_tests {
             // Single item
             let right_panel_file = RightPanelFile {
                 path: PathBuf::from("/dir/file.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -899,7 +899,7 @@ mod iced_tests {
         fn test_sort_then_shuffle_then_sort_right_panel() {
             let right_panel_file1 = RightPanelFile {
                 path: PathBuf::from("/dir_a/file1.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -907,7 +907,7 @@ mod iced_tests {
             };
             let right_panel_file2 = RightPanelFile {
                 path: PathBuf::from("/dir_a/file2.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -1426,7 +1426,7 @@ mod iced_tests {
             let dir_path = std::path::PathBuf::from("/dir");
             let right_panel_file1 = RightPanelFile {
                 path: dir_path.join("file1.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -1434,7 +1434,7 @@ mod iced_tests {
             };
             let right_panel_file2 = RightPanelFile {
                 path: dir_path.join("file2.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -1442,7 +1442,7 @@ mod iced_tests {
             };
             let right_panel_file3 = RightPanelFile {
                 path: std::path::PathBuf::from("/other/file3.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -1489,7 +1489,7 @@ mod iced_tests {
         fn test_right_panel_shuffle_and_sort_ui_feedback() {
             let right_panel_file1 = RightPanelFile {
                 path: std::path::PathBuf::from("/dir_a/file1.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -1497,7 +1497,7 @@ mod iced_tests {
             };
             let right_panel_file2 = RightPanelFile {
                 path: std::path::PathBuf::from("/dir_a/file2.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -1660,7 +1660,7 @@ mod iced_tests {
             let dir_path = std::path::PathBuf::from("/not_present_dir");
             let right_panel_file = RightPanelFile {
                 path: std::path::PathBuf::from("/other/file.txt"),
-                musician: None,
+                creator: None,
                 album: None,
                 title: None,
                 genre: None,
@@ -2084,8 +2084,10 @@ mod iced_tests {
         }
 
         #[test]
-        fn test_left_panel_nav_mode_cycling() {
-            use crate::gui::{FileTreeApp, LeftPanelNavMode, Message, update};
+        fn test_left_panel_selection_mode_cycling() {
+            use crate::gui::{
+                FileTreeApp, LeftPanelSelectMode, Message, update,
+            };
             use std::path::PathBuf;
             use tempfile::NamedTempFile;
 
@@ -2100,23 +2102,38 @@ mod iced_tests {
             );
 
             // Initial state
-            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Directory);
+            assert_eq!(
+                app.left_panel_selection_mode,
+                LeftPanelSelectMode::Directory
+            );
 
             // Directory -> Tag
-            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
-            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Tag);
+            let _ = update(&mut app, Message::ToggleLeftPanelSelectMode);
+            assert_eq!(
+                app.left_panel_selection_mode,
+                LeftPanelSelectMode::GenreTag
+            );
 
             // Tag -> Musician
-            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
-            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Musician);
+            let _ = update(&mut app, Message::ToggleLeftPanelSelectMode);
+            assert_eq!(
+                app.left_panel_selection_mode,
+                LeftPanelSelectMode::CreatorTag
+            );
 
             // Musician -> Directory
-            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
-            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Directory);
+            let _ = update(&mut app, Message::ToggleLeftPanelSelectMode);
+            assert_eq!(
+                app.left_panel_selection_mode,
+                LeftPanelSelectMode::Directory
+            );
 
             // Directory -> Tag (again, to check cycling)
-            let _ = update(&mut app, Message::ToggleLeftPanelNavMode);
-            assert_eq!(app.left_panel_nav_mode, LeftPanelNavMode::Tag);
+            let _ = update(&mut app, Message::ToggleLeftPanelSelectMode);
+            assert_eq!(
+                app.left_panel_selection_mode,
+                LeftPanelSelectMode::GenreTag
+            );
         }
     }
 }

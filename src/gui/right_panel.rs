@@ -8,7 +8,7 @@ use iced::{
 
 #[derive(Default)]
 struct AudioColumnToggles {
-    show_musician: bool,
+    show_creator: bool,
     show_album: bool,
     show_title: bool,
     show_genre: bool,
@@ -92,7 +92,7 @@ fn create_right_panel_menu_row(
 }
 
 /// Builds the header row for the right panel table, including sortable column
-/// buttons for directory, file, and optionally musician, album, title, and
+/// buttons for directory, file, and optionally creator, album, title, and
 /// genre. Column spacing and text size are configurable via parameters.
 fn create_right_panel_header_row(
     app: &FileTreeApp,
@@ -118,8 +118,8 @@ fn create_right_panel_header_row(
     } else {
         ""
     };
-    let musician_arrow = if audio_column_toggles.show_musician
-        && app.right_panel_sort_column == SortColumn::Musician
+    let creator_arrow = if audio_column_toggles.show_creator
+        && app.right_panel_sort_column == SortColumn::Creator
     {
         match app.right_panel_sort_order {
             SortOrder::Desc => " ↑",
@@ -194,17 +194,17 @@ fn create_right_panel_header_row(
             .width(Length::FillPortion(1)),
         );
 
-    if audio_column_toggles.show_musician {
+    if audio_column_toggles.show_creator {
         header_row = header_row.push(
             iced::widget::button(
-                iced::widget::text(format!("Musician{musician_arrow}"))
+                iced::widget::text(format!("Musician{creator_arrow}"))
                     .width(Length::FillPortion(1))
                     .size(header_text_size)
                     .style(move |_theme| iced::widget::text::Style {
                         color: Some(header_text_color.into()),
                     }),
             )
-            .on_press(Message::SortRightPanelByMusician)
+            .on_press(Message::SortRightPanelByCreator)
             .width(Length::FillPortion(1)),
         );
     }
@@ -354,9 +354,9 @@ pub(crate) fn create_right_panel(
     let displayed_files = app.sorted_right_panel_files();
 
     // Determine which columns to show
-    let show_musician = displayed_files
+    let show_creator = displayed_files
         .iter()
-        .any(|f| f.musician.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
+        .any(|f| f.creator.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
     let show_album = displayed_files
         .iter()
         .any(|f| f.album.as_ref().map(|s| !s.is_empty()).unwrap_or(false));
@@ -369,7 +369,7 @@ pub(crate) fn create_right_panel(
     let show_duration = displayed_files.iter().any(|f| f.duration_ms.is_some());
 
     let audio_column_toggles = AudioColumnToggles {
-        show_musician,
+        show_creator,
         show_album,
         show_title,
         show_genre,
@@ -405,9 +405,9 @@ pub(crate) fn create_right_panel(
         let mut row =
             iced::widget::Row::new().push(dir_widget).push(file_context_menu);
 
-        if show_musician {
+        if show_creator {
             row = row.push(
-                iced::widget::text(file.musician.clone().unwrap_or_default())
+                iced::widget::text(file.creator.clone().unwrap_or_default())
                     .width(Length::FillPortion(1))
                     .size(item_list_style.row_text_size),
             );

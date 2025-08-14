@@ -4,7 +4,7 @@ mod gui;
 mod utils;
 
 use crate::db::sled_store::SledStore;
-use crate::fs::media_metadata::{build_musician_tree, build_tag_tree};
+use crate::fs::media_metadata::{build_creator_tag_tree, build_genre_tag_tree};
 use gui::{FileTreeApp, update, view};
 use std::path::PathBuf;
 
@@ -36,20 +36,22 @@ fn main() -> iced::Result {
         );
 
         // Ensure genre tag tree is present in sled
-        if sled_store.load_tag_tree().is_none() {
-            let tree = build_tag_tree(&app.top_dirs, &app.selected_extensions);
-            sled_store.save_tag_tree(&tree).ok();
-        }
-
-        // Ensure musician tree is present in sled
-        if sled_store.load_musician_tree().is_none() {
+        if sled_store.load_genre_tag_tree().is_none() {
             let tree =
-                build_musician_tree(&app.top_dirs, &app.selected_extensions);
-            sled_store.save_musician_tree(&tree).ok();
+                build_genre_tag_tree(&app.top_dirs, &app.selected_extensions);
+            sled_store.save_genre_tag_tree(&tree).ok();
         }
 
-        // Optionally, load the genre tree into app.tag_tree_roots if you want to start in tag mode
-        if let Some(tree) = sled_store.load_tag_tree() {
+        // Ensure creator tree is present in sled
+        if sled_store.load_creator_tag_tree().is_none() {
+            let tree =
+                build_creator_tag_tree(&app.top_dirs, &app.selected_extensions);
+            sled_store.save_creator_tag_tree(&tree).ok();
+        }
+
+        // load the genre tree into app.tag_tree_roots if you want to start in
+        // genre tag tree mode
+        if let Some(tree) = sled_store.load_genre_tag_tree() {
             app.tag_tree_roots = tree;
         }
 

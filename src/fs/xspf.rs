@@ -25,7 +25,7 @@ pub(crate) fn export_xspf_playlist(
         if let Some(title) = meta.title {
             xml.push_str(&format!("<title>{}</title>", xml_escape(&title)));
         }
-        if let Some(creator) = meta.musician {
+        if let Some(creator) = meta.creator {
             xml.push_str(&format!(
                 "<creator>{}</creator>",
                 xml_escape(&creator)
@@ -88,7 +88,7 @@ mod tests {
         // Setup dummy files in a specific order
         let file1 = RightPanelFile {
             path: PathBuf::from("/music/a.mp3"),
-            musician: Some("Artist1".to_string()),
+            creator: Some("Artist1".to_string()),
             album: Some("Album1".to_string()),
             title: Some("Title1".to_string()),
             genre: Some("Genre1".to_string()),
@@ -96,7 +96,7 @@ mod tests {
         };
         let file2 = RightPanelFile {
             path: PathBuf::from("/music/b.mp3"),
-            musician: Some("Artist2".to_string()),
+            creator: Some("Artist2".to_string()),
             album: Some("Album2".to_string()),
             title: Some("Title2".to_string()),
             genre: Some("Genre2".to_string()),

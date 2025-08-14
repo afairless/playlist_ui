@@ -14,7 +14,7 @@ impl SledStore {
         Ok(Self { db })
     }
 
-    pub fn save_tag_tree(
+    pub fn save_genre_tag_tree(
         &self,
         roots: &[TagTreeNode],
     ) -> Result<(), sled::Error> {
@@ -24,31 +24,31 @@ impl SledStore {
         Ok(())
     }
 
-    pub fn load_tag_tree(&self) -> Option<Vec<TagTreeNode>> {
+    pub fn load_genre_tag_tree(&self) -> Option<Vec<TagTreeNode>> {
         let config = standard();
         self.db.get("tag_tree").ok().flatten().and_then(|ivec: IVec| {
             decode_from_slice(&ivec, config).ok().map(|(val, _len)| val)
         })
     }
 
-    pub fn clear_tag_tree(&self) -> Result<(), sled::Error> {
+    pub fn clear_genre_tree(&self) -> Result<(), sled::Error> {
         self.db.remove("tag_tree")?;
         Ok(())
     }
 
-    pub fn save_musician_tree(
+    pub fn save_creator_tag_tree(
         &self,
         roots: &[TagTreeNode],
     ) -> Result<(), sled::Error> {
         let config = standard();
         let data = encode_to_vec(roots, config).unwrap();
-        self.db.insert("musician_tree", data)?;
+        self.db.insert("creator_tag_tree", data)?;
         Ok(())
     }
 
-    pub fn load_musician_tree(&self) -> Option<Vec<TagTreeNode>> {
+    pub fn load_creator_tag_tree(&self) -> Option<Vec<TagTreeNode>> {
         let config = standard();
-        self.db.get("musician_tree").ok().flatten().and_then(|ivec: IVec| {
+        self.db.get("creator_tag_tree").ok().flatten().and_then(|ivec: IVec| {
             decode_from_slice(&ivec, config).ok().map(|(val, _len)| val)
         })
     }
@@ -57,7 +57,7 @@ impl SledStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::media_metadata::build_tag_tree;
+    use crate::fs::media_metadata::build_genre_tag_tree;
     use tempfile::TempDir;
 
     #[test]
@@ -72,11 +72,11 @@ mod tests {
         let extensions = vec!["mp3".to_string(), "flac".to_string()];
 
         // Build and save the tag tree
-        let tag_tree = build_tag_tree(&top_dirs, &extensions);
-        sled_store.save_tag_tree(&tag_tree).unwrap();
+        let tag_tree = build_genre_tag_tree(&top_dirs, &extensions);
+        sled_store.save_genre_tag_tree(&tag_tree).unwrap();
 
         // Load the tag tree back
-        let loaded_tree = sled_store.load_tag_tree().unwrap();
+        let loaded_tree = sled_store.load_genre_tag_tree().unwrap();
 
         // Basic check: the loaded tree should equal the saved tree
         assert_eq!(tag_tree, loaded_tree);

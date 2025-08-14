@@ -1,10 +1,10 @@
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
 use crate::fs::media_metadata::{
-    build_musician_tree, build_tag_tree, extract_media_metadata,
+    build_creator_tag_tree, build_genre_tag_tree, extract_media_metadata,
 };
 use crate::gui::{
-    FileTreeApp, LeftPanelNavMode, LeftPanelSortMode, Message, RightPanelFile,
-    SortColumn, SortOrder, TagTreeNode,
+    FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
+    RightPanelFile, SortColumn, SortOrder, TagTreeNode,
 };
 use iced::Task;
 use rfd::FileDialog;
@@ -178,7 +178,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 let meta = extract_media_metadata(&path);
                 app.right_panel_files.push(RightPanelFile {
                     path,
-                    musician: meta.musician,
+                    creator: meta.creator,
                     album: meta.album,
                     title: meta.title,
                     genre: meta.genre,
@@ -198,7 +198,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                             let meta = extract_media_metadata(&file);
                             app.right_panel_files.push(RightPanelFile {
                                 path: file,
-                                musician: meta.musician,
+                                creator: meta.creator,
                                 album: meta.album,
                                 title: meta.title,
                                 genre: meta.genre,
@@ -247,14 +247,14 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             app.right_panel_shuffled = false;
             Task::none()
         },
-        Message::SortRightPanelByMusician => {
-            if app.right_panel_sort_column == SortColumn::Musician {
+        Message::SortRightPanelByCreator => {
+            if app.right_panel_sort_column == SortColumn::Creator {
                 app.right_panel_sort_order = match app.right_panel_sort_order {
                     SortOrder::Asc => SortOrder::Desc,
                     SortOrder::Desc => SortOrder::Asc,
                 };
             } else {
-                app.right_panel_sort_column = SortColumn::Musician;
+                app.right_panel_sort_column = SortColumn::Creator;
                 app.right_panel_sort_order = SortOrder::Asc;
             }
             app.right_panel_shuffled = false;
@@ -408,51 +408,54 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             };
             Task::none()
         },
-        Message::ToggleLeftPanelNavMode => {
-            app.left_panel_nav_mode = match app.left_panel_nav_mode {
-                LeftPanelNavMode::Directory => {
+        Message::ToggleLeftPanelSelectMode => {
+            app.left_panel_selection_mode = match app.left_panel_selection_mode
+            {
+                LeftPanelSelectMode::Directory => {
                     // Switch to tag mode: load from sled if possible
                     if let Some(ref sled_store) = app.sled_store {
-                        if let Some(tree) = sled_store.load_tag_tree() {
+                        if let Some(tree) = sled_store.load_genre_tag_tree() {
                             app.tag_tree_roots = tree;
                         } else {
-                            let tree = build_tag_tree(
+                            let tree = build_genre_tag_tree(
                                 &app.top_dirs,
                                 &app.selected_extensions,
                             );
-                            sled_store.save_tag_tree(&tree).ok();
+                            sled_store.save_genre_tag_tree(&tree).ok();
                             app.tag_tree_roots = tree;
                         }
                     } else {
-                        app.tag_tree_roots = build_tag_tree(
+                        app.tag_tree_roots = build_genre_tag_tree(
                             &app.top_dirs,
                             &app.selected_extensions,
                         );
                     }
-                    LeftPanelNavMode::Tag
+                    LeftPanelSelectMode::GenreTag
                 },
-                LeftPanelNavMode::Tag => {
-                    // Switch to musician mode: load from sled if possible
+                LeftPanelSelectMode::GenreTag => {
+                    // Switch to creator mode: load from sled if possible
                     if let Some(ref sled_store) = app.sled_store {
-                        if let Some(tree) = sled_store.load_musician_tree() {
+                        if let Some(tree) = sled_store.load_creator_tag_tree() {
                             app.tag_tree_roots = tree;
                         } else {
-                            let tree = build_musician_tree(
+                            let tree = build_creator_tag_tree(
                                 &app.top_dirs,
                                 &app.selected_extensions,
                             );
-                            sled_store.save_musician_tree(&tree).ok();
+                            sled_store.save_creator_tag_tree(&tree).ok();
                             app.tag_tree_roots = tree;
                         }
                     } else {
-                        app.tag_tree_roots = build_musician_tree(
+                        app.tag_tree_roots = build_creator_tag_tree(
                             &app.top_dirs,
                             &app.selected_extensions,
                         );
                     }
-                    LeftPanelNavMode::Musician
+                    LeftPanelSelectMode::CreatorTag
                 },
-                LeftPanelNavMode::Musician => LeftPanelNavMode::Directory,
+                LeftPanelSelectMode::CreatorTag => {
+                    LeftPanelSelectMode::Directory
+                },
             };
             Task::none()
         },
@@ -475,7 +478,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                         let meta = extract_media_metadata(&file);
                         app.right_panel_files.push(RightPanelFile {
                             path: file,
-                            musician: meta.musician,
+                            creator: meta.creator,
                             album: meta.album,
                             title: meta.title,
                             genre: meta.genre,
