@@ -15,7 +15,7 @@ use iced::{
 fn create_toggle_left_panel_button(
     app: &FileTreeApp,
     menu_style: MenuStyle,
-) -> iced::widget::Button<Message> {
+) -> iced::widget::Button<'_, Message> {
     // toggle appearance of left panel
     button(
         text(if app.left_panel_expanded { "←" } else { "→" })
@@ -73,7 +73,7 @@ fn create_extension_menu(
     app: &FileTreeApp,
     menu_size: u16,
     menu_text_color: [f32; 4],
-) -> Element<Message> {
+) -> Element<'_, Message> {
     let header = button(
         text(if app.extensions_menu_expanded {
             "▼ File Extensions"
@@ -205,7 +205,7 @@ pub(crate) fn create_left_panel(
     ) -> iced::widget::button::Style
     + Copy
     + 'static,
-) -> Element<Message> {
+) -> Element<'_, Message> {
     //
     // left_panel_menu_row_1
     // --------------------------------------------------
