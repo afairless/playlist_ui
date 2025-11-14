@@ -350,7 +350,7 @@ pub(crate) fn create_right_panel(
     app: &FileTreeApp,
     menu_style: MenuStyle,
     item_list_style: ItemListStyle,
-) -> Element<Message> {
+) -> Element<'_, Message> {
     let displayed_files = app.sorted_right_panel_files();
 
     // Determine which columns to show

@@ -35,7 +35,7 @@ pub(crate) struct ItemListStyle {
 /// Composes the entire application UI, including the left and right panels,
 /// menus, and file trees, using the current application state to determine
 /// layout and content.
-pub fn view(app: &FileTreeApp) -> Element<Message> {
+pub fn view(app: &FileTreeApp) -> Element<'_, Message> {
     let menu_style = MenuStyle {
         text_size: 20,
         spacing: 10,

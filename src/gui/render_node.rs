@@ -21,7 +21,7 @@ pub(crate) fn render_file_node(
     ) -> iced::widget::button::Style
     + Copy
     + 'static,
-) -> Element<Message> {
+) -> Element<'_, Message> {
     let indent = "  ".repeat(depth);
 
     let mut content = column![];
