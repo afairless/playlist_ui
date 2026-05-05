@@ -93,6 +93,7 @@ fn create_right_panel_menu_row(
         .push(shuffle_button)
         .push(export_button)
         .push(play_button)
+        .push(Space::with_width(Length::Fixed((menu_style.spacing * 2) as f32)))
         .push(clear_button)
         .spacing(menu_style.spacing);
 
