@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: moonrepo/setup-rust@v1.2.2
+      - uses: moonrepo/setup-rust@v1.3.0
         with:
           components: rustfmt
       - name: Check formatting
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: moonrepo/setup-rust@v1.2.2
+      - uses: moonrepo/setup-rust@v1.3.0
         with:
           components: clippy
       - name: Run linter
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: moonrepo/setup-rust@v1.2.2
+      - uses: moonrepo/setup-rust@v1.3.0
         with:
           bins: cargo-make, cargo-nextest
       - name: Run tests
