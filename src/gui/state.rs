@@ -260,11 +260,12 @@ impl FileTreeApp {
                             .unwrap_or_default()
                             .to_string_lossy()
                             .to_ascii_lowercase();
-                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
-                            a_dir.cmp(&b_dir)
-                        } else {
-                            b_dir.cmp(&a_dir)
-                        };
+                        let primary =
+                            if self.right_panel_sort_order == SortOrder::Asc {
+                                a_dir.cmp(&b_dir)
+                            } else {
+                                b_dir.cmp(&a_dir)
+                            };
                         primary.then_with(filename_cmp)
                     },
                     SortColumn::File => {
@@ -297,11 +298,12 @@ impl FileTreeApp {
                             .as_deref()
                             .unwrap_or_default()
                             .to_ascii_lowercase();
-                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
-                            a_creator.cmp(&b_creator)
-                        } else {
-                            b_creator.cmp(&a_creator)
-                        };
+                        let primary =
+                            if self.right_panel_sort_order == SortOrder::Asc {
+                                a_creator.cmp(&b_creator)
+                            } else {
+                                b_creator.cmp(&a_creator)
+                            };
                         primary.then_with(filename_cmp)
                     },
                     SortColumn::Album => {
@@ -315,11 +317,12 @@ impl FileTreeApp {
                             .as_deref()
                             .unwrap_or_default()
                             .to_ascii_lowercase();
-                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
-                            a_album.cmp(&b_album)
-                        } else {
-                            b_album.cmp(&a_album)
-                        };
+                        let primary =
+                            if self.right_panel_sort_order == SortOrder::Asc {
+                                a_album.cmp(&b_album)
+                            } else {
+                                b_album.cmp(&a_album)
+                            };
                         primary.then_with(filename_cmp)
                     },
                     SortColumn::Title => {
@@ -333,11 +336,12 @@ impl FileTreeApp {
                             .as_deref()
                             .unwrap_or_default()
                             .to_ascii_lowercase();
-                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
-                            a_title.cmp(&b_title)
-                        } else {
-                            b_title.cmp(&a_title)
-                        };
+                        let primary =
+                            if self.right_panel_sort_order == SortOrder::Asc {
+                                a_title.cmp(&b_title)
+                            } else {
+                                b_title.cmp(&a_title)
+                            };
                         primary.then_with(filename_cmp)
                     },
                     SortColumn::Genre => {
@@ -351,21 +355,23 @@ impl FileTreeApp {
                             .as_deref()
                             .unwrap_or_default()
                             .to_ascii_lowercase();
-                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
-                            a_genre.cmp(&b_genre)
-                        } else {
-                            b_genre.cmp(&a_genre)
-                        };
+                        let primary =
+                            if self.right_panel_sort_order == SortOrder::Asc {
+                                a_genre.cmp(&b_genre)
+                            } else {
+                                b_genre.cmp(&a_genre)
+                            };
                         primary.then_with(filename_cmp)
                     },
                     SortColumn::Duration => {
                         let a_dur = a.duration_ms.unwrap_or(0);
                         let b_dur = b.duration_ms.unwrap_or(0);
-                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
-                            a_dur.cmp(&b_dur)
-                        } else {
-                            b_dur.cmp(&a_dur)
-                        };
+                        let primary =
+                            if self.right_panel_sort_order == SortOrder::Asc {
+                                a_dur.cmp(&b_dur)
+                            } else {
+                                b_dur.cmp(&a_dur)
+                            };
                         primary.then_with(filename_cmp)
                     },
                 }

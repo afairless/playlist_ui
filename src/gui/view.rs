@@ -1248,7 +1248,9 @@ mod iced_tests {
             let sorted = app.sorted_right_panel_files();
             let names: Vec<_> = sorted
                 .iter()
-                .map(|f| f.path.file_name().unwrap().to_string_lossy().to_string())
+                .map(|f| {
+                    f.path.file_name().unwrap().to_string_lossy().to_string()
+                })
                 .collect();
             assert_eq!(
                 names,
@@ -1281,18 +1283,26 @@ mod iced_tests {
             );
             app.root_nodes[0] = Some(dir_node.clone());
 
-            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+            let _ = update(
+                &mut app,
+                Message::AddDirectoryToRightPanel(dir_path.clone()),
+            );
             let _ = update(&mut app, Message::ShuffleRightPanel);
             let _ = update(&mut app, Message::ClearRightPanel);
 
             // Re-inject the same tree (simulating re-add after clear)
             app.root_nodes[0] = Some(dir_node);
-            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+            let _ = update(
+                &mut app,
+                Message::AddDirectoryToRightPanel(dir_path.clone()),
+            );
 
             let sorted = app.sorted_right_panel_files();
             let names: Vec<_> = sorted
                 .iter()
-                .map(|f| f.path.file_name().unwrap().to_string_lossy().to_string())
+                .map(|f| {
+                    f.path.file_name().unwrap().to_string_lossy().to_string()
+                })
                 .collect();
             assert_eq!(
                 names,
@@ -1321,13 +1331,22 @@ mod iced_tests {
                 None,
             );
             app.root_nodes[0] = Some(dir_node.clone());
-            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+            let _ = update(
+                &mut app,
+                Message::AddDirectoryToRightPanel(dir_path.clone()),
+            );
             let _ = update(&mut app, Message::ShuffleRightPanel);
-            assert!(app.right_panel_shuffled, "should be shuffled after ShuffleRightPanel");
+            assert!(
+                app.right_panel_shuffled,
+                "should be shuffled after ShuffleRightPanel"
+            );
 
             // Add more files — should reset the shuffle flag
             app.root_nodes[0] = Some(dir_node);
-            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+            let _ = update(
+                &mut app,
+                Message::AddDirectoryToRightPanel(dir_path.clone()),
+            );
             assert!(
                 !app.right_panel_shuffled,
                 "adding a directory should reset right_panel_shuffled to false"
@@ -1347,9 +1366,15 @@ mod iced_tests {
                 duration_ms: None,
             });
             let _ = update(&mut app, Message::ShuffleRightPanel);
-            assert!(app.right_panel_shuffled, "should be shuffled after ShuffleRightPanel");
+            assert!(
+                app.right_panel_shuffled,
+                "should be shuffled after ShuffleRightPanel"
+            );
 
-            let _ = update(&mut app, Message::AddToRightPanel(PathBuf::from("/music/b.mp3")));
+            let _ = update(
+                &mut app,
+                Message::AddToRightPanel(PathBuf::from("/music/b.mp3")),
+            );
             assert!(
                 !app.right_panel_shuffled,
                 "adding a single file should reset right_panel_shuffled to false"
@@ -1370,7 +1395,10 @@ mod iced_tests {
                 duration_ms: None,
             });
             let _ = update(&mut app, Message::ShuffleRightPanel);
-            assert!(app.right_panel_shuffled, "should be shuffled after ShuffleRightPanel");
+            assert!(
+                app.right_panel_shuffled,
+                "should be shuffled after ShuffleRightPanel"
+            );
 
             // Set up a tag tree node with a file
             app.tag_tree_roots = vec![TagTreeNode {
@@ -1379,7 +1407,10 @@ mod iced_tests {
                 file_paths: vec![PathBuf::from("/music/b.mp3")],
                 is_expanded: false,
             }];
-            let _ = update(&mut app, Message::AddTagNodeToRightPanel(vec!["Rock".to_string()]));
+            let _ = update(
+                &mut app,
+                Message::AddTagNodeToRightPanel(vec!["Rock".to_string()]),
+            );
             assert!(
                 !app.right_panel_shuffled,
                 "adding a tag node should reset right_panel_shuffled to false"
@@ -2359,7 +2390,9 @@ mod iced_tests {
             );
 
             // View renders without panic with populated playlist
-            { let _elem = view(&app); }
+            {
+                let _elem = view(&app);
+            }
 
             // Clear the playlist
             let _ = update(&mut app, Message::ClearRightPanel);
