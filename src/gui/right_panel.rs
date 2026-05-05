@@ -78,10 +78,22 @@ fn create_right_panel_menu_row(
     .on_press(Message::ExportAndPlayRightPanelAsXspf)
     .width(Length::Shrink);
 
+    let clear_button = iced::widget::button(
+        iced::widget::text("Clear Playlist")
+            .width(Length::Shrink)
+            .size(menu_style.text_size)
+            .style(move |_theme| iced::widget::text::Style {
+                color: Some(menu_style.text_color.into()),
+            }),
+    )
+    .on_press(Message::ClearRightPanel)
+    .width(Length::Shrink);
+
     let mut row = iced::widget::Row::new()
         .push(shuffle_button)
         .push(export_button)
         .push(play_button)
+        .push(clear_button)
         .spacing(menu_style.spacing);
 
     if let Some(widget) = extra_widget {

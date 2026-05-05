@@ -1114,6 +1114,85 @@ mod iced_tests {
         }
 
         #[test]
+        fn test_clear_right_panel() {
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
+            app.right_panel_files = vec![
+                RightPanelFile {
+                    path: PathBuf::from("/a/one.txt"),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                },
+                RightPanelFile {
+                    path: PathBuf::from("/b/two.txt"),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                },
+            ];
+            let _ = update(&mut app, Message::ClearRightPanel);
+            assert!(
+                app.right_panel_files.is_empty(),
+                "right_panel_files should be empty after ClearRightPanel"
+            );
+        }
+
+        #[test]
+        fn test_clear_right_panel_when_already_empty() {
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
+            assert!(app.right_panel_files.is_empty());
+            let _ = update(&mut app, Message::ClearRightPanel);
+            assert!(
+                app.right_panel_files.is_empty(),
+                "ClearRightPanel on an empty playlist should be a no-op"
+            );
+        }
+
+        #[test]
+        fn test_clear_right_panel_resets_shuffle_flag() {
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], PathBuf::from("/tmp"), None);
+            app.right_panel_files = vec![
+                RightPanelFile {
+                    path: PathBuf::from("/a/one.txt"),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                },
+                RightPanelFile {
+                    path: PathBuf::from("/b/two.txt"),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                },
+            ];
+            let _ = update(&mut app, Message::ShuffleRightPanel);
+            assert!(
+                app.right_panel_shuffled,
+                "right_panel_shuffled should be true after shuffle"
+            );
+            let _ = update(&mut app, Message::ClearRightPanel);
+            assert!(
+                app.right_panel_files.is_empty(),
+                "right_panel_files should be empty after ClearRightPanel"
+            );
+            assert!(
+                !app.right_panel_shuffled,
+                "right_panel_shuffled should be reset to false after ClearRightPanel"
+            );
+        }
+
+        #[test]
         fn test_toggle_left_panel_sort_mode() {
             use crate::gui::{FileTreeApp, LeftPanelSortMode, Message, update};
             use std::path::PathBuf;
@@ -1148,6 +1227,162 @@ mod iced_tests {
             assert_eq!(
                 app.left_panel_sort_mode,
                 LeftPanelSortMode::Alphanumeric
+            );
+        }
+
+        #[test]
+        fn test_files_in_same_directory_sorted_alphabetically_by_filename() {
+            let mut app =
+                FileTreeApp::new(vec![], &["mp3"], PathBuf::from("/tmp"), None);
+            // Insert in reverse-alpha order to expose missing secondary sort key
+            for name in &["c.mp3", "b.mp3", "a.mp3"] {
+                app.right_panel_files.push(RightPanelFile {
+                    path: PathBuf::from("/music").join(name),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                });
+            }
+            let sorted = app.sorted_right_panel_files();
+            let names: Vec<_> = sorted
+                .iter()
+                .map(|f| f.path.file_name().unwrap().to_string_lossy().to_string())
+                .collect();
+            assert_eq!(
+                names,
+                vec!["a.mp3", "b.mp3", "c.mp3"],
+                "files in the same directory should be sorted alphabetically by filename"
+            );
+        }
+
+        #[test]
+        fn test_clear_and_re_add_files_appear_in_alphabetical_order() {
+            let dir_path = PathBuf::from("/music");
+            let mut dir_node = FileNode::new_directory(
+                "music".to_string(),
+                dir_path.clone(),
+                vec![],
+            );
+            // Add children in reverse-alpha order (simulating non-alphabetical read_dir)
+            for name in &["c.mp3", "b.mp3", "a.mp3"] {
+                dir_node.children.push(FileNode::new_file(
+                    name.to_string(),
+                    dir_path.join(name),
+                ));
+            }
+
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                &["mp3"],
+                PathBuf::from("/tmp"),
+                None,
+            );
+            app.root_nodes[0] = Some(dir_node.clone());
+
+            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+            let _ = update(&mut app, Message::ShuffleRightPanel);
+            let _ = update(&mut app, Message::ClearRightPanel);
+
+            // Re-inject the same tree (simulating re-add after clear)
+            app.root_nodes[0] = Some(dir_node);
+            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+
+            let sorted = app.sorted_right_panel_files();
+            let names: Vec<_> = sorted
+                .iter()
+                .map(|f| f.path.file_name().unwrap().to_string_lossy().to_string())
+                .collect();
+            assert_eq!(
+                names,
+                vec!["a.mp3", "b.mp3", "c.mp3"],
+                "after clear + re-add, files should be sorted alphabetically"
+            );
+        }
+
+        #[test]
+        fn test_add_directory_resets_shuffle_flag() {
+            let dir_path = PathBuf::from("/music");
+            let mut dir_node = FileNode::new_directory(
+                "music".to_string(),
+                dir_path.clone(),
+                vec![],
+            );
+            dir_node.children.push(FileNode::new_file(
+                "a.mp3".to_string(),
+                dir_path.join("a.mp3"),
+            ));
+
+            let mut app = FileTreeApp::new(
+                vec![dir_path.clone()],
+                &["mp3"],
+                PathBuf::from("/tmp"),
+                None,
+            );
+            app.root_nodes[0] = Some(dir_node.clone());
+            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+            let _ = update(&mut app, Message::ShuffleRightPanel);
+            assert!(app.right_panel_shuffled, "should be shuffled after ShuffleRightPanel");
+
+            // Add more files — should reset the shuffle flag
+            app.root_nodes[0] = Some(dir_node);
+            let _ = update(&mut app, Message::AddDirectoryToRightPanel(dir_path.clone()));
+            assert!(
+                !app.right_panel_shuffled,
+                "adding a directory should reset right_panel_shuffled to false"
+            );
+        }
+
+        #[test]
+        fn test_add_single_file_resets_shuffle_flag() {
+            let mut app =
+                FileTreeApp::new(vec![], &["mp3"], PathBuf::from("/tmp"), None);
+            app.right_panel_files.push(RightPanelFile {
+                path: PathBuf::from("/music/a.mp3"),
+                creator: None,
+                album: None,
+                title: None,
+                genre: None,
+                duration_ms: None,
+            });
+            let _ = update(&mut app, Message::ShuffleRightPanel);
+            assert!(app.right_panel_shuffled, "should be shuffled after ShuffleRightPanel");
+
+            let _ = update(&mut app, Message::AddToRightPanel(PathBuf::from("/music/b.mp3")));
+            assert!(
+                !app.right_panel_shuffled,
+                "adding a single file should reset right_panel_shuffled to false"
+            );
+        }
+
+        #[test]
+        fn test_add_tag_node_resets_shuffle_flag() {
+            use crate::gui::TagTreeNode;
+            let mut app =
+                FileTreeApp::new(vec![], &["mp3"], PathBuf::from("/tmp"), None);
+            app.right_panel_files.push(RightPanelFile {
+                path: PathBuf::from("/music/a.mp3"),
+                creator: None,
+                album: None,
+                title: None,
+                genre: None,
+                duration_ms: None,
+            });
+            let _ = update(&mut app, Message::ShuffleRightPanel);
+            assert!(app.right_panel_shuffled, "should be shuffled after ShuffleRightPanel");
+
+            // Set up a tag tree node with a file
+            app.tag_tree_roots = vec![TagTreeNode {
+                label: "Rock".to_string(),
+                children: vec![],
+                file_paths: vec![PathBuf::from("/music/b.mp3")],
+                is_expanded: false,
+            }];
+            let _ = update(&mut app, Message::AddTagNodeToRightPanel(vec!["Rock".to_string()]));
+            assert!(
+                !app.right_panel_shuffled,
+                "adding a tag node should reset right_panel_shuffled to false"
             );
         }
     }
@@ -2081,6 +2316,61 @@ mod iced_tests {
             let _element = view(&app);
 
             // Test passes if all operations complete without panicking
+        }
+
+        #[test]
+        fn test_clear_right_panel_ui_feedback() {
+            let temp_file = NamedTempFile::new().unwrap();
+            let persist_path = temp_file.path().to_path_buf();
+            let mut app =
+                FileTreeApp::new(vec![], &["txt"], persist_path, None);
+
+            // Populate the playlist
+            app.right_panel_files = vec![
+                RightPanelFile {
+                    path: PathBuf::from("/a/track1.txt"),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                },
+                RightPanelFile {
+                    path: PathBuf::from("/b/track2.txt"),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                },
+                RightPanelFile {
+                    path: PathBuf::from("/c/track3.txt"),
+                    creator: None,
+                    album: None,
+                    title: None,
+                    genre: None,
+                    duration_ms: None,
+                },
+            ];
+            assert_eq!(
+                app.right_panel_files.len(),
+                3,
+                "playlist should have 3 entries before clearing"
+            );
+
+            // View renders without panic with populated playlist
+            { let _elem = view(&app); }
+
+            // Clear the playlist
+            let _ = update(&mut app, Message::ClearRightPanel);
+
+            assert!(
+                app.right_panel_files.is_empty(),
+                "playlist should be empty after ClearRightPanel"
+            );
+
+            // View still renders without panic after clearing
+            let _elem = view(&app);
         }
 
         #[test]

@@ -41,6 +41,7 @@ pub enum Message {
     ExportRightPanelAsXspfTo(PathBuf),
     ExportAndPlayRightPanelAsXspf,
     OpenRightPanelFile(PathBuf),
+    ClearRightPanel,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -227,124 +228,147 @@ impl FileTreeApp {
     pub(crate) fn sorted_right_panel_files(&self) -> Vec<RightPanelFile> {
         let mut files = self.right_panel_files.clone();
         if !self.right_panel_shuffled {
-            files.sort_by(|a, b| match self.right_panel_sort_column {
-                SortColumn::Directory => {
-                    let a_dir = a
-                        .path
-                        .parent()
-                        .and_then(|p| p.file_name())
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_ascii_lowercase();
-                    let b_dir = b
-                        .path
-                        .parent()
-                        .and_then(|p| p.file_name())
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_ascii_lowercase();
-                    if self.right_panel_sort_order == SortOrder::Asc {
-                        a_dir.cmp(&b_dir)
-                    } else {
-                        b_dir.cmp(&a_dir)
-                    }
-                },
-                SortColumn::File => {
-                    let a_file = a
+            files.sort_by(|a, b| {
+                let filename_cmp = || {
+                    let a_name = a
                         .path
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy()
                         .to_ascii_lowercase();
-                    let b_file = b
+                    let b_name = b
                         .path
                         .file_name()
                         .unwrap_or_default()
                         .to_string_lossy()
                         .to_ascii_lowercase();
-                    if self.right_panel_sort_order == SortOrder::Asc {
-                        a_file.cmp(&b_file)
-                    } else {
-                        b_file.cmp(&a_file)
-                    }
-                },
-                SortColumn::Creator => {
-                    let a_creator = a
-                        .creator
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    let b_creator = b
-                        .creator
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    if self.right_panel_sort_order == SortOrder::Asc {
-                        a_creator.cmp(&b_creator)
-                    } else {
-                        b_creator.cmp(&a_creator)
-                    }
-                },
-                SortColumn::Album => {
-                    let a_album = a
-                        .album
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    let b_album = b
-                        .album
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    if self.right_panel_sort_order == SortOrder::Asc {
-                        a_album.cmp(&b_album)
-                    } else {
-                        b_album.cmp(&a_album)
-                    }
-                },
-                SortColumn::Title => {
-                    let a_title = a
-                        .title
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    let b_title = b
-                        .title
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    if self.right_panel_sort_order == SortOrder::Asc {
-                        a_title.cmp(&b_title)
-                    } else {
-                        b_title.cmp(&a_title)
-                    }
-                },
-                SortColumn::Genre => {
-                    let a_genre = a
-                        .genre
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    let b_genre = b
-                        .genre
-                        .as_deref()
-                        .unwrap_or_default()
-                        .to_ascii_lowercase();
-                    if self.right_panel_sort_order == SortOrder::Asc {
-                        a_genre.cmp(&b_genre)
-                    } else {
-                        b_genre.cmp(&a_genre)
-                    }
-                },
-                SortColumn::Duration => {
-                    let a_dur = a.duration_ms.unwrap_or(0);
-                    let b_dur = b.duration_ms.unwrap_or(0);
-                    if self.right_panel_sort_order == SortOrder::Asc {
-                        a_dur.cmp(&b_dur)
-                    } else {
-                        b_dur.cmp(&a_dur)
-                    }
-                },
+                    a_name.cmp(&b_name)
+                };
+                match self.right_panel_sort_column {
+                    SortColumn::Directory => {
+                        let a_dir = a
+                            .path
+                            .parent()
+                            .and_then(|p| p.file_name())
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_ascii_lowercase();
+                        let b_dir = b
+                            .path
+                            .parent()
+                            .and_then(|p| p.file_name())
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_ascii_lowercase();
+                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
+                            a_dir.cmp(&b_dir)
+                        } else {
+                            b_dir.cmp(&a_dir)
+                        };
+                        primary.then_with(filename_cmp)
+                    },
+                    SortColumn::File => {
+                        let a_file = a
+                            .path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_ascii_lowercase();
+                        let b_file = b
+                            .path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_ascii_lowercase();
+                        if self.right_panel_sort_order == SortOrder::Asc {
+                            a_file.cmp(&b_file)
+                        } else {
+                            b_file.cmp(&a_file)
+                        }
+                    },
+                    SortColumn::Creator => {
+                        let a_creator = a
+                            .creator
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let b_creator = b
+                            .creator
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
+                            a_creator.cmp(&b_creator)
+                        } else {
+                            b_creator.cmp(&a_creator)
+                        };
+                        primary.then_with(filename_cmp)
+                    },
+                    SortColumn::Album => {
+                        let a_album = a
+                            .album
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let b_album = b
+                            .album
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
+                            a_album.cmp(&b_album)
+                        } else {
+                            b_album.cmp(&a_album)
+                        };
+                        primary.then_with(filename_cmp)
+                    },
+                    SortColumn::Title => {
+                        let a_title = a
+                            .title
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let b_title = b
+                            .title
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
+                            a_title.cmp(&b_title)
+                        } else {
+                            b_title.cmp(&a_title)
+                        };
+                        primary.then_with(filename_cmp)
+                    },
+                    SortColumn::Genre => {
+                        let a_genre = a
+                            .genre
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let b_genre = b
+                            .genre
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_ascii_lowercase();
+                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
+                            a_genre.cmp(&b_genre)
+                        } else {
+                            b_genre.cmp(&a_genre)
+                        };
+                        primary.then_with(filename_cmp)
+                    },
+                    SortColumn::Duration => {
+                        let a_dur = a.duration_ms.unwrap_or(0);
+                        let b_dur = b.duration_ms.unwrap_or(0);
+                        let primary = if self.right_panel_sort_order == SortOrder::Asc {
+                            a_dur.cmp(&b_dur)
+                        } else {
+                            b_dur.cmp(&a_dur)
+                        };
+                        primary.then_with(filename_cmp)
+                    },
+                }
             });
         }
         files

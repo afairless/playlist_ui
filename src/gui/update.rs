@@ -174,6 +174,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         },
         Message::DirectoryAdded(None) => Task::none(),
         Message::AddToRightPanel(path) => {
+            app.right_panel_shuffled = false;
             if !app.right_panel_files.iter().any(|f| f.path == path) {
                 let meta = extract_media_metadata(&path);
                 app.right_panel_files.push(RightPanelFile {
@@ -188,6 +189,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         },
         Message::AddDirectoryToRightPanel(dir_path) => {
+            app.right_panel_shuffled = false;
             for root in app.root_nodes.iter().flatten() {
                 if let Some(node) = find_node_by_path(root, &dir_path) {
                     let mut files = Vec::new();
@@ -467,7 +469,13 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         },
+        Message::ClearRightPanel => {
+            app.right_panel_files.clear();
+            app.right_panel_shuffled = false;
+            Task::none()
+        },
         Message::AddTagNodeToRightPanel(path) => {
+            app.right_panel_shuffled = false;
             if let Some(node) =
                 find_tag_node_mut(&mut app.tag_tree_roots, &path)
             {
