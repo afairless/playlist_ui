@@ -2,7 +2,7 @@ max_width = 80
 hard_tabs = false
 tab_spaces = 4
 use_small_heuristics = "Max"
-edition = "2021"
+edition = "2024"
 newline_style = "Unix"
 
 reorder_imports = true

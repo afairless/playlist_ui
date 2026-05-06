@@ -39,14 +39,18 @@ fn main() -> iced::Result {
         if sled_store.load_genre_tag_tree().is_none() {
             let tree =
                 build_genre_tag_tree(&app.top_dirs, &app.selected_extensions);
-            sled_store.save_genre_tag_tree(&tree).ok();
+            if let Err(e) = sled_store.save_genre_tag_tree(&tree) {
+                log::warn!("Failed to save genre tag tree: {e}");
+            }
         }
 
         // Ensure creator tree is present in sled
         if sled_store.load_creator_tag_tree().is_none() {
             let tree =
                 build_creator_tag_tree(&app.top_dirs, &app.selected_extensions);
-            sled_store.save_creator_tag_tree(&tree).ok();
+            if let Err(e) = sled_store.save_creator_tag_tree(&tree) {
+                log::warn!("Failed to save creator tag tree: {e}");
+            }
         }
 
         // load the genre tree into app.tag_tree_roots if you want to start in
