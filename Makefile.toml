@@ -1,0 +1,17 @@
+[tasks.ci]
+description = "Run all CI checks locally (extracted from .github/workflows/rust-tests.yml)"
+script_runner = "bash"
+script = """
+set -e
+grep -E '^[[:space:]]+run:' .github/workflows/rust-tests.yml \
+    | sed 's/^[[:space:]]*run:[[:space:]]*//' \
+    | while IFS= read -r cmd; do
+        echo "==> $cmd"
+        eval "$cmd"
+    done
+"""
+
+[tasks.test]
+description = "Run tests"
+command = "cargo"
+args = ["test"]
