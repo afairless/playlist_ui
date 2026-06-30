@@ -11,13 +11,13 @@ use std::fs;
 /// Returns a deep blue for the maximum count, fading to a faint blue for
 /// small counts. If `count == 0`, returns the baseline faint blue.
 fn file_count_highlight(count: usize, max_count: usize) -> Color {
-    let light = Color::from_rgb(0.15, 0.25, 0.55); // faint blue
+    let light = Color::from_rgb(0.20, 0.30, 0.60); // faint blue
     if count == 0 || max_count == 0 {
         return light;
     }
     // Normalise count logarithmically
     let t =
-        ((count as f64).ln() / (max_count as f64).ln()).clamp(0.0, 1.0) as f32;
+        ((count as f64).log2() / (max_count as f64).log2()).clamp(0.0, 1.0) as f32;
     let dark = Color::from_rgb(0.05, 0.12, 0.35); // deep navy blue
     let t_inv = 1.0 - t;
     Color::new(
