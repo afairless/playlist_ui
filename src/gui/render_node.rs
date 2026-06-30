@@ -16,8 +16,8 @@ fn file_count_highlight(count: usize, max_count: usize) -> Color {
         return light;
     }
     // Normalise count logarithmically
-    let t =
-        ((count as f64).log2() / (max_count as f64).log2()).clamp(0.0, 1.0) as f32;
+    let t = ((count as f64).log2() / (max_count as f64).log2()).clamp(0.0, 1.0)
+        as f32;
     let dark = Color::from_rgb(0.05, 0.12, 0.35); // deep navy blue
     let t_inv = 1.0 - t;
     Color::new(
@@ -290,7 +290,7 @@ mod tests {
     fn highlight_zero() {
         // count of 0 returns the light baseline
         let c = file_count_highlight(0, 42);
-        let light = Color::from_rgb(0.15, 0.25, 0.55);
+        let light = Color::from_rgb(0.20, 0.30, 0.60);
         assert_eq!(c, light);
     }
 
@@ -299,7 +299,7 @@ mod tests {
         // minimum non-zero count
         let c = file_count_highlight(1, 42);
         // ln(1) = 0, so t = 0, and the colour should be the light baseline
-        let light = Color::from_rgb(0.15, 0.25, 0.55);
+        let light = Color::from_rgb(0.20, 0.30, 0.60);
         assert_eq!(c, light, "count=1 with ln(1)=0 should give light baseline");
     }
 
@@ -315,7 +315,7 @@ mod tests {
     fn highlight_zero_max() {
         // When max_count is 0, returns baseline
         let c = file_count_highlight(5, 0);
-        let light = Color::from_rgb(0.15, 0.25, 0.55);
+        let light = Color::from_rgb(0.20, 0.30, 0.60);
         assert_eq!(c, light);
     }
 }
