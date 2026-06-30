@@ -122,6 +122,15 @@ fn create_left_panel_file_tree_browser(
 ) -> iced::widget::Column<'_, Message> {
     let gap_width = tree_browser_style.remove_button_width / 4;
 
+    // Compute max file_count across all directory nodes in the file tree
+    let max_count = app
+        .root_nodes
+        .iter()
+        .flatten()
+        .map(|n| n.file_count)
+        .max()
+        .unwrap_or(0);
+
     let mut trees = column![];
     for (i, node_opt) in app.root_nodes.iter().enumerate() {
         let dir_path = app.top_dirs.get(i).cloned().unwrap_or_default();
@@ -141,6 +150,7 @@ fn create_left_panel_file_tree_browser(
                 tree_browser_style.file_row_size,
                 app.left_panel_sort_mode,
                 flat_button_style,
+                max_count,
             )
         } else {
             text("No files found").into()
@@ -174,6 +184,10 @@ fn create_left_panel_tag_tree_browser(
     + Copy
     + 'static,
 ) -> iced::widget::Column<'_, Message> {
+    // Compute max file_count across all tag tree root nodes
+    let max_count =
+        app.tag_tree_roots.iter().map(|n| n.file_count).max().unwrap_or(0);
+
     let mut trees = column![];
     for node in &app.tag_tree_roots {
         trees = trees.push(render_tag_node(
@@ -182,6 +196,7 @@ fn create_left_panel_tag_tree_browser(
             vec![],
             tree_browser_style.directory_row_size,
             flat_button_style,
+            max_count,
         ));
         trees =
             trees.push(Space::with_height(tree_browser_style.tree_row_height));

@@ -2271,6 +2271,7 @@ mod iced_tests {
                 row_size,
                 LeftPanelSortMode::Alphanumeric,
                 flat_button_style,
+                0,
             );
             // Test passes if render_file_node() doesn't panic
         }
@@ -2302,6 +2303,7 @@ mod iced_tests {
                 row_size,
                 LeftPanelSortMode::Alphanumeric,
                 flat_button_style,
+                0,
             );
             // Test passes if render_file_node() doesn't panic
         }

@@ -1,11 +1,56 @@
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{LeftPanelSortMode, Message, TagTreeNode};
 use iced::{
-    Element, Length,
+    Color, Element, Length,
     widget::{button, column, container, row, text},
 };
 use iced_aw::widgets::ContextMenu;
 use std::fs;
+
+/// Maps a file count to a highlight colour using log-scale interpolation.
+/// Returns a deep blue for the maximum count, fading to a faint blue for
+/// small counts. If `count == 0`, returns the baseline faint blue.
+fn file_count_highlight(count: usize, max_count: usize) -> Color {
+    let light = Color::from_rgb(0.15, 0.25, 0.55); // faint blue
+    if count == 0 || max_count == 0 {
+        return light;
+    }
+    // Normalise count logarithmically
+    let t =
+        ((count as f64).ln() / (max_count as f64).ln()).clamp(0.0, 1.0) as f32;
+    let dark = Color::from_rgb(0.05, 0.12, 0.35); // deep navy blue
+    let t_inv = 1.0 - t;
+    Color::new(
+        light.r * t_inv + dark.r * t,
+        light.g * t_inv + dark.g * t,
+        light.b * t_inv + dark.b * t,
+        1.0,
+    )
+}
+
+/// Returns a button style function that applies a background tint based on
+/// the file count relative to the maximum count in the tree.
+fn directory_button_style(
+    count: usize,
+    max_count: usize,
+) -> impl Fn(
+    &iced::Theme,
+    iced::widget::button::Status,
+) -> iced::widget::button::Style
++ Copy
++ 'static {
+    let bg = file_count_highlight(count, max_count);
+    move |_theme: &iced::Theme,
+          _status: iced::widget::button::Status|
+          -> iced::widget::button::Style {
+        iced::widget::button::Style {
+            background: Some(iced::Background::Color(bg)),
+            border: iced::Border::default(),
+            shadow: iced::Shadow::default(),
+            text_color: iced::Color::WHITE,
+        }
+    }
+}
 
 ///  Recursively renders a file tree node (directory or file) with indentation
 ///  based on depth, including context menus for directory and file actions.
@@ -21,6 +66,7 @@ pub(crate) fn render_file_node(
     ) -> iced::widget::button::Style
     + Copy
     + 'static,
+    max_count: usize,
 ) -> Element<'_, Message> {
     let indent = "  ".repeat(depth);
 
@@ -31,16 +77,20 @@ pub(crate) fn render_file_node(
             let expand_symbol = if node.is_expanded { "▼" } else { "▶" };
             let dir_path = node.path.clone();
 
-            let dir_label = container(
-                text(format!("{}{} 📁 {}", indent, expand_symbol, node.name))
-                    .size(directory_row_size),
-            )
-            .width(Length::Fill);
+            let label = format!(
+                "{}{} 📁 {}  ({})",
+                indent, expand_symbol, node.name, node.file_count,
+            );
+            let dir_label = container(text(label).size(directory_row_size))
+                .width(Length::Fill);
 
             let dir_row = row![dir_label];
 
+            let ds = directory_button_style(node.file_count, max_count);
+
             let context_menu = ContextMenu::new(
                 button(dir_row)
+                    .style(ds)
                     .on_press(Message::ToggleExpansion(node.path.clone())),
                 move || {
                     column![button("Add all files to right panel").on_press(
@@ -104,6 +154,7 @@ pub(crate) fn render_file_node(
                         file_row_size,
                         sort_mode,
                         flat_button_style,
+                        max_count,
                     ));
                 }
             }
@@ -152,6 +203,7 @@ pub(crate) fn render_tag_node(
     ) -> iced::widget::button::Style
     + Copy
     + 'static,
+    max_count: usize,
 ) -> Element<'_, Message> {
     let indent = "  ".repeat(depth);
     let mut content = column![];
@@ -165,7 +217,14 @@ pub(crate) fn render_tag_node(
         ""
     };
 
-    let label = format!("{}{} {}", indent, expand_symbol, node.label);
+    let label = if is_leaf {
+        format!("{}{} {}", indent, expand_symbol, node.label)
+    } else {
+        format!(
+            "{}{} {}  ({})",
+            indent, expand_symbol, node.label, node.file_count,
+        )
+    };
 
     let row = if is_leaf {
         // Track node (leaf): right-click to add this track only
@@ -188,8 +247,10 @@ pub(crate) fn render_tag_node(
         iced::widget::row![context_menu]
     } else {
         // Non-leaf: context menu for "Add all files"
+        let ds = directory_button_style(node.file_count, max_count);
         let context_menu = iced_aw::widgets::ContextMenu::new(
             button(text(label).size(directory_row_size))
+                .style(ds)
                 .on_press(Message::ToggleTagExpansion(new_path.clone())),
             {
                 let path = new_path.clone();
@@ -214,8 +275,47 @@ pub(crate) fn render_tag_node(
                 new_path.clone(),
                 directory_row_size,
                 flat_button_style,
+                max_count,
             ));
         }
     }
     content.into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn highlight_zero() {
+        // count of 0 returns the light baseline
+        let c = file_count_highlight(0, 42);
+        let light = Color::from_rgb(0.15, 0.25, 0.55);
+        assert_eq!(c, light);
+    }
+
+    #[test]
+    fn highlight_min() {
+        // minimum non-zero count
+        let c = file_count_highlight(1, 42);
+        // ln(1) = 0, so t = 0, and the colour should be the light baseline
+        let light = Color::from_rgb(0.15, 0.25, 0.55);
+        assert_eq!(c, light, "count=1 with ln(1)=0 should give light baseline");
+    }
+
+    #[test]
+    fn highlight_max() {
+        // max boundary returns darkest colour
+        let c = file_count_highlight(42, 42);
+        let dark = Color::from_rgb(0.05, 0.12, 0.35);
+        assert_eq!(c, dark);
+    }
+
+    #[test]
+    fn highlight_zero_max() {
+        // When max_count is 0, returns baseline
+        let c = file_count_highlight(5, 0);
+        let light = Color::from_rgb(0.15, 0.25, 0.55);
+        assert_eq!(c, light);
+    }
 }
