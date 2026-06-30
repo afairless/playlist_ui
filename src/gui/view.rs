@@ -1406,6 +1406,7 @@ mod iced_tests {
                 children: vec![],
                 file_paths: vec![PathBuf::from("/music/b.mp3")],
                 is_expanded: false,
+                file_count: 1,
             }];
             let _ = update(
                 &mut app,

@@ -152,10 +152,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         ),
         Message::DirectoryAdded(Some(mut path)) => {
             // If the added path is a file, use its parent directory
-            if path.is_file() {
-                if let Some(parent) = path.parent() {
-                    path = parent.to_path_buf();
-                }
+            if path.is_file()
+                && let Some(parent) = path.parent()
+            {
+                path = parent.to_path_buf();
             }
             if !app.top_dirs.contains(&path) && path.exists() && path.is_dir() {
                 app.top_dirs.push(path.clone());

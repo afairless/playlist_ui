@@ -31,6 +31,7 @@ impl SledStore {
         })
     }
 
+    #[allow(dead_code)]
     pub fn clear_genre_tree(&self) -> Result<(), sled::Error> {
         self.db.remove("tag_tree")?;
         Ok(())

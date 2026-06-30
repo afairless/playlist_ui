@@ -14,6 +14,7 @@ pub(crate) struct FileNode {
     pub node_type: NodeType,
     pub children: Vec<FileNode>,
     pub is_expanded: bool,
+    pub file_count: usize,
 }
 
 impl FileNode {
@@ -28,6 +29,7 @@ impl FileNode {
             node_type: NodeType::File,
             children: Vec::new(),
             is_expanded: false,
+            file_count: 1,
         }
     }
     /// Creates a new `FileNode` representing a directory with the given name,
@@ -38,12 +40,14 @@ impl FileNode {
         path: PathBuf,
         children: Vec<FileNode>,
     ) -> Self {
+        let file_count = children.iter().map(|c| c.file_count).sum();
         FileNode {
             name,
             path,
             node_type: NodeType::Directory,
             children,
             is_expanded: false,
+            file_count,
         }
     }
 }
@@ -77,21 +81,20 @@ fn scan_directory_with_expansion(
             let name = entry.file_name().to_string_lossy().to_string();
 
             if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if allowed.contains(&ext.to_lowercase()) {
-                        children.push(FileNode::new_file(name, path));
-                    }
+                if let Some(ext) = path.extension().and_then(|e| e.to_str())
+                    && allowed.contains(&ext.to_lowercase())
+                {
+                    children.push(FileNode::new_file(name, path));
                 }
-            } else if path.is_dir() {
-                if let Some(child_node) = scan_directory_with_expansion(
+            } else if path.is_dir()
+                && let Some(child_node) = scan_directory_with_expansion(
                     &path,
                     allowed_extensions,
                     false,
-                ) {
-                    if !child_node.children.is_empty() {
-                        children.push(child_node);
-                    }
-                }
+                )
+                && !child_node.children.is_empty()
+            {
+                children.push(child_node);
             }
         }
     }
@@ -267,5 +270,75 @@ mod file_tree_tests {
         assert_eq!(node.children[0].children[0].name, "sub2");
         assert_eq!(node.children[0].children[0].children.len(), 1);
         assert_eq!(node.children[0].children[0].children[0].name, "deep.rs");
+    }
+
+    #[test]
+    fn file_count_none() {
+        // Empty directory with no children should report 0
+        let root = FileNode::new_directory(
+            "empty".to_string(),
+            PathBuf::from("/empty"),
+            vec![],
+        );
+        assert_eq!(root.file_count, 0);
+    }
+
+    #[test]
+    fn file_count_one() {
+        // Single-file directory should report 1
+        let file =
+            FileNode::new_file("a.rs".to_string(), PathBuf::from("/dir/a.rs"));
+        assert_eq!(file.file_count, 1);
+        let root = FileNode::new_directory(
+            "dir".to_string(),
+            PathBuf::from("/dir"),
+            vec![file],
+        );
+        assert_eq!(root.file_count, 1);
+    }
+
+    #[test]
+    fn file_count_many() {
+        // Multi-level nested directories with multiple leaf files
+        // Structure: root/ (3 files + sub/ with 2 files + empty/ with 0 files)
+        let file1 =
+            FileNode::new_file("a.rs".to_string(), PathBuf::from("/root/a.rs"));
+        let file2 =
+            FileNode::new_file("b.rs".to_string(), PathBuf::from("/root/b.rs"));
+        let file3 =
+            FileNode::new_file("c.rs".to_string(), PathBuf::from("/root/c.rs"));
+        let file4 = FileNode::new_file(
+            "d.rs".to_string(),
+            PathBuf::from("/root/sub/d.rs"),
+        );
+        let file5 = FileNode::new_file(
+            "e.rs".to_string(),
+            PathBuf::from("/root/sub/e.rs"),
+        );
+
+        let sub = FileNode::new_directory(
+            "sub".to_string(),
+            PathBuf::from("/root/sub"),
+            vec![file4, file5],
+        );
+        let empty = FileNode::new_directory(
+            "empty".to_string(),
+            PathBuf::from("/root/empty"),
+            vec![],
+        );
+
+        let root = FileNode::new_directory(
+            "root".to_string(),
+            PathBuf::from("/root"),
+            vec![file1, file2, file3, sub, empty],
+        );
+        // Verify counts by walking the tree
+        assert_eq!(root.file_count, 5); // 3 direct + 2 in sub + 0 in empty
+        // Find the "sub" child
+        let sub_node = root.children.iter().find(|c| c.name == "sub").unwrap();
+        assert_eq!(sub_node.file_count, 2);
+        let empty_node =
+            root.children.iter().find(|c| c.name == "empty").unwrap();
+        assert_eq!(empty_node.file_count, 0);
     }
 }

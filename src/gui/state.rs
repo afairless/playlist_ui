@@ -66,6 +66,8 @@ pub struct TagTreeNode {
     pub children: Vec<TagTreeNode>,
     pub file_paths: Vec<std::path::PathBuf>,
     pub is_expanded: bool,
+    #[serde(default)]
+    pub file_count: usize,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -161,10 +163,10 @@ impl FileTreeApp {
             })
             .collect();
         let mut expanded_dirs = HashSet::new();
-        if top_dirs.len() == 1 {
-            if let Some(Some(node)) = root_nodes.first() {
-                expanded_dirs.insert(node.path.clone());
-            }
+        if top_dirs.len() == 1
+            && let Some(Some(node)) = root_nodes.first()
+        {
+            expanded_dirs.insert(node.path.clone());
         }
         for root in root_nodes.iter_mut().flatten() {
             restore_expansion_state(root, &expanded_dirs);

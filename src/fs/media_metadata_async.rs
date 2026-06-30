@@ -79,27 +79,34 @@ pub async fn build_tag_genre_tree_async(
                         children: vec![],
                         file_paths: vec![path],
                         is_expanded: false,
+                        file_count: 1,
                     });
                 }
+                let album_file_count = track_nodes.iter().map(|n| n.file_count).sum();
                 album_nodes.push(TagTreeNode {
                     label: album,
                     children: track_nodes,
                     file_paths: vec![],
                     is_expanded: false,
+                    file_count: album_file_count,
                 });
             }
+            let artist_file_count = album_nodes.iter().map(|n| n.file_count).sum();
             artist_nodes.push(TagTreeNode {
                 label: artist,
                 children: album_nodes,
                 file_paths: vec![],
                 is_expanded: false,
+                file_count: artist_file_count,
             });
         }
+        let genre_file_count = artist_nodes.iter().map(|n| n.file_count).sum();
         roots.push(TagTreeNode {
             label: genre,
             children: artist_nodes,
             file_paths: vec![],
             is_expanded: false,
+            file_count: genre_file_count,
         });
     }
     roots
@@ -162,20 +169,25 @@ pub async fn build_tag_musician_tree_async(
                     children: vec![],
                     file_paths: vec![path],
                     is_expanded: false,
+                    file_count: 1,
                 });
             }
+            let album_file_count = track_nodes.iter().map(|n| n.file_count).sum();
             album_nodes.push(TagTreeNode {
                 label: album,
                 children: track_nodes,
                 file_paths: vec![],
                 is_expanded: false,
+                file_count: album_file_count,
             });
         }
+        let artist_file_count = album_nodes.iter().map(|n| n.file_count).sum();
         roots.push(TagTreeNode {
             label: artist,
             children: album_nodes,
             file_paths: vec![],
             is_expanded: false,
+            file_count: artist_file_count,
         });
     }
     roots

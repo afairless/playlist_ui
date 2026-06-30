@@ -9,6 +9,12 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+/// Nested map: genre → artist → album → [(title, path)]
+type GenreTreeMap = BTreeMap<
+    String,
+    BTreeMap<String, BTreeMap<String, Vec<(String, PathBuf)>>>,
+>;
+
 #[derive(Default)]
 pub(crate) struct MediaMetadata {
     pub creator: Option<String>,
@@ -89,41 +95,31 @@ pub(crate) fn build_genre_tag_tree(
     top_dirs: &[PathBuf],
     allowed_extensions: &[String],
 ) -> Vec<TagTreeNode> {
-    let mut genre_map: BTreeMap<
-        String,
-        BTreeMap<String, BTreeMap<String, Vec<(String, PathBuf)>>>,
-    > = BTreeMap::new();
+    let mut genre_map: GenreTreeMap = BTreeMap::new();
 
     for dir in top_dirs {
         for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
             let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if allowed_extensions.iter().any(|ae| ae == ext) {
-                        let meta = extract_media_metadata(path);
-                        let genre =
-                            meta.genre.unwrap_or_else(|| "Unknown".to_string());
-                        let artist = meta
-                            .creator
-                            .unwrap_or_else(|| "Unknown".to_string());
-                        let album =
-                            meta.album.unwrap_or_else(|| "Unknown".to_string());
-                        let title = meta.title.clone().unwrap_or_else(|| {
-                            path.file_name()
-                                .unwrap()
-                                .to_string_lossy()
-                                .to_string()
-                        });
-                        genre_map
-                            .entry(genre)
-                            .or_default()
-                            .entry(artist)
-                            .or_default()
-                            .entry(album)
-                            .or_default()
-                            .push((title, path.to_path_buf()));
-                    }
-                }
+            if path.is_file()
+                && let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && allowed_extensions.iter().any(|ae| ae == ext)
+            {
+                let meta = extract_media_metadata(path);
+                let genre = meta.genre.unwrap_or_else(|| "Unknown".to_string());
+                let artist =
+                    meta.creator.unwrap_or_else(|| "Unknown".to_string());
+                let album = meta.album.unwrap_or_else(|| "Unknown".to_string());
+                let title = meta.title.clone().unwrap_or_else(|| {
+                    path.file_name().unwrap().to_string_lossy().to_string()
+                });
+                genre_map
+                    .entry(genre)
+                    .or_default()
+                    .entry(artist)
+                    .or_default()
+                    .entry(album)
+                    .or_default()
+                    .push((title, path.to_path_buf()));
             }
         }
     }
@@ -142,27 +138,36 @@ pub(crate) fn build_genre_tag_tree(
                         children: vec![],
                         file_paths: vec![path],
                         is_expanded: false,
+                        file_count: 1,
                     });
                 }
+                let album_file_count =
+                    track_nodes.iter().map(|n| n.file_count).sum();
                 album_nodes.push(TagTreeNode {
                     label: album,
                     children: track_nodes,
                     file_paths: vec![],
                     is_expanded: false,
+                    file_count: album_file_count,
                 });
             }
+            let artist_file_count =
+                album_nodes.iter().map(|n| n.file_count).sum();
             artist_nodes.push(TagTreeNode {
                 label: artist,
                 children: album_nodes,
                 file_paths: vec![],
                 is_expanded: false,
+                file_count: artist_file_count,
             });
         }
+        let genre_file_count = artist_nodes.iter().map(|n| n.file_count).sum();
         roots.push(TagTreeNode {
             label: genre,
             children: artist_nodes,
             file_paths: vec![],
             is_expanded: false,
+            file_count: genre_file_count,
         });
     }
     roots
@@ -189,29 +194,23 @@ pub(crate) fn build_creator_tag_tree(
     for dir in top_dirs {
         for entry in WalkDir::new(dir).into_iter().filter_map(Result::ok) {
             let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if allowed_extensions.iter().any(|ae| ae == ext) {
-                        let meta = extract_media_metadata(path);
-                        let artist = meta
-                            .creator
-                            .unwrap_or_else(|| "Unknown".to_string());
-                        let album =
-                            meta.album.unwrap_or_else(|| "Unknown".to_string());
-                        let title = meta.title.clone().unwrap_or_else(|| {
-                            path.file_name()
-                                .unwrap()
-                                .to_string_lossy()
-                                .to_string()
-                        });
-                        creator_map
-                            .entry(artist)
-                            .or_default()
-                            .entry(album)
-                            .or_default()
-                            .push((title, path.to_path_buf()));
-                    }
-                }
+            if path.is_file()
+                && let Some(ext) = path.extension().and_then(|e| e.to_str())
+                && allowed_extensions.iter().any(|ae| ae == ext)
+            {
+                let meta = extract_media_metadata(path);
+                let artist =
+                    meta.creator.unwrap_or_else(|| "Unknown".to_string());
+                let album = meta.album.unwrap_or_else(|| "Unknown".to_string());
+                let title = meta.title.clone().unwrap_or_else(|| {
+                    path.file_name().unwrap().to_string_lossy().to_string()
+                });
+                creator_map
+                    .entry(artist)
+                    .or_default()
+                    .entry(album)
+                    .or_default()
+                    .push((title, path.to_path_buf()));
             }
         }
     }
@@ -227,20 +226,26 @@ pub(crate) fn build_creator_tag_tree(
                     children: vec![],
                     file_paths: vec![path],
                     is_expanded: false,
+                    file_count: 1,
                 });
             }
+            let album_file_count =
+                track_nodes.iter().map(|n| n.file_count).sum();
             album_nodes.push(TagTreeNode {
                 label: album,
                 children: track_nodes,
                 file_paths: vec![],
                 is_expanded: false,
+                file_count: album_file_count,
             });
         }
+        let artist_file_count = album_nodes.iter().map(|n| n.file_count).sum();
         roots.push(TagTreeNode {
             label: artist,
             children: album_nodes,
             file_paths: vec![],
             is_expanded: false,
+            file_count: artist_file_count,
         });
     }
     roots
