@@ -136,7 +136,6 @@ pub(crate) fn render_file_node(
                         });
                     },
                     LeftPanelSortMode::FileCount => {
-                        // Placeholder — full implementation in Step 4
                         indices.sort_by(|&i, &j| {
                             let a = &node.children[i];
                             let b = &node.children[j];
@@ -147,10 +146,16 @@ pub(crate) fn render_file_node(
                                 (NodeType::File, NodeType::Directory) => {
                                     std::cmp::Ordering::Greater
                                 },
-                                _ => a
-                                    .name
-                                    .to_lowercase()
-                                    .cmp(&b.name.to_lowercase()),
+                                _ => {
+                                    // Directories: sort by file_count descending
+                                    // Files: both count=1, falls back to alpha
+                                    let count_cmp = b.file_count
+                                        .cmp(&a.file_count);
+                                    count_cmp.then_with(|| {
+                                        a.name.to_lowercase()
+                                            .cmp(&b.name.to_lowercase())
+                                    })
+                                },
                             }
                         });
                     },
@@ -348,5 +353,85 @@ mod tests {
         let c = file_count_highlight(5, 0);
         let light = Color::from_rgb(0.20, 0.30, 0.60);
         assert_eq!(c, light);
+    }
+
+    #[test]
+    fn test_render_file_node_sorted_by_file_count() {
+        // Create a directory with children in non-optimal order
+        // and verify that render_file_node with FileCount mode does not panic.
+        use crate::fs::file_tree::FileNode;
+        use std::path::PathBuf;
+
+        // Children in reverse-count order to expose sorting
+        let small_dir = FileNode::new_directory(
+            "small_dir".to_string(),
+            PathBuf::from("/root/small_dir"),
+            vec![
+                FileNode::new_file(
+                    "a.mp3".to_string(),
+                    PathBuf::from("/root/small_dir/a.mp3"),
+                ),
+                FileNode::new_file(
+                    "b.mp3".to_string(),
+                    PathBuf::from("/root/small_dir/b.mp3"),
+                ),
+            ],
+        );
+        let big_dir = FileNode::new_directory(
+            "big_dir".to_string(),
+            PathBuf::from("/root/big_dir"),
+            vec![
+                FileNode::new_file(
+                    "c.mp3".to_string(),
+                    PathBuf::from("/root/big_dir/c.mp3"),
+                ),
+                FileNode::new_file(
+                    "d.mp3".to_string(),
+                    PathBuf::from("/root/big_dir/d.mp3"),
+                ),
+                FileNode::new_file(
+                    "e.mp3".to_string(),
+                    PathBuf::from("/root/big_dir/e.mp3"),
+                ),
+            ],
+        );
+        let file_z = FileNode::new_file(
+            "z_file.txt".to_string(),
+            PathBuf::from("/root/z_file.txt"),
+        );
+        let file_a = FileNode::new_file(
+            "a_file.txt".to_string(),
+            PathBuf::from("/root/a_file.txt"),
+        );
+
+        // Insert in worst-case order: small dir first, big dir last,
+        // z before a
+        let root = FileNode::new_directory(
+            "root".to_string(),
+            PathBuf::from("/root"),
+            vec![small_dir, file_z, file_a, big_dir],
+        );
+
+        let flat_button_style =
+            |_theme: &iced::Theme,
+             _status: iced::widget::button::Status| {
+                iced::widget::button::Style {
+                    background: None,
+                    border: iced::Border::default(),
+                    shadow: iced::Shadow::default(),
+                    text_color: iced::Color::WHITE,
+                }
+            };
+
+        // This should not panic — FileCount sort orders children correctly
+        let _element = render_file_node(
+            &root,
+            0,
+            12,
+            12,
+            LeftPanelSortMode::FileCount,
+            flat_button_style,
+            10,
+        );
     }
 }
