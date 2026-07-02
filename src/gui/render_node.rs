@@ -149,10 +149,11 @@ pub(crate) fn render_file_node(
                                 _ => {
                                     // Directories: sort by file_count descending
                                     // Files: both count=1, falls back to alpha
-                                    let count_cmp = b.file_count
-                                        .cmp(&a.file_count);
+                                    let count_cmp =
+                                        b.file_count.cmp(&a.file_count);
                                     count_cmp.then_with(|| {
-                                        a.name.to_lowercase()
+                                        a.name
+                                            .to_lowercase()
                                             .cmp(&b.name.to_lowercase())
                                     })
                                 },
@@ -305,8 +306,7 @@ pub(crate) fn render_tag_node(
     content = content.push(row);
 
     if node.is_expanded {
-        let mut indices: Vec<usize> =
-            (0..node.children.len()).collect();
+        let mut indices: Vec<usize> = (0..node.children.len()).collect();
         match sort_mode {
             LeftPanelSortMode::Alphanumeric => {
                 indices.sort_by(|&i, &j| {
@@ -455,8 +455,7 @@ mod tests {
         );
 
         let flat_button_style =
-            |_theme: &iced::Theme,
-             _status: iced::widget::button::Status| {
+            |_theme: &iced::Theme, _status: iced::widget::button::Status| {
                 iced::widget::button::Style {
                     background: None,
                     border: iced::Border::default(),
@@ -518,15 +517,13 @@ mod tests {
         };
         let small_genre = TagTreeNode {
             label: "small genre".to_string(),
-            children: vec![
-                TagTreeNode {
-                    label: "track_a".to_string(),
-                    children: vec![],
-                    file_paths: vec![PathBuf::from("/small/track_a.mp3")],
-                    is_expanded: false,
-                    file_count: 1,
-                },
-            ],
+            children: vec![TagTreeNode {
+                label: "track_a".to_string(),
+                children: vec![],
+                file_paths: vec![PathBuf::from("/small/track_a.mp3")],
+                is_expanded: false,
+                file_count: 1,
+            }],
             file_paths: vec![PathBuf::from("/small/track_a.mp3")],
             is_expanded: true,
             file_count: 1,
@@ -567,8 +564,7 @@ mod tests {
         };
 
         let flat_button_style =
-            |_theme: &iced::Theme,
-             _status: iced::widget::button::Status| {
+            |_theme: &iced::Theme, _status: iced::widget::button::Status| {
                 iced::widget::button::Style {
                     background: None,
                     border: iced::Border::default(),
@@ -639,8 +635,7 @@ mod tests {
         };
 
         let flat_button_style =
-            |_theme: &iced::Theme,
-             _status: iced::widget::button::Status| {
+            |_theme: &iced::Theme, _status: iced::widget::button::Status| {
                 iced::widget::button::Style {
                     background: None,
                     border: iced::Border::default(),

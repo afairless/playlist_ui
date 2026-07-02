@@ -1237,10 +1237,7 @@ mod iced_tests {
 
             // Toggle twice: ModifiedDate -> FileCount
             let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
-            assert_eq!(
-                app.left_panel_sort_mode,
-                LeftPanelSortMode::FileCount
-            );
+            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::FileCount);
 
             // Toggle thrice: FileCount -> Alphanumeric
             let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
