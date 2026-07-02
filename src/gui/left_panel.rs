@@ -11,7 +11,7 @@
 use crate::gui::render_node::{render_file_node, render_tag_node};
 use crate::gui::view::{MenuStyle, TreeBrowserStyle};
 use crate::gui::{
-    FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
+    FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message, TagTreeNode,
 };
 use iced::{
     Element,
@@ -199,10 +199,20 @@ fn create_left_panel_tag_tree_browser(
     let max_count =
         app.tag_tree_roots.iter().map(|n| n.file_count).max().unwrap_or(0);
 
+    // Sort root indices according to the current sort mode, then render in
+    // that order. We use index-based sorting to avoid borrowing a local copy
+    // when the return lifetime is tied to &app.
+    let mut indices: Vec<usize> = (0..app.tag_tree_roots.len()).collect();
+    sort_tag_tree_roots(
+        &mut indices,
+        &app.tag_tree_roots,
+        app.left_panel_sort_mode,
+    );
+
     let mut trees = column![];
-    for node in &app.tag_tree_roots {
+    for &i in &indices {
         trees = trees.push(render_tag_node(
-            node,
+            &app.tag_tree_roots[i],
             0,
             vec![],
             tree_browser_style.directory_row_size,
@@ -214,6 +224,69 @@ fn create_left_panel_tag_tree_browser(
             trees.push(Space::with_height(tree_browser_style.tree_row_height));
     }
     trees
+}
+
+/// Sorts indices into the `roots` slice according to the given sort mode.
+///
+/// After this function returns, `indices` is permuted so that iterating
+/// `roots[indices[i]]` yields nodes in the desired order.
+///
+/// * `Alphanumeric` — ascending by label (case-insensitive).
+/// * `ModifiedDate` — descending by modification time of the first file path,
+///   falling back to alphabetical order when timestamps are unavailable.
+/// * `FileCount` — descending by `file_count`, then ascending by label as
+///   tiebreaker.
+fn sort_tag_tree_roots(
+    indices: &mut [usize],
+    roots: &[TagTreeNode],
+    sort_mode: LeftPanelSortMode,
+) {
+    match sort_mode {
+        LeftPanelSortMode::Alphanumeric => {
+            indices.sort_by(|&i, &j| {
+                roots[i]
+                    .label
+                    .to_lowercase()
+                    .cmp(&roots[j].label.to_lowercase())
+            });
+        },
+        // NOTE: Non-leaf tag tree nodes have empty file_paths, so for
+        // root-level nodes this comparator always sees None == None and
+        // produces no effective sort. This is a pre-existing limitation
+        // shared with the child-level sort in render_tag_node. The
+        // `.then_with` fallback ensures roots are at least sorted
+        // alphabetically when timestamps are missing.
+        LeftPanelSortMode::ModifiedDate => {
+            indices.sort_by(|&i, &j| {
+                let a_time = roots[i]
+                    .file_paths
+                    .first()
+                    .and_then(|p| std::fs::metadata(p).ok())
+                    .and_then(|m| m.modified().ok());
+                let b_time = roots[j]
+                    .file_paths
+                    .first()
+                    .and_then(|p| std::fs::metadata(p).ok())
+                    .and_then(|m| m.modified().ok());
+                b_time.cmp(&a_time).then_with(|| {
+                    roots[i]
+                        .label
+                        .to_lowercase()
+                        .cmp(&roots[j].label.to_lowercase())
+                })
+            });
+        },
+        LeftPanelSortMode::FileCount => {
+            indices.sort_by(|&i, &j| {
+                roots[j].file_count.cmp(&roots[i].file_count).then_with(|| {
+                    roots[i]
+                        .label
+                        .to_lowercase()
+                        .cmp(&roots[j].label.to_lowercase())
+                })
+            });
+        },
+    }
 }
 
 /// Constructs the left panel UI for the application, including the menu row,
