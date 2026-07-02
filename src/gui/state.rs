@@ -1,3 +1,20 @@
+//! Application state model for the Playlist UI.
+//!
+//! Defines `FileTreeApp`, the root Elm-architecture model holding all UI
+//! state: directory trees, tag trees, right-panel playlist, sorting, and
+//! persistence. Also defines the `Message` enum for all user actions, and
+//! supporting types (`TagTreeNode`, `RightPanelFile`, `SortColumn`, etc.).
+//!
+//! Public API:
+//!     FileTreeApp           — root application model
+//!     Message               — all user-action messages
+//!     TagTreeNode           — genre/creator/album hierarchy node
+//!     RightPanelFile        — a file entry with metadata
+//!     LeftPanelSelectMode   — directory / genre / creator
+//!     LeftPanelSortMode     — alphanumeric / modified-date
+//!     SortColumn            — column key for sorting
+//!     SortOrder             — ascending / descending
+
 use crate::db::sled_store::SledStore;
 use crate::fs::file_tree::{FileNode, scan_directory};
 use crate::gui::update::restore_expansion_state;

@@ -1,3 +1,8 @@
+//! Utility functions shared across the application.
+//!
+//! Public API:
+//!     format_duration — convert milliseconds to `M:SS` or `H:MM:SS`
+
 /// Formats an optional duration in milliseconds as a human-readable string,
 ///     using `H:MM:SS` for durations of one hour or more, and `M:SS` otherwise.
 ///     Returns an empty string if the input is `None`.

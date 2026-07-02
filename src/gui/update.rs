@@ -1,3 +1,16 @@
+//! Message-handling update logic for the Playlist UI.
+//!
+//! Implements the pure state-transition function required by the iced
+//! Elm architecture. Each `Message` variant is handled by a corresponding
+//! arm that mutates `FileTreeApp` and returns an optional `Task` for
+//! side effects (file dialogs, exports, etc.).
+//!
+//! Public API:
+//!     update — handle a message and transition the app state
+//!     restore_expansion_state — walk a tree restoring expanded dirs
+//!     find_tag_node_mut — locate a tag tree node by label path
+//!     collect_tag_node_files — gather all file paths under a tag node
+
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
 use crate::fs::media_metadata::{
     build_creator_tag_tree, build_genre_tag_tree, extract_media_metadata,

@@ -1,3 +1,14 @@
+//! Right-panel UI construction for the Playlist UI.
+//!
+//! Builds the right sidebar containing the playlist table: a menu row
+//! (Shuffle, Export, Play, Clear), a sortable header row, and alternating
+//! file rows with context menus. Automatically shows/hides metadata columns
+//! (creator, album, title, genre, duration) based on which fields are
+//! populated in the current playlist.
+//!
+//! Public API:
+//!     create_right_panel — assemble the full right-panel Element
+
 use crate::gui::view::{ItemListStyle, MenuStyle};
 use crate::gui::{FileTreeApp, Message, RightPanelFile, SortColumn, SortOrder};
 use crate::utils::format_duration;

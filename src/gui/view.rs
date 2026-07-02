@@ -1,3 +1,16 @@
+//! View composition for the Playlist UI.
+//!
+//! Assembles the full application layout: a horizontal split with a left
+//! panel (file/tag browser) and a right panel (playlist). Defines style
+//! structs (`MenuStyle`, `TreeBrowserStyle`, `ItemListStyle`) that control
+//! text sizes, spacing, and colours throughout the UI.
+//!
+//! Public API:
+//!     view              — compose the full UI tree
+//!     MenuStyle         — menu text size, spacing, colour
+//!     TreeBrowserStyle  — left-panel row heights and widths
+//!     ItemListStyle     — right-panel column spacing and colours
+
 use crate::gui::left_panel::create_left_panel;
 use crate::gui::right_panel::create_right_panel;
 use crate::gui::{FileTreeApp, Message};

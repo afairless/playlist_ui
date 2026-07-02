@@ -1,3 +1,13 @@
+//! XSPF (XML Shareable Playlist Format) playlist export.
+//!
+//! Exports a list of audio files with their metadata to the XSPF format,
+//! which can be opened by media players such as VLC. Each track entry
+//! includes location, title, creator, album, duration, genre, identifier,
+//! annotation, track number, and album art URI where available.
+//!
+//! Public API:
+//!     export_xspf_playlist — write a playlist to an XSPF file
+
 use crate::fs::media_metadata::extract_media_metadata;
 use crate::gui::RightPanelFile;
 use std::fs::File;

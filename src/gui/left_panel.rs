@@ -1,3 +1,13 @@
+//! Left-panel UI construction for the Playlist UI.
+//!
+//! Builds the left sidebar containing the menu row (Add Directory, sort
+//! toggle, panel toggle), the file-extension filter menu, and either a
+//! directory tree or a tag-based navigation tree (genre/creator) depending
+//! on the current `LeftPanelSelectMode`.
+//!
+//! Public API:
+//!     create_left_panel — assemble the full left-panel Element
+
 use crate::gui::render_node::{render_file_node, render_tag_node};
 use crate::gui::view::{MenuStyle, TreeBrowserStyle};
 use crate::gui::{

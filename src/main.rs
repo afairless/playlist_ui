@@ -1,3 +1,12 @@
+//! Application entry point for Playlist UI.
+//!
+//! Initializes the embedded Sled database, builds the initial genre and
+//! creator tag trees on first launch, and launches the iced GUI application
+//! loop.
+//!
+//! Public API:
+//!     main — application entry point
+
 mod db;
 mod fs;
 mod gui;

@@ -1,3 +1,19 @@
+//! Sled-backed persistent store for the Playlist UI.
+//!
+//! Wraps a Sled embedded database to provide save/load operations for
+//! genre and creator tag trees. Trees are serialised with bincode. The
+//! database is not incrementally updated — it must be deleted and rebuilt
+//! when file metadata changes.
+//!
+//! Public API:
+//!     SledStore              — database handle
+//!     SledStore::new         — open or create a database at a path
+//!     save_genre_tag_tree    — persist a genre hierarchy
+//!     load_genre_tag_tree    — load a cached genre hierarchy
+//!     clear_genre_tree       — remove the genre tree from the DB
+//!     save_creator_tag_tree  — persist a creator hierarchy
+//!     load_creator_tag_tree  — load a cached creator hierarchy
+
 use crate::gui::TagTreeNode;
 use bincode;
 use bincode::{config::standard, decode_from_slice, encode_to_vec};

@@ -1,5 +1,18 @@
-// trying async didn't consistently improve tree construction speed
-// leaving module here for possible future use
+//! [Experimental] Async media metadata extraction and tag-tree construction.
+//!
+//! Provides async variants of the sync tag-tree builders using
+//! `tokio::task::spawn_blocking` and `futures::join_all`. Currently NOT
+//! wired into the application update path — kept here for future use if
+//! metadata extraction becomes a performance bottleneck.
+//!
+//! Note: Initial experiments showed async didn't consistently improve
+//! tree construction speed, likely because the bottleneck is I/O wait
+//! on individual files rather than CPU contention.
+//!
+//! Public API:
+//!     extract_media_metadata_async — async metadata extraction
+//!     build_tag_genre_tree_async   — async genre-based tag tree
+//!     build_tag_musician_tree_async — async creator-based tag tree
 
 use crate::fs::media_metadata::MediaMetadata;
 use crate::fs::media_metadata::extract_media_metadata;
@@ -82,7 +95,8 @@ pub async fn build_tag_genre_tree_async(
                         file_count: 1,
                     });
                 }
-                let album_file_count = track_nodes.iter().map(|n| n.file_count).sum();
+                let album_file_count =
+                    track_nodes.iter().map(|n| n.file_count).sum();
                 album_nodes.push(TagTreeNode {
                     label: album,
                     children: track_nodes,
@@ -91,7 +105,8 @@ pub async fn build_tag_genre_tree_async(
                     file_count: album_file_count,
                 });
             }
-            let artist_file_count = album_nodes.iter().map(|n| n.file_count).sum();
+            let artist_file_count =
+                album_nodes.iter().map(|n| n.file_count).sum();
             artist_nodes.push(TagTreeNode {
                 label: artist,
                 children: album_nodes,
@@ -172,7 +187,8 @@ pub async fn build_tag_musician_tree_async(
                     file_count: 1,
                 });
             }
-            let album_file_count = track_nodes.iter().map(|n| n.file_count).sum();
+            let album_file_count =
+                track_nodes.iter().map(|n| n.file_count).sum();
             album_nodes.push(TagTreeNode {
                 label: album,
                 children: track_nodes,

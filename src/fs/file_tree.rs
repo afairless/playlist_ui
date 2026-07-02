@@ -1,3 +1,15 @@
+//! File-tree construction for the Playlist UI.
+//!
+//! Recursively scans directories for audio files matching a set of
+//! allowed extensions, building a `FileNode` tree that mirrors the
+//! filesystem layout. Each node carries a pre-computed file count for
+//! display and highlight purposes.
+//!
+//! Public API:
+//!     FileNode        — tree node (file or directory)
+//!     NodeType        — file / directory discriminant
+//!     scan_directory  — build a FileNode tree from a directory path
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

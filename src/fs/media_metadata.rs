@@ -1,3 +1,17 @@
+//! Media metadata extraction and tag-tree construction.
+//!
+//! Uses the `lofty` crate to read audio-file metadata (artist, album,
+//! title, genre, duration, track number, album art, etc.) and builds
+//! hierarchical tag trees for tag-based browsing:
+//! - `build_genre_tag_tree`: genre → artist → album → track
+//! - `build_creator_tag_tree`: artist → album → track
+//!
+//! Public API:
+//!     MediaMetadata        — parsed metadata fields
+//!     extract_media_metadata  — read metadata from a file path
+//!     build_genre_tag_tree     — genre-based hierarchy
+//!     build_creator_tag_tree   — creator-based hierarchy
+
 use crate::gui::TagTreeNode;
 use lofty::{
     file::{AudioFile, TaggedFileExt},

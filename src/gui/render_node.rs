@@ -1,3 +1,15 @@
+//! Recursive tree-node rendering for the Playlist UI.
+//!
+//! Renders `FileNode` (directory/file trees) and `TagTreeNode`
+//! (genre/creator/album/track trees) as nested, indented button rows.
+//! Provides log-scale colour highlighting based on per-node file counts,
+//! and context menus for adding files to the right panel.
+//!
+//! Public API:
+//!     render_file_node   — draw a directory/file tree node
+//!     render_tag_node    — draw a genre/creator/album/track tree node
+//!     file_count_highlight — map file count to a highlight colour
+
 use crate::fs::file_tree::{FileNode, NodeType};
 use crate::gui::{LeftPanelSortMode, Message, TagTreeNode};
 use iced::{
