@@ -56,6 +56,7 @@ fn create_left_panel_menu_row<'a>(
     let sort_mode_label = match app.left_panel_sort_mode {
         LeftPanelSortMode::Alphanumeric => "Sort: Name",
         LeftPanelSortMode::ModifiedDate => "Sort: Date Modified",
+        LeftPanelSortMode::FileCount => "Sort: File Count",
     };
     let sort_mode_button =
         iced::widget::button::<Message, iced::Theme, iced::Renderer>(
@@ -205,6 +206,7 @@ fn create_left_panel_tag_tree_browser(
             0,
             vec![],
             tree_browser_style.directory_row_size,
+            app.left_panel_sort_mode,
             flat_button_style,
             max_count,
         ));

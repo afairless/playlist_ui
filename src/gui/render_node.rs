@@ -6,8 +6,8 @@
 //! and context menus for adding files to the right panel.
 //!
 //! Public API:
-//!     render_file_node   — draw a directory/file tree node
-//!     render_tag_node    — draw a genre/creator/album/track tree node
+//!     render_file_node   — draw a directory/file tree node (accepts sort mode)
+//!     render_tag_node    — draw a genre/creator/album/track tree node (accepts sort mode)
 //!     file_count_highlight — map file count to a highlight colour
 
 use crate::fs::file_tree::{FileNode, NodeType};
@@ -135,6 +135,31 @@ pub(crate) fn render_file_node(
                             }
                         });
                     },
+                    LeftPanelSortMode::FileCount => {
+                        indices.sort_by(|&i, &j| {
+                            let a = &node.children[i];
+                            let b = &node.children[j];
+                            match (a.node_type.clone(), b.node_type.clone()) {
+                                (NodeType::Directory, NodeType::File) => {
+                                    std::cmp::Ordering::Less
+                                },
+                                (NodeType::File, NodeType::Directory) => {
+                                    std::cmp::Ordering::Greater
+                                },
+                                _ => {
+                                    // Directories: sort by file_count descending
+                                    // Files: both count=1, falls back to alpha
+                                    let count_cmp =
+                                        b.file_count.cmp(&a.file_count);
+                                    count_cmp.then_with(|| {
+                                        a.name
+                                            .to_lowercase()
+                                            .cmp(&b.name.to_lowercase())
+                                    })
+                                },
+                            }
+                        });
+                    },
                     LeftPanelSortMode::ModifiedDate => {
                         indices.sort_by(|&i, &j| {
                             let a = &node.children[i];
@@ -209,6 +234,7 @@ pub(crate) fn render_tag_node(
     depth: usize,
     path: Vec<String>,
     directory_row_size: u16,
+    sort_mode: LeftPanelSortMode,
     flat_button_style: impl Fn(
         &iced::Theme,
         iced::widget::button::Status,
@@ -280,12 +306,52 @@ pub(crate) fn render_tag_node(
     content = content.push(row);
 
     if node.is_expanded {
-        for child in &node.children {
+        let mut indices: Vec<usize> = (0..node.children.len()).collect();
+        match sort_mode {
+            LeftPanelSortMode::Alphanumeric => {
+                indices.sort_by(|&i, &j| {
+                    node.children[i]
+                        .label
+                        .to_lowercase()
+                        .cmp(&node.children[j].label.to_lowercase())
+                });
+            },
+            LeftPanelSortMode::ModifiedDate => {
+                indices.sort_by(|&i, &j| {
+                    let a_time = node.children[i]
+                        .file_paths
+                        .first()
+                        .and_then(|p| std::fs::metadata(p).ok())
+                        .and_then(|m| m.modified().ok());
+                    let b_time = node.children[j]
+                        .file_paths
+                        .first()
+                        .and_then(|p| std::fs::metadata(p).ok())
+                        .and_then(|m| m.modified().ok());
+                    b_time.cmp(&a_time) // newest first
+                });
+            },
+            LeftPanelSortMode::FileCount => {
+                indices.sort_by(|&i, &j| {
+                    let count_cmp = node.children[j]
+                        .file_count
+                        .cmp(&node.children[i].file_count);
+                    count_cmp.then_with(|| {
+                        node.children[i]
+                            .label
+                            .to_lowercase()
+                            .cmp(&node.children[j].label.to_lowercase())
+                    })
+                });
+            },
+        }
+        for &i in &indices {
             content = content.push(render_tag_node(
-                child,
+                &node.children[i],
                 depth + 1,
                 new_path.clone(),
                 directory_row_size,
+                sort_mode,
                 flat_button_style,
                 max_count,
             ));
@@ -329,5 +395,265 @@ mod tests {
         let c = file_count_highlight(5, 0);
         let light = Color::from_rgb(0.20, 0.30, 0.60);
         assert_eq!(c, light);
+    }
+
+    #[test]
+    fn test_render_file_node_sorted_by_file_count() {
+        // Create a directory with children in non-optimal order
+        // and verify that render_file_node with FileCount mode does not panic.
+        use crate::fs::file_tree::FileNode;
+        use std::path::PathBuf;
+
+        // Children in reverse-count order to expose sorting
+        let small_dir = FileNode::new_directory(
+            "small_dir".to_string(),
+            PathBuf::from("/root/small_dir"),
+            vec![
+                FileNode::new_file(
+                    "a.mp3".to_string(),
+                    PathBuf::from("/root/small_dir/a.mp3"),
+                ),
+                FileNode::new_file(
+                    "b.mp3".to_string(),
+                    PathBuf::from("/root/small_dir/b.mp3"),
+                ),
+            ],
+        );
+        let big_dir = FileNode::new_directory(
+            "big_dir".to_string(),
+            PathBuf::from("/root/big_dir"),
+            vec![
+                FileNode::new_file(
+                    "c.mp3".to_string(),
+                    PathBuf::from("/root/big_dir/c.mp3"),
+                ),
+                FileNode::new_file(
+                    "d.mp3".to_string(),
+                    PathBuf::from("/root/big_dir/d.mp3"),
+                ),
+                FileNode::new_file(
+                    "e.mp3".to_string(),
+                    PathBuf::from("/root/big_dir/e.mp3"),
+                ),
+            ],
+        );
+        let file_z = FileNode::new_file(
+            "z_file.txt".to_string(),
+            PathBuf::from("/root/z_file.txt"),
+        );
+        let file_a = FileNode::new_file(
+            "a_file.txt".to_string(),
+            PathBuf::from("/root/a_file.txt"),
+        );
+
+        // Insert in worst-case order: small dir first, big dir last,
+        // z before a
+        let root = FileNode::new_directory(
+            "root".to_string(),
+            PathBuf::from("/root"),
+            vec![small_dir, file_z, file_a, big_dir],
+        );
+
+        let flat_button_style =
+            |_theme: &iced::Theme, _status: iced::widget::button::Status| {
+                iced::widget::button::Style {
+                    background: None,
+                    border: iced::Border::default(),
+                    shadow: iced::Shadow::default(),
+                    text_color: iced::Color::WHITE,
+                }
+            };
+
+        // This should not panic — FileCount sort orders children correctly
+        let _element = render_file_node(
+            &root,
+            0,
+            12,
+            12,
+            LeftPanelSortMode::FileCount,
+            flat_button_style,
+            10,
+        );
+    }
+
+    #[test]
+    fn test_render_tag_node_sorted_by_file_count() {
+        // Create a tag tree where children are in worst-case order
+        // and verify that render_tag_node with FileCount mode does not panic.
+        use std::path::PathBuf;
+
+        let big_genre = TagTreeNode {
+            label: "big genre".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "track1".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/big/track1.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "track2".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/big/track2.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "track3".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/big/track3.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![
+                PathBuf::from("/big/track1.mp3"),
+                PathBuf::from("/big/track2.mp3"),
+                PathBuf::from("/big/track3.mp3"),
+            ],
+            is_expanded: true,
+            file_count: 3,
+        };
+        let small_genre = TagTreeNode {
+            label: "small genre".to_string(),
+            children: vec![TagTreeNode {
+                label: "track_a".to_string(),
+                children: vec![],
+                file_paths: vec![PathBuf::from("/small/track_a.mp3")],
+                is_expanded: false,
+                file_count: 1,
+            }],
+            file_paths: vec![PathBuf::from("/small/track_a.mp3")],
+            is_expanded: true,
+            file_count: 1,
+        };
+        let medium_genre = TagTreeNode {
+            label: "medium genre".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "track_x".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/medium/track_x.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "track_y".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/medium/track_y.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![
+                PathBuf::from("/medium/track_x.mp3"),
+                PathBuf::from("/medium/track_y.mp3"),
+            ],
+            is_expanded: true,
+            file_count: 2,
+        };
+
+        // Root with children in worst-case order: small, medium, big
+        let root = TagTreeNode {
+            label: "root".to_string(),
+            children: vec![small_genre, medium_genre, big_genre],
+            file_paths: vec![],
+            is_expanded: true,
+            file_count: 6,
+        };
+
+        let flat_button_style =
+            |_theme: &iced::Theme, _status: iced::widget::button::Status| {
+                iced::widget::button::Style {
+                    background: None,
+                    border: iced::Border::default(),
+                    shadow: iced::Shadow::default(),
+                    text_color: iced::Color::WHITE,
+                }
+            };
+
+        // This should not panic — FileCount sort orders children correctly
+        let _element = render_tag_node(
+            &root,
+            0,
+            vec![],
+            12,
+            LeftPanelSortMode::FileCount,
+            flat_button_style,
+            10,
+        );
+
+        // Also verify Alphanumeric sort still works
+        let _element = render_tag_node(
+            &root,
+            0,
+            vec![],
+            12,
+            LeftPanelSortMode::Alphanumeric,
+            flat_button_style,
+            10,
+        );
+    }
+
+    #[test]
+    fn test_render_tag_node_unsorted_children_sorted_alphabetically_now() {
+        // Regression test: tag tree children previously rendered in
+        // BTreeMap insertion order (unsorted). Now they should be sorted
+        // alphabetically in Alphanumeric mode.
+        use std::path::PathBuf;
+
+        // Children in reverse alphabetical order
+        let node = TagTreeNode {
+            label: "root".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "z_track".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/z.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "m_track".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/m.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "a_track".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/a.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![],
+            is_expanded: true,
+            file_count: 3,
+        };
+
+        let flat_button_style =
+            |_theme: &iced::Theme, _status: iced::widget::button::Status| {
+                iced::widget::button::Style {
+                    background: None,
+                    border: iced::Border::default(),
+                    shadow: iced::Shadow::default(),
+                    text_color: iced::Color::WHITE,
+                }
+            };
+
+        // This should not panic — Alphanumeric sort orders children
+        // alphabetically, unlike the previous unsorted behaviour
+        let _element = render_tag_node(
+            &node,
+            0,
+            vec![],
+            12,
+            LeftPanelSortMode::Alphanumeric,
+            flat_button_style,
+            10,
+        );
     }
 }

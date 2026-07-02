@@ -1228,14 +1228,18 @@ mod iced_tests {
                 LeftPanelSortMode::Alphanumeric
             );
 
-            // Toggle once
+            // Toggle once: Alphanumeric -> ModifiedDate
             let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
             assert_eq!(
                 app.left_panel_sort_mode,
                 LeftPanelSortMode::ModifiedDate
             );
 
-            // Toggle again
+            // Toggle twice: ModifiedDate -> FileCount
+            let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
+            assert_eq!(app.left_panel_sort_mode, LeftPanelSortMode::FileCount);
+
+            // Toggle thrice: FileCount -> Alphanumeric
             let _ = update(&mut app, Message::ToggleLeftPanelSortMode);
             assert_eq!(
                 app.left_panel_sort_mode,
@@ -1269,6 +1273,30 @@ mod iced_tests {
                 names,
                 vec!["a.mp3", "b.mp3", "c.mp3"],
                 "files in the same directory should be sorted alphabetically by filename"
+            );
+        }
+
+        #[test]
+        fn test_left_panel_sort_mode_default() {
+            use crate::gui::{FileTreeApp, LeftPanelSortMode};
+            use std::path::PathBuf;
+            use tempfile::NamedTempFile;
+
+            let dir = PathBuf::from("/dummy");
+            let file_extensions = &["txt"];
+            let temp_file = NamedTempFile::new().unwrap();
+            let persist_path = temp_file.path().to_path_buf();
+            let app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
+
+            // Default should be Alphanumeric
+            assert_eq!(
+                app.left_panel_sort_mode,
+                LeftPanelSortMode::Alphanumeric
             );
         }
 
