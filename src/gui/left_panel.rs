@@ -373,3 +373,121 @@ pub(crate) fn create_left_panel(
     };
     left_content.into()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::sort_tag_tree_roots;
+    use crate::gui::LeftPanelSortMode;
+    use crate::gui::state::TagTreeNode;
+
+    /// Helper to build a TagTreeNode with the given label and file_count.
+    fn node(label: &str, file_count: usize) -> TagTreeNode {
+        TagTreeNode {
+            label: label.to_string(),
+            children: vec![],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count,
+        }
+    }
+
+    #[test]
+    fn test_sort_roots_alphanumeric() {
+        let roots =
+            vec![node("z_genre", 10), node("a_genre", 20), node("m_genre", 15)];
+        let mut indices: Vec<usize> = (0..roots.len()).collect();
+        sort_tag_tree_roots(
+            &mut indices,
+            &roots,
+            LeftPanelSortMode::Alphanumeric,
+        );
+        let sorted: Vec<&str> =
+            indices.iter().map(|&i| roots[i].label.as_str()).collect();
+        assert_eq!(sorted, vec!["a_genre", "m_genre", "z_genre"]);
+    }
+
+    #[test]
+    fn test_sort_roots_file_count_descending() {
+        let roots =
+            vec![node("root_c", 50), node("root_b", 100), node("root_a", 30)];
+        let mut indices: Vec<usize> = (0..roots.len()).collect();
+        sort_tag_tree_roots(&mut indices, &roots, LeftPanelSortMode::FileCount);
+        let sorted: Vec<&str> =
+            indices.iter().map(|&i| roots[i].label.as_str()).collect();
+        assert_eq!(sorted, vec!["root_b", "root_c", "root_a"]);
+    }
+
+    #[test]
+    fn test_sort_roots_file_count_tiebreaker() {
+        let roots = vec![node("b_label", 50), node("a_label", 50)];
+        let mut indices: Vec<usize> = (0..roots.len()).collect();
+        sort_tag_tree_roots(&mut indices, &roots, LeftPanelSortMode::FileCount);
+        let sorted: Vec<&str> =
+            indices.iter().map(|&i| roots[i].label.as_str()).collect();
+        // Same file_count → alphabetical tiebreaker
+        assert_eq!(sorted, vec!["a_label", "b_label"]);
+    }
+
+    #[test]
+    fn test_sort_roots_alphanumeric_mixed_case() {
+        let roots =
+            vec![node("Z_genre", 10), node("a_genre", 20), node("M_genre", 15)];
+        let mut indices: Vec<usize> = (0..roots.len()).collect();
+        sort_tag_tree_roots(
+            &mut indices,
+            &roots,
+            LeftPanelSortMode::Alphanumeric,
+        );
+        let sorted: Vec<&str> =
+            indices.iter().map(|&i| roots[i].label.as_str()).collect();
+        assert_eq!(sorted, vec!["a_genre", "M_genre", "Z_genre"]);
+    }
+
+    #[test]
+    fn test_sort_roots_file_count_single() {
+        let roots = vec![node("only", 42)];
+        let mut indices: Vec<usize> = (0..roots.len()).collect();
+        sort_tag_tree_roots(&mut indices, &roots, LeftPanelSortMode::FileCount);
+        let sorted: Vec<&str> =
+            indices.iter().map(|&i| roots[i].label.as_str()).collect();
+        assert_eq!(sorted, vec!["only"]);
+    }
+
+    #[test]
+    fn test_sort_roots_empty() {
+        let roots: Vec<TagTreeNode> = vec![];
+        let mut indices: Vec<usize> = vec![];
+        sort_tag_tree_roots(&mut indices, &roots, LeftPanelSortMode::FileCount);
+        assert!(indices.is_empty());
+    }
+
+    #[test]
+    fn test_sort_roots_modified_date_empty_paths() {
+        let roots =
+            vec![node("c_genre", 10), node("a_genre", 20), node("b_genre", 15)];
+        let mut indices: Vec<usize> = (0..roots.len()).collect();
+        // All file_paths are empty, so ModifiedDate falls back to alphabetical
+        sort_tag_tree_roots(
+            &mut indices,
+            &roots,
+            LeftPanelSortMode::ModifiedDate,
+        );
+        let sorted: Vec<&str> =
+            indices.iter().map(|&i| roots[i].label.as_str()).collect();
+        assert_eq!(sorted, vec!["a_genre", "b_genre", "c_genre"]);
+    }
+
+    #[test]
+    fn test_sort_roots_modified_date_no_panic() {
+        // Empty file_paths on all nodes should not panic
+        let roots = vec![node("x", 5), node("y", 3)];
+        let mut indices: Vec<usize> = (0..roots.len()).collect();
+        sort_tag_tree_roots(
+            &mut indices,
+            &roots,
+            LeftPanelSortMode::ModifiedDate,
+        );
+        // Should complete without panic
+        assert_eq!(indices.len(), 2);
+    }
+}
