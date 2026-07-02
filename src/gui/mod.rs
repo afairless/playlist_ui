@@ -11,7 +11,7 @@
 //!     TagTreeNode        — genre/creator/album/track hierarchy node
 //!     RightPanelFile     — a file entry in the playlist
 //!     LeftPanelSelectMode — directory / genre / creator selection mode
-//!     LeftPanelSortMode  — alphanumeric or modified-date sort
+//!     LeftPanelSortMode  — alphanumeric, modified-date, or file-count sort
 //!     SortColumn         — column key for right-panel sorting
 //!     SortOrder          — ascending or descending
 //!     update             — message handler (pure state transition)

@@ -11,7 +11,7 @@
 //!     TagTreeNode           — genre/creator/album hierarchy node
 //!     RightPanelFile        — a file entry with metadata
 //!     LeftPanelSelectMode   — directory / genre / creator
-//!     LeftPanelSortMode     — alphanumeric / modified-date
+//!     LeftPanelSortMode     — alphanumeric / modified-date / file-count
 //!     SortColumn            — column key for sorting
 //!     SortOrder             — ascending / descending
 
@@ -92,6 +92,8 @@ pub enum LeftPanelSortMode {
     #[default]
     Alphanumeric,
     ModifiedDate,
+    #[allow(dead_code)]
+    FileCount,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

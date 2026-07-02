@@ -1273,6 +1273,30 @@ mod iced_tests {
         }
 
         #[test]
+        fn test_left_panel_sort_mode_default() {
+            use crate::gui::{FileTreeApp, LeftPanelSortMode};
+            use std::path::PathBuf;
+            use tempfile::NamedTempFile;
+
+            let dir = PathBuf::from("/dummy");
+            let file_extensions = &["txt"];
+            let temp_file = NamedTempFile::new().unwrap();
+            let persist_path = temp_file.path().to_path_buf();
+            let app = FileTreeApp::new(
+                vec![dir],
+                file_extensions,
+                persist_path,
+                None,
+            );
+
+            // Default should be Alphanumeric
+            assert_eq!(
+                app.left_panel_sort_mode,
+                LeftPanelSortMode::Alphanumeric
+            );
+        }
+
+        #[test]
         fn test_clear_and_re_add_files_appear_in_alphabetical_order() {
             let dir_path = PathBuf::from("/music");
             let mut dir_node = FileNode::new_directory(

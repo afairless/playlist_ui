@@ -135,6 +135,25 @@ pub(crate) fn render_file_node(
                             }
                         });
                     },
+                    LeftPanelSortMode::FileCount => {
+                        // Placeholder — full implementation in Step 4
+                        indices.sort_by(|&i, &j| {
+                            let a = &node.children[i];
+                            let b = &node.children[j];
+                            match (a.node_type.clone(), b.node_type.clone()) {
+                                (NodeType::Directory, NodeType::File) => {
+                                    std::cmp::Ordering::Less
+                                },
+                                (NodeType::File, NodeType::Directory) => {
+                                    std::cmp::Ordering::Greater
+                                },
+                                _ => a
+                                    .name
+                                    .to_lowercase()
+                                    .cmp(&b.name.to_lowercase()),
+                            }
+                        });
+                    },
                     LeftPanelSortMode::ModifiedDate => {
                         indices.sort_by(|&i, &j| {
                             let a = &node.children[i];
