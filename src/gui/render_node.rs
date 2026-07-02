@@ -6,8 +6,8 @@
 //! and context menus for adding files to the right panel.
 //!
 //! Public API:
-//!     render_file_node   — draw a directory/file tree node
-//!     render_tag_node    — draw a genre/creator/album/track tree node
+//!     render_file_node   — draw a directory/file tree node (accepts sort mode)
+//!     render_tag_node    — draw a genre/creator/album/track tree node (accepts sort mode)
 //!     file_count_highlight — map file count to a highlight colour
 
 use crate::fs::file_tree::{FileNode, NodeType};
