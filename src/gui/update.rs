@@ -418,7 +418,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     LeftPanelSortMode::ModifiedDate
                 },
                 LeftPanelSortMode::ModifiedDate => {
-                    LeftPanelSortMode::Alphanumeric
+                    LeftPanelSortMode::FileCount
                 },
                 LeftPanelSortMode::FileCount => {
                     LeftPanelSortMode::Alphanumeric

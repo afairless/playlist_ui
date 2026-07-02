@@ -92,7 +92,6 @@ pub enum LeftPanelSortMode {
     #[default]
     Alphanumeric,
     ModifiedDate,
-    #[allow(dead_code)]
     FileCount,
 }
 
