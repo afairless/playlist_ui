@@ -599,4 +599,66 @@ mod tests {
             10,
         );
     }
+
+    #[test]
+    fn test_render_tag_node_unsorted_children_sorted_alphabetically_now() {
+        // Regression test: tag tree children previously rendered in
+        // BTreeMap insertion order (unsorted). Now they should be sorted
+        // alphabetically in Alphanumeric mode.
+        use std::path::PathBuf;
+
+        // Children in reverse alphabetical order
+        let node = TagTreeNode {
+            label: "root".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "z_track".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/z.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "m_track".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/m.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "a_track".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/a.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![],
+            is_expanded: true,
+            file_count: 3,
+        };
+
+        let flat_button_style =
+            |_theme: &iced::Theme,
+             _status: iced::widget::button::Status| {
+                iced::widget::button::Style {
+                    background: None,
+                    border: iced::Border::default(),
+                    shadow: iced::Shadow::default(),
+                    text_color: iced::Color::WHITE,
+                }
+            };
+
+        // This should not panic — Alphanumeric sort orders children
+        // alphabetically, unlike the previous unsorted behaviour
+        let _element = render_tag_node(
+            &node,
+            0,
+            vec![],
+            12,
+            LeftPanelSortMode::Alphanumeric,
+            flat_button_style,
+            10,
+        );
+    }
 }
