@@ -5,6 +5,11 @@
 //! directory tree or a tag-based navigation tree (genre/creator) depending
 //! on the current `LeftPanelSelectMode`.
 //!
+//! Before rendering, tag-tree root nodes are sorted via
+//! [`sort_tag_tree_roots`] according to the active sort mode
+//! (`Alphanumeric`, `ModifiedDate`, or `FileCount`).  Child-level sorting
+//! is handled inside the recursive `render_tag_node` in `render_node.rs`.
+//!
 //! Public API:
 //!     create_left_panel — assemble the full left-panel Element
 
