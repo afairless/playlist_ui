@@ -206,6 +206,7 @@ fn create_left_panel_tag_tree_browser(
             0,
             vec![],
             tree_browser_style.directory_row_size,
+            app.left_panel_sort_mode,
             flat_button_style,
             max_count,
         ));
