@@ -174,6 +174,8 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             for root in app.root_nodes.iter_mut().flatten() {
                 restore_expansion_state(root, &app.expanded_dirs);
             }
+            app.filtered_root_nodes = recompute_filtered_nodes(app);
+            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
             Task::none()
         },
         Message::ToggleExtensionsMenu => {
@@ -745,6 +747,67 @@ mod tests {
 
         assert!(app.root_nodes[0].as_ref().unwrap().is_expanded);
         assert!(app.filtered_root_nodes[0].as_ref().unwrap().is_expanded);
+    }
+
+    #[test]
+    fn test_toggle_extension_recomputes_filtered_trees() {
+        let mut app = FileTreeApp::new(
+            vec![PathBuf::from("/dummy")],
+            &["mp3", "flac"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 42,
+        }];
+        app.search_query = "Jazz".to_string();
+        // Set stale filtered trees to empty — they will be recomputed
+        app.filtered_root_nodes = vec![];
+        app.filtered_tag_tree_roots = vec![];
+
+        let msg = Message::ToggleExtension("flac".to_string());
+        let _ = update(&mut app, msg);
+
+        // filtered_root_nodes should match recomputed state (None from
+        // non-existent dir, no matching files)
+        assert_eq!(app.filtered_root_nodes.len(), 1);
+        assert!(app.filtered_root_nodes[0].is_none());
+
+        // filtered_tag_tree_roots should have the matching Jazz node
+        assert_eq!(app.filtered_tag_tree_roots.len(), 1);
+        assert_eq!(app.filtered_tag_tree_roots[0].label, "Jazz");
+    }
+
+    #[test]
+    fn test_toggle_extension_recomputes_filtered_trees_no_search() {
+        let mut app = FileTreeApp::new(
+            vec![PathBuf::from("/dummy")],
+            &["mp3", "flac"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![],
+            file_paths: vec![],
+            is_expanded: true,
+            file_count: 42,
+        }];
+        // No search — filtered is a clone of original
+        app.filtered_root_nodes = vec![];
+        app.filtered_tag_tree_roots = vec![];
+
+        let msg = Message::ToggleExtension("flac".to_string());
+        let _ = update(&mut app, msg);
+
+        // Without search, both filtered trees should be clones of originals
+        assert_eq!(app.filtered_root_nodes.len(), app.root_nodes.len());
+        assert_eq!(app.filtered_tag_tree_roots.len(), app.tag_tree_roots.len());
+        assert!(app.filtered_tag_tree_roots[0].is_expanded);
     }
 
     #[test]
