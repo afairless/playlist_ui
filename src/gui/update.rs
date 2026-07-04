@@ -50,7 +50,9 @@ fn recompute_filtered_tag_nodes(app: &FileTreeApp) -> Vec<TagTreeNode> {
     } else {
         app.tag_tree_roots
             .iter()
-            .filter_map(|node| filter_tag_node(node, &app.search_query))
+            .filter_map(|node| {
+                filter_tag_node(node, &app.search_query, app.search_mode)
+            })
             .collect()
     }
 }
@@ -1364,5 +1366,58 @@ mod tests {
         // Only the file with genre "Rock" matches
         assert_eq!(genre_filtered.len(), 1);
         assert!(title_filtered != genre_filtered);
+    }
+
+    #[test]
+    fn test_toggle_search_mode_changes_filtered_tag_roots() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![],
+            file_paths: vec![PathBuf::from("/music/jazz/track.mp3")],
+            is_expanded: false,
+            file_count: 1,
+        }];
+        app.search_query = "jazz".to_string();
+        // Start in Genre mode — label "Jazz" matches
+        app.search_mode = TextSearchMode::Genre;
+        let _ = update(
+            &mut app,
+            Message::SearchQueryChanged("jazz".to_string()),
+        );
+        let genre_filtered = app.filtered_tag_tree_roots.clone();
+        assert_eq!(genre_filtered.len(), 1);
+
+        // Toggle to DirectoryPath — label still matches, but also
+        // checks path (which also matches). Still 1 result.
+        // Genre → All → Dir (2 toggles from Genre)
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::DirectoryPath);
+        let path_filtered = app.filtered_tag_tree_roots.clone();
+        assert_eq!(path_filtered.len(), 1);
+
+        // Now search for something in the file path but NOT in the label
+        app.search_mode = TextSearchMode::Genre;
+        app.search_query = "track".to_string();
+        let _ = update(
+            &mut app,
+            Message::SearchQueryChanged("track".to_string()),
+        );
+        // Genre mode checks labels only — "track" not in label
+        assert!(app.filtered_tag_tree_roots.is_empty());
+
+        // Toggle to DirectoryPath mode — checks file path too
+        // Genre → All (1), All → Dir (2)
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::DirectoryPath);
+        // Now "track" is in the file path
+        assert_eq!(app.filtered_tag_tree_roots.len(), 1);
     }
 }
