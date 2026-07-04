@@ -531,3 +531,76 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gui::TextSearchMode;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_search_query_changed() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let _ = update(
+            &mut app,
+            Message::SearchQueryChanged("test query".to_string()),
+        );
+        assert_eq!(app.search_query, "test query");
+    }
+
+    #[test]
+    fn test_search_query_cleared() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = "previous".to_string();
+        let _ = update(
+            &mut app,
+            Message::SearchQueryChanged(String::new()),
+        );
+        assert_eq!(app.search_query, "");
+    }
+
+    #[test]
+    fn test_toggle_search_mode_cycles_all_modes() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        // Start at All (default)
+        assert_eq!(app.search_mode, TextSearchMode::All);
+
+        // Cycle through all modes
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::DirectoryPath);
+
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::TrackFilename);
+
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::Creator);
+
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::Album);
+
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::Title);
+
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::Genre);
+
+        // One more wraps back to All
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::All);
+    }
+}
