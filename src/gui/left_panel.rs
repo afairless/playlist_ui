@@ -145,19 +145,12 @@ fn create_left_panel_file_tree_browser(
     let is_searching = !app.search_query.is_empty();
 
     // Use filtered nodes when search is active, otherwise use original nodes
-    let nodes = if is_searching {
-        &app.filtered_root_nodes
-    } else {
-        &app.root_nodes
-    };
+    let nodes =
+        if is_searching { &app.filtered_root_nodes } else { &app.root_nodes };
 
     // Compute max file_count across all directory nodes
-    let max_count = nodes
-        .iter()
-        .flatten()
-        .map(|n| n.file_count)
-        .max()
-        .unwrap_or(0);
+    let max_count =
+        nodes.iter().flatten().map(|n| n.file_count).max().unwrap_or(0);
 
     let mut trees = column![];
     for (i, node_opt) in nodes.iter().enumerate() {
@@ -182,24 +175,19 @@ fn create_left_panel_file_tree_browser(
             // issues with filtered root nodes
             trees = trees.push(content);
         } else {
-            let remove_button = button(
-                text("X").size(tree_browser_style.directory_row_size),
-            )
-            .width(tree_browser_style.remove_button_width - gap_width)
-            .on_press(Message::RemoveTopDir(dir_path.clone()));
+            let remove_button =
+                button(text("X").size(tree_browser_style.directory_row_size))
+                    .width(tree_browser_style.remove_button_width - gap_width)
+                    .on_press(Message::RemoveTopDir(dir_path.clone()));
 
-            let row = row![
-                content,
-                Space::with_width(gap_width),
-                remove_button,
-            ]
-            .align_y(iced::Alignment::Start);
+            let row =
+                row![content, Space::with_width(gap_width), remove_button,]
+                    .align_y(iced::Alignment::Start);
 
             trees = trees.push(row);
         }
-        trees = trees.push(Space::with_height(
-            tree_browser_style.tree_row_height,
-        ));
+        trees =
+            trees.push(Space::with_height(tree_browser_style.tree_row_height));
     }
     trees
 }
@@ -335,16 +323,14 @@ fn create_search_row(
         TextSearchMode::Genre => "🔍 Genre",
     };
 
-    let search_input =
-        text_input::<Message, iced::Theme, iced::Renderer>(
-            "Search...",
-            &app.search_query,
-        )
-        .on_input(Message::SearchQueryChanged);
+    let search_input = text_input::<Message, iced::Theme, iced::Renderer>(
+        "Search...",
+        &app.search_query,
+    )
+    .on_input(Message::SearchQueryChanged);
 
-    let mode_button =
-        button(text(mode_label).size(menu_style.text_size))
-            .on_press(Message::ToggleSearchMode);
+    let mode_button = button(text(mode_label).size(menu_style.text_size))
+        .on_press(Message::ToggleSearchMode);
 
     row![search_input, mode_button].spacing(menu_style.spacing).into()
 }
@@ -401,10 +387,8 @@ pub(crate) fn filter_file_node(
                 .to_string_lossy()
                 .to_ascii_lowercase()
                 .contains(&query_lower);
-            let name_match = node
-                .name
-                .to_ascii_lowercase()
-                .contains(&query_lower);
+            let name_match =
+                node.name.to_ascii_lowercase().contains(&query_lower);
             let metadata_match = match &node.node_type {
                 crate::fs::file_tree::NodeType::File => {
                     file_matches_mode(&node.path, mode, query)
@@ -418,10 +402,9 @@ pub(crate) fn filter_file_node(
             .to_string_lossy()
             .to_ascii_lowercase()
             .contains(&query_lower),
-        TextSearchMode::TrackFilename => node
-            .name
-            .to_ascii_lowercase()
-            .contains(&query_lower),
+        TextSearchMode::TrackFilename => {
+            node.name.to_ascii_lowercase().contains(&query_lower)
+        },
         TextSearchMode::Creator
         | TextSearchMode::Album
         | TextSearchMode::Title
@@ -466,10 +449,8 @@ pub(crate) fn filter_tag_node(
         return Some(node.clone());
     }
 
-    let label_matches = node
-        .label
-        .to_ascii_lowercase()
-        .contains(&query.to_ascii_lowercase());
+    let label_matches =
+        node.label.to_ascii_lowercase().contains(&query.to_ascii_lowercase());
 
     if node.children.is_empty() {
         // Leaf node (file_paths but no sub-children)
@@ -586,13 +567,13 @@ pub(crate) fn create_left_panel(
 
 #[cfg(test)]
 mod tests {
-    use super::sort_tag_tree_roots;
     use super::create_search_row;
+    use super::sort_tag_tree_roots;
     use super::{filter_file_node, filter_tag_node};
     use crate::fs::file_tree::FileNode;
-    use crate::gui::{FileTreeApp, LeftPanelSortMode, TextSearchMode};
     use crate::gui::state::TagTreeNode;
     use crate::gui::view::MenuStyle;
+    use crate::gui::{FileTreeApp, LeftPanelSortMode, TextSearchMode};
     use std::path::PathBuf;
 
     /// Helper to build a TagTreeNode with the given label and file_count.
@@ -850,11 +831,8 @@ mod tests {
         let child = test_file("track.mp3", "/music/jazz/track.mp3");
         let dir = test_dir("jazz_collection", "/music/jazz", vec![child]);
         // Directory path matches "jazz" in DirectoryPath mode
-        let result = filter_file_node(
-            &dir,
-            "jazz",
-            TextSearchMode::DirectoryPath,
-        );
+        let result =
+            filter_file_node(&dir, "jazz", TextSearchMode::DirectoryPath);
         assert!(result.is_some());
         let filtered = result.unwrap();
         // Directory kept with all children since the directory itself matches
@@ -865,8 +843,11 @@ mod tests {
     fn test_filter_directory_with_no_matches() {
         let child = test_file("track.mp3", "/music/track.mp3");
         let dir = test_dir("my_dir", "/music", vec![child]);
-        let result =
-            filter_file_node(&dir, "nonexistent", TextSearchMode::TrackFilename);
+        let result = filter_file_node(
+            &dir,
+            "nonexistent",
+            TextSearchMode::TrackFilename,
+        );
         assert!(result.is_none());
     }
 
@@ -895,11 +876,8 @@ mod tests {
     #[test]
     fn test_filter_all_mode_no_match() {
         let node = test_file("track.mp3", "/music/jazz/track.mp3");
-        let result = filter_file_node(
-            &node,
-            "nonexistent",
-            TextSearchMode::All,
-        );
+        let result =
+            filter_file_node(&node, "nonexistent", TextSearchMode::All);
         assert!(result.is_none());
     }
 
@@ -908,11 +886,8 @@ mod tests {
         // A directory matching by name keeps all children
         let child = test_file("song.mp3", "/target/song.mp3");
         let dir = test_dir("target", "/target", vec![child]);
-        let result = filter_file_node(
-            &dir,
-            "target",
-            TextSearchMode::DirectoryPath,
-        );
+        let result =
+            filter_file_node(&dir, "target", TextSearchMode::DirectoryPath);
         assert!(result.is_some());
         assert_eq!(result.unwrap().children.len(), 1);
     }
@@ -1026,10 +1001,7 @@ mod tests {
         assert_eq!(filtered.children.len(), 1);
         assert_eq!(filtered.children[0].label, "My Artist");
         assert_eq!(filtered.children[0].children.len(), 1);
-        assert_eq!(
-            filtered.children[0].children[0].label,
-            "My Album"
-        );
+        assert_eq!(filtered.children[0].children[0].label, "My Album");
         assert_eq!(
             filtered.children[0].children[0].children[0].label,
             "target_track"

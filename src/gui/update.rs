@@ -12,10 +12,10 @@
 //!     collect_tag_node_files — gather all file paths under a tag node
 
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
-use crate::gui::left_panel::{filter_file_node, filter_tag_node};
 use crate::fs::media_metadata::{
     build_creator_tag_tree, build_genre_tag_tree, extract_media_metadata,
 };
+use crate::gui::left_panel::{filter_file_node, filter_tag_node};
 use crate::gui::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
     RightPanelFile, SortColumn, SortOrder, TagTreeNode, TextSearchMode,
@@ -36,20 +36,14 @@ fn recompute_filtered_nodes(app: &FileTreeApp) -> Vec<Option<FileNode>> {
             .iter()
             .map(|node_opt| {
                 node_opt.as_ref().and_then(|node| {
-                    filter_file_node(
-                        node,
-                        &app.search_query,
-                        app.search_mode,
-                    )
+                    filter_file_node(node, &app.search_query, app.search_mode)
                 })
             })
             .collect()
     }
 }
 
-fn recompute_filtered_tag_nodes(
-    app: &FileTreeApp,
-) -> Vec<TagTreeNode> {
+fn recompute_filtered_tag_nodes(app: &FileTreeApp) -> Vec<TagTreeNode> {
     if app.search_query.is_empty() {
         app.tag_tree_roots.clone()
     } else {
@@ -467,12 +461,8 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::ToggleSearchMode => {
             app.search_mode = match app.search_mode {
                 TextSearchMode::All => TextSearchMode::DirectoryPath,
-                TextSearchMode::DirectoryPath => {
-                    TextSearchMode::TrackFilename
-                },
-                TextSearchMode::TrackFilename => {
-                    TextSearchMode::Creator
-                },
+                TextSearchMode::DirectoryPath => TextSearchMode::TrackFilename,
+                TextSearchMode::TrackFilename => TextSearchMode::Creator,
                 TextSearchMode::Creator => TextSearchMode::Album,
                 TextSearchMode::Album => TextSearchMode::Title,
                 TextSearchMode::Title => TextSearchMode::Genre,
@@ -602,10 +592,7 @@ mod tests {
             None,
         );
         app.search_query = "previous".to_string();
-        let _ = update(
-            &mut app,
-            Message::SearchQueryChanged(String::new()),
-        );
+        let _ = update(&mut app, Message::SearchQueryChanged(String::new()));
         assert_eq!(app.search_query, "");
     }
 
