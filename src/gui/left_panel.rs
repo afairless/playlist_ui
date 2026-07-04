@@ -17,10 +17,11 @@ use crate::gui::render_node::{render_file_node, render_tag_node};
 use crate::gui::view::{MenuStyle, TreeBrowserStyle};
 use crate::gui::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message, TagTreeNode,
+    TextSearchMode,
 };
 use iced::{
     Element,
-    widget::{Space, button, column, row, text},
+    widget::{Space, button, column, row, text, text_input},
 };
 
 /// Creates the toggle button for the left panel, displaying either a left or
@@ -294,6 +295,36 @@ fn sort_tag_tree_roots(
     }
 }
 
+/// Creates the search row UI containing a text input and a mode toggle button.
+/// The search row is hidden when the left panel is collapsed.
+fn create_search_row(
+    app: &FileTreeApp,
+    menu_style: MenuStyle,
+) -> Element<'_, Message> {
+    let mode_label = match app.search_mode {
+        TextSearchMode::All => "🔍 All",
+        TextSearchMode::DirectoryPath => "🔍 Path",
+        TextSearchMode::TrackFilename => "🔍 File",
+        TextSearchMode::Creator => "🔍 Artist",
+        TextSearchMode::Album => "🔍 Album",
+        TextSearchMode::Title => "🔍 Title",
+        TextSearchMode::Genre => "🔍 Genre",
+    };
+
+    let search_input =
+        text_input::<Message, iced::Theme, iced::Renderer>(
+            "Search...",
+            &app.search_query,
+        )
+        .on_input(Message::SearchQueryChanged);
+
+    let mode_button =
+        button(text(mode_label).size(menu_style.text_size))
+            .on_press(Message::ToggleSearchMode);
+
+    row![search_input, mode_button].spacing(menu_style.spacing).into()
+}
+
 /// Constructs the left panel UI for the application, including the menu row,
 /// file extension filter menu, and either the directory or tag tree browser
 /// depending on the current navigation/selection mode. The panel's appearance
@@ -371,6 +402,8 @@ pub(crate) fn create_left_panel(
             Space::with_height(10),
             left_panel_menu_row_2,
             Space::with_height(10),
+            create_search_row(app, menu_style),
+            Space::with_height(5),
             tree_browser,
         ]
     } else {
@@ -382,8 +415,11 @@ pub(crate) fn create_left_panel(
 #[cfg(test)]
 mod tests {
     use super::sort_tag_tree_roots;
-    use crate::gui::LeftPanelSortMode;
+    use super::create_search_row;
+    use crate::gui::{FileTreeApp, LeftPanelSortMode, TextSearchMode};
     use crate::gui::state::TagTreeNode;
+    use crate::gui::view::MenuStyle;
+    use std::path::PathBuf;
 
     /// Helper to build a TagTreeNode with the given label and file_count.
     fn node(label: &str, file_count: usize) -> TagTreeNode {
@@ -494,5 +530,65 @@ mod tests {
         );
         // Should complete without panic
         assert_eq!(indices.len(), 2);
+    }
+
+    #[test]
+    fn test_create_search_row_does_not_panic() {
+        let menu_style = MenuStyle {
+            text_size: 20,
+            spacing: 10,
+            text_color: [0.0, 1.0, 1.0, 1.0],
+        };
+        let app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let _element = create_search_row(&app, menu_style);
+    }
+
+    #[test]
+    fn test_create_search_row_with_query() {
+        let menu_style = MenuStyle {
+            text_size: 20,
+            spacing: 10,
+            text_color: [0.0, 1.0, 1.0, 1.0],
+        };
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = "test".to_string();
+        let _element = create_search_row(&app, menu_style);
+    }
+
+    #[test]
+    fn test_create_search_row_with_various_modes() {
+        let menu_style = MenuStyle {
+            text_size: 20,
+            spacing: 10,
+            text_color: [0.0, 1.0, 1.0, 1.0],
+        };
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        for mode in &[
+            TextSearchMode::All,
+            TextSearchMode::DirectoryPath,
+            TextSearchMode::TrackFilename,
+            TextSearchMode::Creator,
+            TextSearchMode::Album,
+            TextSearchMode::Title,
+            TextSearchMode::Genre,
+        ] {
+            app.search_mode = *mode;
+            let _element = create_search_row(&app, menu_style);
+        }
     }
 }

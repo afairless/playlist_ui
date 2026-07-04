@@ -60,9 +60,7 @@ pub enum Message {
     ExportAndPlayRightPanelAsXspf,
     OpenRightPanelFile(PathBuf),
     ClearRightPanel,
-    #[allow(dead_code)]
     SearchQueryChanged(String),
-    #[allow(dead_code)]
     ToggleSearchMode,
 }
 
