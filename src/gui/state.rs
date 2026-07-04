@@ -14,6 +14,7 @@
 //!     LeftPanelSortMode     — alphanumeric / modified-date / file-count
 //!     SortColumn            — column key for sorting
 //!     SortOrder             — ascending / descending
+//!     TextSearchMode        — search mode (all, path, filename, tags)
 
 use crate::db::sled_store::SledStore;
 use crate::fs::file_tree::{FileNode, scan_directory};
@@ -59,6 +60,10 @@ pub enum Message {
     ExportAndPlayRightPanelAsXspf,
     OpenRightPanelFile(PathBuf),
     ClearRightPanel,
+    #[allow(dead_code)]
+    SearchQueryChanged(String),
+    #[allow(dead_code)]
+    ToggleSearchMode,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -85,6 +90,18 @@ pub struct TagTreeNode {
     pub is_expanded: bool,
     #[serde(default)]
     pub file_count: usize,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextSearchMode {
+    #[default]
+    All,
+    DirectoryPath,
+    TrackFilename,
+    Creator,
+    Album,
+    Title,
+    Genre,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,6 +161,10 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub all_extensions: Vec<String>,
     #[serde(skip)]
+    pub search_query: String,
+    #[serde(skip)]
+    pub search_mode: TextSearchMode,
+    #[serde(skip)]
     pub extensions_menu_expanded: bool,
     #[serde(skip)]
     pub expanded_dirs: HashSet<PathBuf>,
@@ -200,6 +221,8 @@ impl FileTreeApp {
             persist_path,
             selected_extensions: all_extensions_vec.clone(),
             all_extensions: all_extensions_vec,
+            search_query: String::new(),
+            search_mode: TextSearchMode::All,
             extensions_menu_expanded: false,
             expanded_dirs,
             right_panel_files: Vec::new(),
@@ -398,5 +421,22 @@ impl FileTreeApp {
             });
         }
         files
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_app_search_defaults() {
+        let app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        assert_eq!(app.search_query, "");
+        assert_eq!(app.search_mode, TextSearchMode::All);
     }
 }

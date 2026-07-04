@@ -14,6 +14,7 @@
 //!     LeftPanelSortMode  — alphanumeric, modified-date, or file-count sort
 //!     SortColumn         — column key for right-panel sorting
 //!     SortOrder          — ascending or descending
+//!     TextSearchMode     — search mode for text filtering
 //!     update             — message handler (pure state transition)
 //!     view               — layout composer
 
@@ -26,7 +27,7 @@ mod view;
 
 pub use state::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
-    RightPanelFile, SortColumn, SortOrder, TagTreeNode,
+    RightPanelFile, SortColumn, SortOrder, TagTreeNode, TextSearchMode,
 };
 pub use update::update;
 pub use view::view;

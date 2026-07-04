@@ -17,7 +17,7 @@ use crate::fs::media_metadata::{
 };
 use crate::gui::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
-    RightPanelFile, SortColumn, SortOrder, TagTreeNode,
+    RightPanelFile, SortColumn, SortOrder, TagTreeNode, TextSearchMode,
 };
 use iced::Task;
 use rfd::FileDialog;
@@ -419,6 +419,26 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 },
                 LeftPanelSortMode::ModifiedDate => LeftPanelSortMode::FileCount,
                 LeftPanelSortMode::FileCount => LeftPanelSortMode::Alphanumeric,
+            };
+            Task::none()
+        },
+        Message::SearchQueryChanged(query) => {
+            app.search_query = query;
+            Task::none()
+        },
+        Message::ToggleSearchMode => {
+            app.search_mode = match app.search_mode {
+                TextSearchMode::All => TextSearchMode::DirectoryPath,
+                TextSearchMode::DirectoryPath => {
+                    TextSearchMode::TrackFilename
+                },
+                TextSearchMode::TrackFilename => {
+                    TextSearchMode::Creator
+                },
+                TextSearchMode::Creator => TextSearchMode::Album,
+                TextSearchMode::Album => TextSearchMode::Title,
+                TextSearchMode::Title => TextSearchMode::Genre,
+                TextSearchMode::Genre => TextSearchMode::All,
             };
             Task::none()
         },
