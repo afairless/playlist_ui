@@ -167,6 +167,8 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub filtered_tag_tree_roots: Vec<TagTreeNode>,
     #[serde(skip)]
+    pub filtered_right_panel_files: Vec<RightPanelFile>,
+    #[serde(skip)]
     pub extensions_menu_expanded: bool,
     #[serde(skip)]
     pub expanded_dirs: HashSet<PathBuf>,
@@ -228,6 +230,7 @@ impl FileTreeApp {
             search_mode: TextSearchMode::All,
             filtered_root_nodes,
             filtered_tag_tree_roots: Vec::new(),
+            filtered_right_panel_files: Vec::new(),
             extensions_menu_expanded: false,
             expanded_dirs,
             right_panel_files: Vec::new(),

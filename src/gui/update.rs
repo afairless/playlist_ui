@@ -20,6 +20,7 @@ use crate::gui::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
     RightPanelFile, SortColumn, SortOrder, TagTreeNode, TextSearchMode,
 };
+use crate::utils::file_field_matches;
 use iced::Task;
 use rfd::FileDialog;
 use std::collections::HashSet;
@@ -52,6 +53,215 @@ fn recompute_filtered_tag_nodes(app: &FileTreeApp) -> Vec<TagTreeNode> {
             .filter_map(|node| filter_tag_node(node, &app.search_query))
             .collect()
     }
+}
+
+/// Returns the files that should be displayed in the right panel,
+/// sorted according to the current sort settings. When a search query
+/// is active, only matching files are returned; otherwise all files
+/// are returned.
+fn displayed_right_panel_files(app: &FileTreeApp) -> Vec<RightPanelFile> {
+    let files = if app.search_query.is_empty() {
+        app.right_panel_files.clone()
+    } else {
+        app.filtered_right_panel_files.clone()
+    };
+    let mut files = files;
+    if !app.right_panel_shuffled {
+        files.sort_by(|a, b| {
+            let filename_cmp = || {
+                let a_name = a
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_ascii_lowercase();
+                let b_name = b
+                    .path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_ascii_lowercase();
+                a_name.cmp(&b_name)
+            };
+            match app.right_panel_sort_column {
+                SortColumn::Directory => {
+                    let a_dir = a
+                        .path
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    let b_dir = b
+                        .path
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    let primary =
+                        if app.right_panel_sort_order == SortOrder::Asc {
+                            a_dir.cmp(&b_dir)
+                        } else {
+                            b_dir.cmp(&a_dir)
+                        };
+                    primary.then_with(filename_cmp)
+                },
+                SortColumn::File => {
+                    let a_file = a
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    let b_file = b
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_ascii_lowercase();
+                    if app.right_panel_sort_order == SortOrder::Asc {
+                        a_file.cmp(&b_file)
+                    } else {
+                        b_file.cmp(&a_file)
+                    }
+                },
+                SortColumn::Creator => {
+                    let a_creator = a
+                        .creator
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_creator = b
+                        .creator
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let primary =
+                        if app.right_panel_sort_order == SortOrder::Asc {
+                            a_creator.cmp(&b_creator)
+                        } else {
+                            b_creator.cmp(&a_creator)
+                        };
+                    primary.then_with(filename_cmp)
+                },
+                SortColumn::Album => {
+                    let a_album = a
+                        .album
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_album = b
+                        .album
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let primary =
+                        if app.right_panel_sort_order == SortOrder::Asc {
+                            a_album.cmp(&b_album)
+                        } else {
+                            b_album.cmp(&a_album)
+                        };
+                    primary.then_with(filename_cmp)
+                },
+                SortColumn::Title => {
+                    let a_title = a
+                        .title
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_title = b
+                        .title
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let primary =
+                        if app.right_panel_sort_order == SortOrder::Asc {
+                            a_title.cmp(&b_title)
+                        } else {
+                            b_title.cmp(&a_title)
+                        };
+                    primary.then_with(filename_cmp)
+                },
+                SortColumn::Genre => {
+                    let a_genre = a
+                        .genre
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let b_genre = b
+                        .genre
+                        .as_deref()
+                        .unwrap_or_default()
+                        .to_ascii_lowercase();
+                    let primary =
+                        if app.right_panel_sort_order == SortOrder::Asc {
+                            a_genre.cmp(&b_genre)
+                        } else {
+                            b_genre.cmp(&a_genre)
+                        };
+                    primary.then_with(filename_cmp)
+                },
+                SortColumn::Duration => {
+                    let a_dur = a.duration_ms.unwrap_or(0);
+                    let b_dur = b.duration_ms.unwrap_or(0);
+                    let primary =
+                        if app.right_panel_sort_order == SortOrder::Asc {
+                            a_dur.cmp(&b_dur)
+                        } else {
+                            b_dur.cmp(&a_dur)
+                        };
+                    primary.then_with(filename_cmp)
+                },
+            }
+        });
+    }
+    files
+}
+
+/// Recomputes `filtered_right_panel_files` from `app.right_panel_files`
+/// using the current search query and mode. When the query is empty,
+/// returns an empty vector signalling the view to fall back to
+/// `sorted_right_panel_files()`. When a query is active, filters files
+/// according to the active search mode and returns the matching subset
+/// (unsorted — sorting is applied by the view).
+fn recompute_filtered_right_panel_files(
+    app: &FileTreeApp,
+) -> Vec<RightPanelFile> {
+    if app.search_query.is_empty() {
+        return Vec::new();
+    }
+    let query = &app.search_query;
+    app.right_panel_files
+        .iter()
+        .filter(|f| match app.search_mode {
+            TextSearchMode::All => {
+                file_field_matches(&f.creator, query)
+                    || file_field_matches(&f.album, query)
+                    || file_field_matches(&f.title, query)
+                    || file_field_matches(&f.genre, query)
+            },
+            TextSearchMode::Creator => {
+                file_field_matches(&f.creator, query)
+            },
+            TextSearchMode::Album => file_field_matches(&f.album, query),
+            TextSearchMode::Title => file_field_matches(&f.title, query),
+            TextSearchMode::Genre => file_field_matches(&f.genre, query),
+            TextSearchMode::DirectoryPath => f
+                .path
+                .to_string_lossy()
+                .to_ascii_lowercase()
+                .contains(&query.to_ascii_lowercase()),
+            TextSearchMode::TrackFilename => f
+                .path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_ascii_lowercase()
+                .contains(&query.to_ascii_lowercase()),
+        })
+        .cloned()
+        .collect()
 }
 
 /// Restores the expansion state of a file tree node and its descendants based
@@ -382,17 +592,17 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         },
         Message::ExportRightPanelAsXspfTo(path) => {
             let audio_exts: &Vec<String> = &app.all_extensions;
-            let audio_files: Vec<RightPanelFile> = app
-                .sorted_right_panel_files()
-                .into_iter()
-                .filter(|f| {
-                    f.path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .map(|ext| audio_exts.iter().any(|ae| ae == ext))
-                        .unwrap_or(false)
-                })
-                .collect();
+            let audio_files: Vec<RightPanelFile> =
+                displayed_right_panel_files(app)
+                    .into_iter()
+                    .filter(|f| {
+                        f.path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|ext| audio_exts.iter().any(|ae| ae == ext))
+                            .unwrap_or(false)
+                    })
+                    .collect();
             let _ = crate::fs::xspf::export_xspf_playlist(&audio_files, &path);
             Task::none()
         },
@@ -401,17 +611,17 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             use std::process::Command;
 
             let audio_exts: &Vec<String> = &app.all_extensions;
-            let audio_files: Vec<RightPanelFile> = app
-                .sorted_right_panel_files()
-                .into_iter()
-                .filter(|f| {
-                    f.path
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .map(|ext| audio_exts.iter().any(|ae| ae == ext))
-                        .unwrap_or(false)
-                })
-                .collect();
+            let audio_files: Vec<RightPanelFile> =
+                displayed_right_panel_files(app)
+                    .into_iter()
+                    .filter(|f| {
+                        f.path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .map(|ext| audio_exts.iter().any(|ae| ae == ext))
+                            .unwrap_or(false)
+                    })
+                    .collect();
 
             let xspf_path = temp_dir().join("playlist.xspf");
             let _ =
@@ -458,7 +668,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::SearchQueryChanged(query) => {
             app.search_query = query;
             app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
+            app.filtered_tag_tree_roots =
+                recompute_filtered_tag_nodes(app);
+            app.filtered_right_panel_files =
+                recompute_filtered_right_panel_files(app);
             Task::none()
         },
         Message::ToggleSearchMode => {
@@ -472,7 +685,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 TextSearchMode::Genre => TextSearchMode::All,
             };
             app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
+            app.filtered_tag_tree_roots =
+                recompute_filtered_tag_nodes(app);
+            app.filtered_right_panel_files =
+                recompute_filtered_right_panel_files(app);
             Task::none()
         },
         Message::ToggleLeftPanelSelectMode => {
@@ -843,5 +1059,310 @@ mod tests {
         // One more wraps back to All
         let _ = update(&mut app, Message::ToggleSearchMode);
         assert_eq!(app.search_mode, TextSearchMode::All);
+    }
+
+    // ── right-panel filtering tests ──────────────────────────────────
+
+    /// Helper to create a RightPanelFile with metadata.
+    fn rp_file(
+        path: &str,
+        creator: Option<&str>,
+        album: Option<&str>,
+        title: Option<&str>,
+        genre: Option<&str>,
+    ) -> RightPanelFile {
+        RightPanelFile {
+            path: PathBuf::from(path),
+            creator: creator.map(|s| s.to_string()),
+            album: album.map(|s| s.to_string()),
+            title: title.map(|s| s.to_string()),
+            genre: genre.map(|s| s.to_string()),
+            duration_ms: None,
+        }
+    }
+
+    fn app_with_right_panel_files(
+        files: Vec<RightPanelFile>,
+    ) -> FileTreeApp {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.right_panel_files = files;
+        app
+    }
+
+    #[test]
+    fn test_right_panel_filter_empty_query() {
+        let app = app_with_right_panel_files(vec![
+            rp_file("/a/song.mp3", Some("Artist"), None, None, None),
+            rp_file("/b/track.mp3", None, None, None, None),
+        ]);
+        let result = recompute_filtered_right_panel_files(&app);
+        // Empty query returns empty (signals "no filtering needed")
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_right_panel_filter_genre_mode() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file(
+                "/a/rock.mp3",
+                None,
+                None,
+                None,
+                Some("Rock"),
+            ),
+            rp_file(
+                "/b/jazz.mp3",
+                None,
+                None,
+                None,
+                Some("Jazz"),
+            ),
+            rp_file(
+                "/c/unknown.mp3",
+                None,
+                None,
+                None,
+                None,
+            ),
+        ]);
+        app.search_query = "rock".to_string();
+        app.search_mode = TextSearchMode::Genre;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].path, PathBuf::from("/a/rock.mp3"));
+    }
+
+    #[test]
+    fn test_right_panel_filter_title_mode() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file(
+                "/a/track.mp3",
+                None,
+                None,
+                Some("My Song"),
+                None,
+            ),
+            rp_file(
+                "/b/other.mp3",
+                None,
+                None,
+                Some("Different"),
+                None,
+            ),
+        ]);
+        app.search_query = "my song".to_string();
+        app.search_mode = TextSearchMode::Title;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, Some("My Song".to_string()));
+    }
+
+    #[test]
+    fn test_right_panel_filter_album_mode() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file(
+                "/a/a.mp3",
+                None,
+                Some("Abbey Road"),
+                None,
+                None,
+            ),
+            rp_file(
+                "/b/b.mp3",
+                None,
+                Some("Revolver"),
+                None,
+                None,
+            ),
+        ]);
+        app.search_query = "abbey".to_string();
+        app.search_mode = TextSearchMode::Album;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].album, Some("Abbey Road".to_string()));
+    }
+
+    #[test]
+    fn test_right_panel_filter_creator_mode() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file(
+                "/a/a.mp3",
+                Some("Miles Davis"),
+                None,
+                None,
+                None,
+            ),
+            rp_file(
+                "/b/b.mp3",
+                Some("Coltrane"),
+                None,
+                None,
+                None,
+            ),
+        ]);
+        app.search_query = "miles".to_string();
+        app.search_mode = TextSearchMode::Creator;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].creator, Some("Miles Davis".to_string()));
+    }
+
+    #[test]
+    fn test_right_panel_filter_path_mode() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file("/music/jazz/song.mp3", None, None, None, None),
+            rp_file("/music/rock/track.mp3", None, None, None, None),
+        ]);
+        app.search_query = "jazz".to_string();
+        app.search_mode = TextSearchMode::DirectoryPath;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].path,
+            PathBuf::from("/music/jazz/song.mp3")
+        );
+    }
+
+    #[test]
+    fn test_right_panel_filter_filename_mode() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file("/a/my_song.mp3", None, None, None, None),
+            rp_file("/b/other_track.mp3", None, None, None, None),
+        ]);
+        app.search_query = "my_song".to_string();
+        app.search_mode = TextSearchMode::TrackFilename;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].path,
+            PathBuf::from("/a/my_song.mp3")
+        );
+    }
+
+    #[test]
+    fn test_right_panel_filter_all_mode() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file(
+                "/a/a.mp3",
+                None,
+                None,
+                Some("Little Wing"),
+                None,
+            ),
+            rp_file(
+                "/b/b.mp3",
+                None,
+                None,
+                None,
+                Some("Littlesound"),
+            ),
+            rp_file(
+                "/c/c.mp3",
+                None,
+                None,
+                None,
+                None,
+            ),
+        ]);
+        app.search_query = "little".to_string();
+        app.search_mode = TextSearchMode::All;
+        let result = recompute_filtered_right_panel_files(&app);
+        // Title match for first, genre match for second, third excluded
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_right_panel_filter_no_match() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file("/a/a.mp3", Some("Artist"), None, None, None),
+        ]);
+        app.search_query = "nonexistent".to_string();
+        app.search_mode = TextSearchMode::All;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_right_panel_filter_case_insensitive() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file(
+                "/a/a.mp3",
+                None,
+                None,
+                Some("LITTLE WING"),
+                None,
+            ),
+        ]);
+        app.search_query = "little".to_string();
+        app.search_mode = TextSearchMode::Title;
+        let result = recompute_filtered_right_panel_files(&app);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_right_panel_filter_metadata_none_fields() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file("/a/a.mp3", None, None, None, None),
+            rp_file(
+                "/b/b.mp3",
+                Some("Artist"),
+                None,
+                None,
+                None,
+            ),
+        ]);
+        app.search_query = "Artist".to_string();
+        app.search_mode = TextSearchMode::Creator;
+        let result = recompute_filtered_right_panel_files(&app);
+        // Only the file with a creator matching "Artist" should be kept
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].creator,
+            Some("Artist".to_string())
+        );
+    }
+
+    #[test]
+    fn test_toggle_search_mode_changes_filtered_right_panel() {
+        let mut app = app_with_right_panel_files(vec![
+            rp_file(
+                "/a/a.mp3",
+                None,
+                None,
+                Some("Rock Song"),
+                None,
+            ),
+            rp_file(
+                "/b/b.mp3",
+                None,
+                None,
+                None,
+                Some("Rock"),
+            ),
+        ]);
+        app.search_query = "rock".to_string();
+        // Start in Title mode — verify title matching
+        app.search_mode = TextSearchMode::Title;
+        let _ = update(
+            &mut app,
+            Message::SearchQueryChanged("rock".to_string()),
+        );
+        let title_filtered = app.filtered_right_panel_files.clone();
+        // Only "Rock Song" matches title
+        assert_eq!(title_filtered.len(), 1);
+
+        // Toggle once: Title → Genre
+        let _ = update(&mut app, Message::ToggleSearchMode);
+        assert_eq!(app.search_mode, TextSearchMode::Genre);
+
+        let genre_filtered = app.filtered_right_panel_files.clone();
+        // Only the file with genre "Rock" matches
+        assert_eq!(genre_filtered.len(), 1);
+        assert!(title_filtered != genre_filtered);
     }
 }
