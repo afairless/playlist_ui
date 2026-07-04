@@ -13,12 +13,16 @@
 //! Public API:
 //!     create_left_panel — assemble the full left-panel Element
 
+use crate::fs::file_tree::FileNode;
+use crate::fs::media_metadata::extract_media_metadata;
 use crate::gui::render_node::{render_file_node, render_tag_node};
 use crate::gui::view::{MenuStyle, TreeBrowserStyle};
 use crate::gui::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message, TagTreeNode,
     TextSearchMode,
 };
+use std::path::Path;
+
 use iced::{
     Element,
     widget::{Space, button, column, row, text, text_input},
@@ -138,10 +142,17 @@ fn create_left_panel_file_tree_browser(
     + 'static,
 ) -> iced::widget::Column<'_, Message> {
     let gap_width = tree_browser_style.remove_button_width / 4;
+    let is_searching = !app.search_query.is_empty();
 
-    // Compute max file_count across all directory nodes in the file tree
-    let max_count = app
-        .root_nodes
+    // Use filtered nodes when search is active, otherwise use original nodes
+    let nodes = if is_searching {
+        &app.filtered_root_nodes
+    } else {
+        &app.root_nodes
+    };
+
+    // Compute max file_count across all directory nodes
+    let max_count = nodes
         .iter()
         .flatten()
         .map(|n| n.file_count)
@@ -149,17 +160,10 @@ fn create_left_panel_file_tree_browser(
         .unwrap_or(0);
 
     let mut trees = column![];
-    for (i, node_opt) in app.root_nodes.iter().enumerate() {
+    for (i, node_opt) in nodes.iter().enumerate() {
         let dir_path = app.top_dirs.get(i).cloned().unwrap_or_default();
 
-        // Remove button (narrow column)
-        let remove_button =
-            button(text("X").size(tree_browser_style.directory_row_size))
-                .width(tree_browser_style.remove_button_width - gap_width)
-                .on_press(Message::RemoveTopDir(dir_path.clone()));
-
         let content = if let Some(node) = node_opt {
-            // Directory tree
             render_file_node(
                 node,
                 0,
@@ -173,13 +177,29 @@ fn create_left_panel_file_tree_browser(
             text("No files found").into()
         };
 
-        // Row: [X][directory tree]
-        let row = row![content, Space::with_width(gap_width), remove_button,]
+        if is_searching {
+            // Hide remove buttons during search to avoid index-alignment
+            // issues with filtered root nodes
+            trees = trees.push(content);
+        } else {
+            let remove_button = button(
+                text("X").size(tree_browser_style.directory_row_size),
+            )
+            .width(tree_browser_style.remove_button_width - gap_width)
+            .on_press(Message::RemoveTopDir(dir_path.clone()));
+
+            let row = row![
+                content,
+                Space::with_width(gap_width),
+                remove_button,
+            ]
             .align_y(iced::Alignment::Start);
 
-        trees = trees.push(row);
-        trees =
-            trees.push(Space::with_height(tree_browser_style.tree_row_height));
+            trees = trees.push(row);
+        }
+        trees = trees.push(Space::with_height(
+            tree_browser_style.tree_row_height,
+        ));
     }
     trees
 }
@@ -325,6 +345,111 @@ fn create_search_row(
     row![search_input, mode_button].spacing(menu_style.spacing).into()
 }
 
+/// Checks whether a metadata field value contains the given query string
+/// (case-insensitive). Returns `true` if the value is present and contains
+/// the query, or `false` otherwise.
+fn field_matches(value: &Option<String>, query: &str) -> bool {
+    value
+        .as_deref()
+        .map(|v| v.to_ascii_lowercase().contains(&query.to_ascii_lowercase()))
+        .unwrap_or(false)
+}
+
+/// Checks whether a file's metadata matches the given search mode and query.
+/// Extracts metadata from the file path and checks the relevant field.
+/// Used internally by `filter_file_node` for metadata-based filtering.
+fn file_matches_mode(path: &Path, mode: TextSearchMode, query: &str) -> bool {
+    let meta = extract_media_metadata(path);
+    match mode {
+        TextSearchMode::Creator => field_matches(&meta.creator, query),
+        TextSearchMode::Album => field_matches(&meta.album, query),
+        TextSearchMode::Title => field_matches(&meta.title, query),
+        TextSearchMode::Genre => field_matches(&meta.genre, query),
+        TextSearchMode::All => {
+            field_matches(&meta.creator, query)
+                || field_matches(&meta.album, query)
+                || field_matches(&meta.title, query)
+                || field_matches(&meta.genre, query)
+        },
+        TextSearchMode::DirectoryPath | TextSearchMode::TrackFilename => false,
+    }
+}
+
+/// Recursively filters a `FileNode` tree, keeping only nodes that match the
+/// current search query and mode. Returns `Some(FileNode)` when the node or
+/// at least one descendant matches, or `None` when no match is found.
+pub(crate) fn filter_file_node(
+    node: &FileNode,
+    query: &str,
+    mode: TextSearchMode,
+) -> Option<FileNode> {
+    if query.is_empty() {
+        return Some(node.clone());
+    }
+
+    let query_lower = query.to_ascii_lowercase();
+
+    // Check if this node itself matches
+    let node_matches = match mode {
+        TextSearchMode::All => {
+            let path_match = node
+                .path
+                .to_string_lossy()
+                .to_ascii_lowercase()
+                .contains(&query_lower);
+            let name_match = node
+                .name
+                .to_ascii_lowercase()
+                .contains(&query_lower);
+            let metadata_match = match &node.node_type {
+                crate::fs::file_tree::NodeType::File => {
+                    file_matches_mode(&node.path, mode, query)
+                },
+                crate::fs::file_tree::NodeType::Directory => false,
+            };
+            path_match || name_match || metadata_match
+        },
+        TextSearchMode::DirectoryPath => node
+            .path
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .contains(&query_lower),
+        TextSearchMode::TrackFilename => node
+            .name
+            .to_ascii_lowercase()
+            .contains(&query_lower),
+        TextSearchMode::Creator
+        | TextSearchMode::Album
+        | TextSearchMode::Title
+        | TextSearchMode::Genre => match &node.node_type {
+            crate::fs::file_tree::NodeType::File => {
+                file_matches_mode(&node.path, mode, query)
+            },
+            crate::fs::file_tree::NodeType::Directory => false,
+        },
+    };
+
+    // For file nodes: keep if matching, drop otherwise
+    if matches!(node.node_type, crate::fs::file_tree::NodeType::File) {
+        return if node_matches { Some(node.clone()) } else { None };
+    }
+
+    // For directory nodes: recursively filter children
+    let filtered_children: Vec<FileNode> = node
+        .children
+        .iter()
+        .filter_map(|child| filter_file_node(child, query, mode))
+        .collect();
+
+    if node_matches || !filtered_children.is_empty() {
+        let mut cloned = node.clone();
+        cloned.children = filtered_children;
+        Some(cloned)
+    } else {
+        None
+    }
+}
+
 /// Constructs the left panel UI for the application, including the menu row,
 /// file extension filter menu, and either the directory or tag tree browser
 /// depending on the current navigation/selection mode. The panel's appearance
@@ -416,6 +541,8 @@ pub(crate) fn create_left_panel(
 mod tests {
     use super::sort_tag_tree_roots;
     use super::create_search_row;
+    use super::filter_file_node;
+    use crate::fs::file_tree::FileNode;
     use crate::gui::{FileTreeApp, LeftPanelSortMode, TextSearchMode};
     use crate::gui::state::TagTreeNode;
     use crate::gui::view::MenuStyle;
@@ -590,5 +717,156 @@ mod tests {
             app.search_mode = *mode;
             let _element = create_search_row(&app, menu_style);
         }
+    }
+
+    // ── filter_file_node tests ──────────────────────────────────────────
+
+    /// Helper to build a file node for testing.
+    fn test_file(name: &str, path: &str) -> FileNode {
+        FileNode::new_file(name.to_string(), PathBuf::from(path))
+    }
+
+    /// Helper to build a directory node with children.
+    fn test_dir(name: &str, path: &str, children: Vec<FileNode>) -> FileNode {
+        FileNode::new_directory(name.to_string(), PathBuf::from(path), children)
+    }
+
+    #[test]
+    fn test_filter_empty_query_returns_some() {
+        let node = test_file("song.mp3", "/music/song.mp3");
+        let result = filter_file_node(&node, "", TextSearchMode::All);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().name, "song.mp3");
+    }
+
+    #[test]
+    fn test_filter_empty_query_preserves_directory_children() {
+        let child = test_file("track.flac", "/dir/track.flac");
+        let dir = test_dir("my_dir", "/dir", vec![child]);
+        let result = filter_file_node(&dir, "", TextSearchMode::All);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().children.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_path_match_directory_path_mode() {
+        let node = test_file("song.mp3", "/music/rock/song.mp3");
+        // DirectoryPath mode matches against the full path
+        let result =
+            filter_file_node(&node, "rock", TextSearchMode::DirectoryPath);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_filter_path_nomatch_directory_path_mode() {
+        let node = test_file("song.mp3", "/music/rock/song.mp3");
+        let result =
+            filter_file_node(&node, "jazz", TextSearchMode::DirectoryPath);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_filter_filename_match() {
+        let node = test_file("my_song.mp3", "/music/my_song.mp3");
+        let result =
+            filter_file_node(&node, "my_song", TextSearchMode::TrackFilename);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_filter_filename_nomatch() {
+        let node = test_file("my_song.mp3", "/music/my_song.mp3");
+        let result = filter_file_node(
+            &node,
+            "other_song",
+            TextSearchMode::TrackFilename,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_filter_directory_with_matching_child() {
+        let child = test_file("target.mp3", "/dir/target.mp3");
+        let other = test_file("other.mp3", "/dir/other.mp3");
+        let dir = test_dir("my_dir", "/dir", vec![child, other]);
+        let result =
+            filter_file_node(&dir, "target", TextSearchMode::TrackFilename);
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        // Directory kept but only with matching children
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.children[0].name, "target.mp3");
+    }
+
+    #[test]
+    fn test_filter_directory_with_matching_path() {
+        let child = test_file("track.mp3", "/music/jazz/track.mp3");
+        let dir = test_dir("jazz_collection", "/music/jazz", vec![child]);
+        // Directory path matches "jazz" in DirectoryPath mode
+        let result = filter_file_node(
+            &dir,
+            "jazz",
+            TextSearchMode::DirectoryPath,
+        );
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        // Directory kept with all children since the directory itself matches
+        assert_eq!(filtered.children.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_directory_with_no_matches() {
+        let child = test_file("track.mp3", "/music/track.mp3");
+        let dir = test_dir("my_dir", "/music", vec![child]);
+        let result =
+            filter_file_node(&dir, "nonexistent", TextSearchMode::TrackFilename);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_filter_case_insensitive() {
+        let node = test_file("Song.MP3", "/Music/Song.MP3");
+        let result =
+            filter_file_node(&node, "song", TextSearchMode::TrackFilename);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_filter_all_mode_matches_path() {
+        let node = test_file("track.mp3", "/music/jazz/track.mp3");
+        let result = filter_file_node(&node, "jazz", TextSearchMode::All);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_filter_all_mode_matches_filename() {
+        let node = test_file("track.mp3", "/music/jazz/track.mp3");
+        let result = filter_file_node(&node, "track", TextSearchMode::All);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_filter_all_mode_no_match() {
+        let node = test_file("track.mp3", "/music/jazz/track.mp3");
+        let result = filter_file_node(
+            &node,
+            "nonexistent",
+            TextSearchMode::All,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_filter_empty_directory_with_children_retains() {
+        // A directory matching by name keeps all children
+        let child = test_file("song.mp3", "/target/song.mp3");
+        let dir = test_dir("target", "/target", vec![child]);
+        let result = filter_file_node(
+            &dir,
+            "target",
+            TextSearchMode::DirectoryPath,
+        );
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().children.len(), 1);
     }
 }

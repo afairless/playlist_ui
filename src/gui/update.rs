@@ -12,6 +12,7 @@
 //!     collect_tag_node_files — gather all file paths under a tag node
 
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
+use crate::gui::left_panel::filter_file_node;
 use crate::fs::media_metadata::{
     build_creator_tag_tree, build_genre_tag_tree, extract_media_metadata,
 };
@@ -23,6 +24,28 @@ use iced::Task;
 use rfd::FileDialog;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+
+/// Recomputes `filtered_root_nodes` from `app.root_nodes` using the current
+/// search query and mode. Called whenever the query string or search mode
+/// changes.
+fn recompute_filtered_nodes(app: &FileTreeApp) -> Vec<Option<FileNode>> {
+    if app.search_query.is_empty() {
+        app.root_nodes.clone()
+    } else {
+        app.root_nodes
+            .iter()
+            .map(|node_opt| {
+                node_opt.as_ref().and_then(|node| {
+                    filter_file_node(
+                        node,
+                        &app.search_query,
+                        app.search_mode,
+                    )
+                })
+            })
+            .collect()
+    }
+}
 
 /// Restores the expansion state of a file tree node and its descendants based
 /// on the provided set of expanded directory paths.
@@ -424,6 +447,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         },
         Message::SearchQueryChanged(query) => {
             app.search_query = query;
+            app.filtered_root_nodes = recompute_filtered_nodes(app);
             Task::none()
         },
         Message::ToggleSearchMode => {
@@ -440,6 +464,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 TextSearchMode::Title => TextSearchMode::Genre,
                 TextSearchMode::Genre => TextSearchMode::All,
             };
+            app.filtered_root_nodes = recompute_filtered_nodes(app);
             Task::none()
         },
         Message::ToggleLeftPanelSelectMode => {

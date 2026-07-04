@@ -163,6 +163,8 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub search_mode: TextSearchMode,
     #[serde(skip)]
+    pub filtered_root_nodes: Vec<Option<FileNode>>,
+    #[serde(skip)]
     pub extensions_menu_expanded: bool,
     #[serde(skip)]
     pub expanded_dirs: HashSet<PathBuf>,
@@ -205,6 +207,7 @@ impl FileTreeApp {
         {
             expanded_dirs.insert(node.path.clone());
         }
+        let filtered_root_nodes = root_nodes.clone();
         for root in root_nodes.iter_mut().flatten() {
             restore_expansion_state(root, &expanded_dirs);
         }
@@ -221,6 +224,7 @@ impl FileTreeApp {
             all_extensions: all_extensions_vec,
             search_query: String::new(),
             search_mode: TextSearchMode::All,
+            filtered_root_nodes,
             extensions_menu_expanded: false,
             expanded_dirs,
             right_panel_files: Vec::new(),
