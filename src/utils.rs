@@ -1,7 +1,24 @@
 //! Utility functions shared across the application.
 //!
 //! Public API:
-//!     format_duration — convert milliseconds to `M:SS` or `H:MM:SS`
+//!     file_field_matches — case-insensitive substring check on optional
+//!                          string fields
+//!     format_duration     — convert milliseconds to `M:SS` or `H:MM:SS`
+
+/// Checks whether an optional string field contains the given query
+/// (case-insensitive). Returns `false` when the field is `None`.
+pub(crate) fn file_field_matches(
+    value: &Option<String>,
+    query: &str,
+) -> bool {
+    value
+        .as_deref()
+        .map(|v| {
+            v.to_ascii_lowercase()
+                .contains(&query.to_ascii_lowercase())
+        })
+        .unwrap_or(false)
+}
 
 /// Formats an optional duration in milliseconds as a human-readable string,
 ///     using `H:MM:SS` for durations of one hour or more, and `M:SS` otherwise.
@@ -25,7 +42,60 @@ pub(crate) fn format_duration(duration_ms: Option<u64>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::format_duration;
+    use super::{file_field_matches, format_duration};
+
+    // ── file_field_matches tests ──────────────────────────────────────
+
+    #[test]
+    fn test_file_field_matches_empty_query() {
+        assert!(file_field_matches(&Some("Rock".to_string()), ""));
+        assert!(file_field_matches(&Some("".to_string()), ""));
+    }
+
+    #[test]
+    fn test_file_field_matches_none_value() {
+        assert!(!file_field_matches(&None, "Rock"));
+        assert!(!file_field_matches(&None, ""));
+    }
+
+    #[test]
+    fn test_file_field_matches_case_insensitive() {
+        assert!(file_field_matches(
+            &Some("LITTLE".to_string()),
+            "little"
+        ));
+        assert!(file_field_matches(
+            &Some("little".to_string()),
+            "LITTLE"
+        ));
+        assert!(file_field_matches(
+            &Some("LiTtLe".to_string()),
+            "lItTlE"
+        ));
+    }
+
+    #[test]
+    fn test_file_field_matches_no_match() {
+        assert!(!file_field_matches(&Some("Rock".to_string()), "Jazz"));
+        assert!(!file_field_matches(
+            &Some("Electronic".to_string()),
+            "electronix"
+        ));
+    }
+
+    #[test]
+    fn test_file_field_matches_partial_match() {
+        assert!(file_field_matches(
+            &Some("Progressive Rock".to_string()),
+            "rock"
+        ));
+        assert!(file_field_matches(
+            &Some("Progressive Rock".to_string()),
+            "prog"
+        ));
+    }
+
+    // ── format_duration tests ─────────────────────────────────────────
 
     #[test]
     fn test_format_duration_cases_empty_input() {

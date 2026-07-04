@@ -21,6 +21,7 @@ use crate::gui::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message, TagTreeNode,
     TextSearchMode,
 };
+use crate::utils::file_field_matches;
 use std::path::Path;
 
 use iced::{
@@ -335,31 +336,21 @@ fn create_search_row(
     row![search_input, mode_button].spacing(menu_style.spacing).into()
 }
 
-/// Checks whether a metadata field value contains the given query string
-/// (case-insensitive). Returns `true` if the value is present and contains
-/// the query, or `false` otherwise.
-fn field_matches(value: &Option<String>, query: &str) -> bool {
-    value
-        .as_deref()
-        .map(|v| v.to_ascii_lowercase().contains(&query.to_ascii_lowercase()))
-        .unwrap_or(false)
-}
-
 /// Checks whether a file's metadata matches the given search mode and query.
 /// Extracts metadata from the file path and checks the relevant field.
 /// Used internally by `filter_file_node` for metadata-based filtering.
 fn file_matches_mode(path: &Path, mode: TextSearchMode, query: &str) -> bool {
     let meta = extract_media_metadata(path);
     match mode {
-        TextSearchMode::Creator => field_matches(&meta.creator, query),
-        TextSearchMode::Album => field_matches(&meta.album, query),
-        TextSearchMode::Title => field_matches(&meta.title, query),
-        TextSearchMode::Genre => field_matches(&meta.genre, query),
+        TextSearchMode::Creator => file_field_matches(&meta.creator, query),
+        TextSearchMode::Album => file_field_matches(&meta.album, query),
+        TextSearchMode::Title => file_field_matches(&meta.title, query),
+        TextSearchMode::Genre => file_field_matches(&meta.genre, query),
         TextSearchMode::All => {
-            field_matches(&meta.creator, query)
-                || field_matches(&meta.album, query)
-                || field_matches(&meta.title, query)
-                || field_matches(&meta.genre, query)
+            file_field_matches(&meta.creator, query)
+                || file_field_matches(&meta.album, query)
+                || file_field_matches(&meta.title, query)
+                || file_field_matches(&meta.genre, query)
         },
         TextSearchMode::DirectoryPath | TextSearchMode::TrackFilename => false,
     }
