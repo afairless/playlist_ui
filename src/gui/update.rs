@@ -146,6 +146,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             for root in app.root_nodes.iter_mut().flatten() {
                 restore_expansion_state(root, &app.expanded_dirs);
             }
+            app.filtered_root_nodes = recompute_filtered_nodes(app);
             Task::none()
         },
         Message::ToggleExtension(ext) => {
@@ -686,6 +687,64 @@ mod tests {
         assert!(app.filtered_tag_tree_roots[0].is_expanded);
         // Matching child should still be present
         assert_eq!(app.filtered_tag_tree_roots[0].children.len(), 1);
+    }
+
+    #[test]
+    fn test_toggle_expansion_during_search_updates_filtered() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let dir = FileNode::new_directory(
+            "Music".to_string(),
+            PathBuf::from("/Music"),
+            vec![FileNode::new_file(
+                "song.mp3".to_string(),
+                PathBuf::from("/Music/song.mp3"),
+            )],
+        );
+        app.root_nodes = vec![Some(dir)];
+        app.search_query = "song".to_string();
+        app.filtered_root_nodes = recompute_filtered_nodes(&app);
+
+        // Directory is in filtered (child matches search) but not expanded
+        assert!(!app.filtered_root_nodes[0].as_ref().unwrap().is_expanded);
+
+        let _ =
+            update(&mut app, Message::ToggleExpansion(PathBuf::from("/Music")));
+
+        // Both original and filtered should now be expanded
+        assert!(app.root_nodes[0].as_ref().unwrap().is_expanded);
+        assert!(app.filtered_root_nodes[0].as_ref().unwrap().is_expanded);
+    }
+
+    #[test]
+    fn test_toggle_expansion_no_search_preserves_filtered() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let dir = FileNode::new_directory(
+            "Music".to_string(),
+            PathBuf::from("/Music"),
+            vec![FileNode::new_file(
+                "song.mp3".to_string(),
+                PathBuf::from("/Music/song.mp3"),
+            )],
+        );
+        app.root_nodes = vec![Some(dir)];
+        // No search — filtered is a clone of original
+        app.filtered_root_nodes = app.root_nodes.clone();
+
+        let _ =
+            update(&mut app, Message::ToggleExpansion(PathBuf::from("/Music")));
+
+        assert!(app.root_nodes[0].as_ref().unwrap().is_expanded);
+        assert!(app.filtered_root_nodes[0].as_ref().unwrap().is_expanded);
     }
 
     #[test]
