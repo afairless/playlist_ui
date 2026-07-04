@@ -529,6 +529,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             {
                 node.is_expanded = !node.is_expanded;
             }
+            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
             Task::none()
         },
         Message::ClearRightPanel => {
@@ -594,6 +595,97 @@ mod tests {
         app.search_query = "previous".to_string();
         let _ = update(&mut app, Message::SearchQueryChanged(String::new()));
         assert_eq!(app.search_query, "");
+    }
+
+    #[test]
+    fn test_toggle_tag_expansion_during_search_updates_filtered() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 42,
+        }];
+        app.search_query = "Jazz".to_string();
+        app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(&app);
+
+        assert!(!app.filtered_tag_tree_roots[0].is_expanded);
+        let path = vec!["Jazz".to_string()];
+        let _ = update(&mut app, Message::ToggleTagExpansion(path));
+
+        assert!(app.tag_tree_roots[0].is_expanded);
+        assert!(app.filtered_tag_tree_roots[0].is_expanded);
+    }
+
+    #[test]
+    fn test_toggle_tag_expansion_no_search_preserves_filtered() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 42,
+        }];
+        // No search query set — filtered matches original
+        app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+
+        let path = vec!["Jazz".to_string()];
+        let _ = update(&mut app, Message::ToggleTagExpansion(path));
+
+        assert!(app.tag_tree_roots[0].is_expanded);
+        assert!(app.filtered_tag_tree_roots[0].is_expanded);
+    }
+
+    #[test]
+    fn test_tag_expansion_nonmatching_parent_matching_child() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Parent".to_string(),
+            children: vec![TagTreeNode {
+                label: "Jazz".to_string(),
+                children: vec![],
+                file_paths: vec![PathBuf::from("/music/track.mp3")],
+                is_expanded: false,
+                file_count: 1,
+            }],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        }];
+        // Search for a child label, not the parent label
+        app.search_query = "Jazz".to_string();
+        app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(&app);
+
+        // Parent should appear in filtered via child match, not expanded
+        assert!(!app.filtered_tag_tree_roots[0].is_expanded);
+        assert_eq!(app.filtered_tag_tree_roots[0].children.len(), 1);
+
+        // Toggle expansion on the original parent node
+        let path = vec!["Parent".to_string()];
+        let _ = update(&mut app, Message::ToggleTagExpansion(path));
+
+        assert!(app.tag_tree_roots[0].is_expanded);
+        // After recompute, filtered parent should also be expanded
+        assert!(app.filtered_tag_tree_roots[0].is_expanded);
+        // Matching child should still be present
+        assert_eq!(app.filtered_tag_tree_roots[0].children.len(), 1);
     }
 
     #[test]
