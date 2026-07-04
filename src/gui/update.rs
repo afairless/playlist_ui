@@ -243,9 +243,7 @@ fn recompute_filtered_right_panel_files(
                     || file_field_matches(&f.title, query)
                     || file_field_matches(&f.genre, query)
             },
-            TextSearchMode::Creator => {
-                file_field_matches(&f.creator, query)
-            },
+            TextSearchMode::Creator => file_field_matches(&f.creator, query),
             TextSearchMode::Album => file_field_matches(&f.album, query),
             TextSearchMode::Title => file_field_matches(&f.title, query),
             TextSearchMode::Genre => file_field_matches(&f.genre, query),
@@ -670,8 +668,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::SearchQueryChanged(query) => {
             app.search_query = query;
             app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots =
-                recompute_filtered_tag_nodes(app);
+            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
             app.filtered_right_panel_files =
                 recompute_filtered_right_panel_files(app);
             Task::none()
@@ -687,8 +684,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 TextSearchMode::Genre => TextSearchMode::All,
             };
             app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots =
-                recompute_filtered_tag_nodes(app);
+            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
             app.filtered_right_panel_files =
                 recompute_filtered_right_panel_files(app);
             Task::none()
@@ -1083,9 +1079,7 @@ mod tests {
         }
     }
 
-    fn app_with_right_panel_files(
-        files: Vec<RightPanelFile>,
-    ) -> FileTreeApp {
+    fn app_with_right_panel_files(files: Vec<RightPanelFile>) -> FileTreeApp {
         let mut app = FileTreeApp::new(
             vec![],
             &["mp3"],
@@ -1110,27 +1104,9 @@ mod tests {
     #[test]
     fn test_right_panel_filter_genre_mode() {
         let mut app = app_with_right_panel_files(vec![
-            rp_file(
-                "/a/rock.mp3",
-                None,
-                None,
-                None,
-                Some("Rock"),
-            ),
-            rp_file(
-                "/b/jazz.mp3",
-                None,
-                None,
-                None,
-                Some("Jazz"),
-            ),
-            rp_file(
-                "/c/unknown.mp3",
-                None,
-                None,
-                None,
-                None,
-            ),
+            rp_file("/a/rock.mp3", None, None, None, Some("Rock")),
+            rp_file("/b/jazz.mp3", None, None, None, Some("Jazz")),
+            rp_file("/c/unknown.mp3", None, None, None, None),
         ]);
         app.search_query = "rock".to_string();
         app.search_mode = TextSearchMode::Genre;
@@ -1142,20 +1118,8 @@ mod tests {
     #[test]
     fn test_right_panel_filter_title_mode() {
         let mut app = app_with_right_panel_files(vec![
-            rp_file(
-                "/a/track.mp3",
-                None,
-                None,
-                Some("My Song"),
-                None,
-            ),
-            rp_file(
-                "/b/other.mp3",
-                None,
-                None,
-                Some("Different"),
-                None,
-            ),
+            rp_file("/a/track.mp3", None, None, Some("My Song"), None),
+            rp_file("/b/other.mp3", None, None, Some("Different"), None),
         ]);
         app.search_query = "my song".to_string();
         app.search_mode = TextSearchMode::Title;
@@ -1167,20 +1131,8 @@ mod tests {
     #[test]
     fn test_right_panel_filter_album_mode() {
         let mut app = app_with_right_panel_files(vec![
-            rp_file(
-                "/a/a.mp3",
-                None,
-                Some("Abbey Road"),
-                None,
-                None,
-            ),
-            rp_file(
-                "/b/b.mp3",
-                None,
-                Some("Revolver"),
-                None,
-                None,
-            ),
+            rp_file("/a/a.mp3", None, Some("Abbey Road"), None, None),
+            rp_file("/b/b.mp3", None, Some("Revolver"), None, None),
         ]);
         app.search_query = "abbey".to_string();
         app.search_mode = TextSearchMode::Album;
@@ -1192,20 +1144,8 @@ mod tests {
     #[test]
     fn test_right_panel_filter_creator_mode() {
         let mut app = app_with_right_panel_files(vec![
-            rp_file(
-                "/a/a.mp3",
-                Some("Miles Davis"),
-                None,
-                None,
-                None,
-            ),
-            rp_file(
-                "/b/b.mp3",
-                Some("Coltrane"),
-                None,
-                None,
-                None,
-            ),
+            rp_file("/a/a.mp3", Some("Miles Davis"), None, None, None),
+            rp_file("/b/b.mp3", Some("Coltrane"), None, None, None),
         ]);
         app.search_query = "miles".to_string();
         app.search_mode = TextSearchMode::Creator;
@@ -1224,10 +1164,7 @@ mod tests {
         app.search_mode = TextSearchMode::DirectoryPath;
         let result = recompute_filtered_right_panel_files(&app);
         assert_eq!(result.len(), 1);
-        assert_eq!(
-            result[0].path,
-            PathBuf::from("/music/jazz/song.mp3")
-        );
+        assert_eq!(result[0].path, PathBuf::from("/music/jazz/song.mp3"));
     }
 
     #[test]
@@ -1240,36 +1177,15 @@ mod tests {
         app.search_mode = TextSearchMode::TrackFilename;
         let result = recompute_filtered_right_panel_files(&app);
         assert_eq!(result.len(), 1);
-        assert_eq!(
-            result[0].path,
-            PathBuf::from("/a/my_song.mp3")
-        );
+        assert_eq!(result[0].path, PathBuf::from("/a/my_song.mp3"));
     }
 
     #[test]
     fn test_right_panel_filter_all_mode() {
         let mut app = app_with_right_panel_files(vec![
-            rp_file(
-                "/a/a.mp3",
-                None,
-                None,
-                Some("Little Wing"),
-                None,
-            ),
-            rp_file(
-                "/b/b.mp3",
-                None,
-                None,
-                None,
-                Some("Littlesound"),
-            ),
-            rp_file(
-                "/c/c.mp3",
-                None,
-                None,
-                None,
-                None,
-            ),
+            rp_file("/a/a.mp3", None, None, Some("Little Wing"), None),
+            rp_file("/b/b.mp3", None, None, None, Some("Littlesound")),
+            rp_file("/c/c.mp3", None, None, None, None),
         ]);
         app.search_query = "little".to_string();
         app.search_mode = TextSearchMode::All;
@@ -1280,9 +1196,13 @@ mod tests {
 
     #[test]
     fn test_right_panel_filter_no_match() {
-        let mut app = app_with_right_panel_files(vec![
-            rp_file("/a/a.mp3", Some("Artist"), None, None, None),
-        ]);
+        let mut app = app_with_right_panel_files(vec![rp_file(
+            "/a/a.mp3",
+            Some("Artist"),
+            None,
+            None,
+            None,
+        )]);
         app.search_query = "nonexistent".to_string();
         app.search_mode = TextSearchMode::All;
         let result = recompute_filtered_right_panel_files(&app);
@@ -1291,15 +1211,13 @@ mod tests {
 
     #[test]
     fn test_right_panel_filter_case_insensitive() {
-        let mut app = app_with_right_panel_files(vec![
-            rp_file(
-                "/a/a.mp3",
-                None,
-                None,
-                Some("LITTLE WING"),
-                None,
-            ),
-        ]);
+        let mut app = app_with_right_panel_files(vec![rp_file(
+            "/a/a.mp3",
+            None,
+            None,
+            Some("LITTLE WING"),
+            None,
+        )]);
         app.search_query = "little".to_string();
         app.search_mode = TextSearchMode::Title;
         let result = recompute_filtered_right_panel_files(&app);
@@ -1310,50 +1228,27 @@ mod tests {
     fn test_right_panel_filter_metadata_none_fields() {
         let mut app = app_with_right_panel_files(vec![
             rp_file("/a/a.mp3", None, None, None, None),
-            rp_file(
-                "/b/b.mp3",
-                Some("Artist"),
-                None,
-                None,
-                None,
-            ),
+            rp_file("/b/b.mp3", Some("Artist"), None, None, None),
         ]);
         app.search_query = "Artist".to_string();
         app.search_mode = TextSearchMode::Creator;
         let result = recompute_filtered_right_panel_files(&app);
         // Only the file with a creator matching "Artist" should be kept
         assert_eq!(result.len(), 1);
-        assert_eq!(
-            result[0].creator,
-            Some("Artist".to_string())
-        );
+        assert_eq!(result[0].creator, Some("Artist".to_string()));
     }
 
     #[test]
     fn test_toggle_search_mode_changes_filtered_right_panel() {
         let mut app = app_with_right_panel_files(vec![
-            rp_file(
-                "/a/a.mp3",
-                None,
-                None,
-                Some("Rock Song"),
-                None,
-            ),
-            rp_file(
-                "/b/b.mp3",
-                None,
-                None,
-                None,
-                Some("Rock"),
-            ),
+            rp_file("/a/a.mp3", None, None, Some("Rock Song"), None),
+            rp_file("/b/b.mp3", None, None, None, Some("Rock")),
         ]);
         app.search_query = "rock".to_string();
         // Start in Title mode — verify title matching
         app.search_mode = TextSearchMode::Title;
-        let _ = update(
-            &mut app,
-            Message::SearchQueryChanged("rock".to_string()),
-        );
+        let _ =
+            update(&mut app, Message::SearchQueryChanged("rock".to_string()));
         let title_filtered = app.filtered_right_panel_files.clone();
         // Only "Rock Song" matches title
         assert_eq!(title_filtered.len(), 1);
@@ -1386,10 +1281,8 @@ mod tests {
         app.search_query = "jazz".to_string();
         // Start in Genre mode — label "Jazz" matches
         app.search_mode = TextSearchMode::Genre;
-        let _ = update(
-            &mut app,
-            Message::SearchQueryChanged("jazz".to_string()),
-        );
+        let _ =
+            update(&mut app, Message::SearchQueryChanged("jazz".to_string()));
         let genre_filtered = app.filtered_tag_tree_roots.clone();
         assert_eq!(genre_filtered.len(), 1);
 
@@ -1405,10 +1298,8 @@ mod tests {
         // Now search for something in the file path but NOT in the label
         app.search_mode = TextSearchMode::Genre;
         app.search_query = "track".to_string();
-        let _ = update(
-            &mut app,
-            Message::SearchQueryChanged("track".to_string()),
-        );
+        let _ =
+            update(&mut app, Message::SearchQueryChanged("track".to_string()));
         // Genre mode checks labels only — "track" not in label
         assert!(app.filtered_tag_tree_roots.is_empty());
 

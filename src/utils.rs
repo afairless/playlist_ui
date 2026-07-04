@@ -7,16 +7,10 @@
 
 /// Checks whether an optional string field contains the given query
 /// (case-insensitive). Returns `false` when the field is `None`.
-pub(crate) fn file_field_matches(
-    value: &Option<String>,
-    query: &str,
-) -> bool {
+pub(crate) fn file_field_matches(value: &Option<String>, query: &str) -> bool {
     value
         .as_deref()
-        .map(|v| {
-            v.to_ascii_lowercase()
-                .contains(&query.to_ascii_lowercase())
-        })
+        .map(|v| v.to_ascii_lowercase().contains(&query.to_ascii_lowercase()))
         .unwrap_or(false)
 }
 
@@ -60,18 +54,9 @@ mod tests {
 
     #[test]
     fn test_file_field_matches_case_insensitive() {
-        assert!(file_field_matches(
-            &Some("LITTLE".to_string()),
-            "little"
-        ));
-        assert!(file_field_matches(
-            &Some("little".to_string()),
-            "LITTLE"
-        ));
-        assert!(file_field_matches(
-            &Some("LiTtLe".to_string()),
-            "lItTlE"
-        ));
+        assert!(file_field_matches(&Some("LITTLE".to_string()), "little"));
+        assert!(file_field_matches(&Some("little".to_string()), "LITTLE"));
+        assert!(file_field_matches(&Some("LiTtLe".to_string()), "lItTlE"));
     }
 
     #[test]

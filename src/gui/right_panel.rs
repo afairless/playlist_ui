@@ -377,12 +377,11 @@ pub(crate) fn create_right_panel(
 ) -> Element<'_, Message> {
     // Use filtered files when a search query is active; otherwise
     // show all files (sorted).
-    let displayed_files: Vec<RightPanelFile> =
-        if app.search_query.is_empty() {
-            app.sorted_right_panel_files()
-        } else {
-            app.filtered_right_panel_files.clone()
-        };
+    let displayed_files: Vec<RightPanelFile> = if app.search_query.is_empty() {
+        app.sorted_right_panel_files()
+    } else {
+        app.filtered_right_panel_files.clone()
+    };
 
     // Determine which columns to show
     let show_creator = displayed_files

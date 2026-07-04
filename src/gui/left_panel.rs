@@ -453,44 +453,31 @@ pub(crate) fn filter_tag_node(
     }
 
     let query_lower = query.to_ascii_lowercase();
-    let label_matches = node
-        .label
-        .to_ascii_lowercase()
-        .contains(&query_lower);
+    let label_matches = node.label.to_ascii_lowercase().contains(&query_lower);
 
     // For path/file modes, check file_paths directly (no metadata I/O).
     let path_matches = !node.file_paths.is_empty()
         && match mode {
-            TextSearchMode::DirectoryPath => {
-                node.file_paths.iter().any(|p| {
-                    p.to_string_lossy()
-                        .to_ascii_lowercase()
-                        .contains(&query_lower)
-                })
-            },
-            TextSearchMode::TrackFilename => {
-                node.file_paths.iter().any(|p| {
-                    p.file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_ascii_lowercase()
-                        .contains(&query_lower)
-                })
-            },
-            TextSearchMode::All => {
-                node.file_paths.iter().any(|p| {
-                    let path_str = p
-                        .to_string_lossy()
-                        .to_ascii_lowercase();
-                    let name_str = p
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_ascii_lowercase();
-                    path_str.contains(&query_lower)
-                        || name_str.contains(&query_lower)
-                })
-            },
+            TextSearchMode::DirectoryPath => node.file_paths.iter().any(|p| {
+                p.to_string_lossy().to_ascii_lowercase().contains(&query_lower)
+            }),
+            TextSearchMode::TrackFilename => node.file_paths.iter().any(|p| {
+                p.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_ascii_lowercase()
+                    .contains(&query_lower)
+            }),
+            TextSearchMode::All => node.file_paths.iter().any(|p| {
+                let path_str = p.to_string_lossy().to_ascii_lowercase();
+                let name_str = p
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_ascii_lowercase();
+                path_str.contains(&query_lower)
+                    || name_str.contains(&query_lower)
+            }),
             // Metadata modes: label matching is sufficient — the node's
             // label already represents the metadata category.
             TextSearchMode::Creator
@@ -507,8 +494,7 @@ pub(crate) fn filter_tag_node(
             | TextSearchMode::Title
             | TextSearchMode::Genre => label_matches,
             TextSearchMode::All => label_matches || path_matches,
-            TextSearchMode::DirectoryPath
-            | TextSearchMode::TrackFilename => {
+            TextSearchMode::DirectoryPath | TextSearchMode::TrackFilename => {
                 label_matches || path_matches
             },
         };
@@ -974,27 +960,21 @@ mod tests {
     #[test]
     fn test_filter_tag_label_match() {
         let node = tag_leaf("Jazz");
-        let result =
-            filter_tag_node(&node, "jazz", TextSearchMode::All);
+        let result = filter_tag_node(&node, "jazz", TextSearchMode::All);
         assert!(result.is_some());
     }
 
     #[test]
     fn test_filter_tag_label_no_match() {
         let node = tag_leaf("Jazz");
-        let result =
-            filter_tag_node(&node, "Rock", TextSearchMode::All);
+        let result = filter_tag_node(&node, "Rock", TextSearchMode::All);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_filter_tag_case_insensitive() {
         let node = tag_leaf("Electronic");
-        let result = filter_tag_node(
-            &node,
-            "ELECTRONIC",
-            TextSearchMode::All,
-        );
+        let result = filter_tag_node(&node, "ELECTRONIC", TextSearchMode::All);
         assert!(result.is_some());
     }
 
@@ -1057,7 +1037,8 @@ mod tests {
             is_expanded: false,
             file_count: 1,
         };
-        let result = filter_tag_node(&genre, "target_track", TextSearchMode::All);
+        let result =
+            filter_tag_node(&genre, "target_track", TextSearchMode::All);
         assert!(result.is_some());
         let filtered = result.unwrap();
         // Genre kept, but only with the matching chain
@@ -1082,15 +1063,15 @@ mod tests {
             is_expanded: false,
             file_count: 1,
         };
-        let result = filter_tag_node(&parent, "nonexistent", TextSearchMode::All);
+        let result =
+            filter_tag_node(&parent, "nonexistent", TextSearchMode::All);
         assert!(result.is_none());
     }
 
     #[test]
     fn test_filter_tag_partial_query_match() {
         let node = tag_leaf("Progressive Rock");
-        let result =
-            filter_tag_node(&node, "rock", TextSearchMode::All);
+        let result = filter_tag_node(&node, "rock", TextSearchMode::All);
         assert!(result.is_some());
     }
 
@@ -1113,8 +1094,7 @@ mod tests {
             file_count: 1,
         };
         // Label doesn't match, but file path does — All mode keeps it
-        let result =
-            filter_tag_node(&node, "jazz", TextSearchMode::All);
+        let result = filter_tag_node(&node, "jazz", TextSearchMode::All);
         assert!(result.is_some());
     }
 
@@ -1149,8 +1129,7 @@ mod tests {
         };
         // File path contains "jazz" but label does not — Genre mode
         // should NOT keep the node (metadata modes check labels only)
-        let result =
-            filter_tag_node(&node, "jazz", TextSearchMode::Genre);
+        let result = filter_tag_node(&node, "jazz", TextSearchMode::Genre);
         assert!(result.is_none());
     }
 
@@ -1163,8 +1142,7 @@ mod tests {
             is_expanded: false,
             file_count: 1,
         };
-        let result =
-            filter_tag_node(&node, "miles", TextSearchMode::Creator);
+        let result = filter_tag_node(&node, "miles", TextSearchMode::Creator);
         assert!(result.is_some());
     }
 
@@ -1177,8 +1155,7 @@ mod tests {
             is_expanded: false,
             file_count: 1,
         };
-        let result =
-            filter_tag_node(&node, "blue", TextSearchMode::Album);
+        let result = filter_tag_node(&node, "blue", TextSearchMode::Album);
         assert!(result.is_some());
     }
 
@@ -1191,8 +1168,7 @@ mod tests {
             is_expanded: false,
             file_count: 1,
         };
-        let result =
-            filter_tag_node(&node, "what", TextSearchMode::Title);
+        let result = filter_tag_node(&node, "what", TextSearchMode::Title);
         assert!(result.is_some());
     }
 
@@ -1206,11 +1182,8 @@ mod tests {
             file_count: 1,
         };
         // Label doesn't match, but path does — DirectoryPath mode
-        let result = filter_tag_node(
-            &node,
-            "jazz",
-            TextSearchMode::DirectoryPath,
-        );
+        let result =
+            filter_tag_node(&node, "jazz", TextSearchMode::DirectoryPath);
         assert!(result.is_some());
     }
 
@@ -1219,18 +1192,13 @@ mod tests {
         let node = TagTreeNode {
             label: "Unrelated".to_string(),
             children: vec![],
-            file_paths: vec![PathBuf::from(
-                "/music/genre/my_song.mp3",
-            )],
+            file_paths: vec![PathBuf::from("/music/genre/my_song.mp3")],
             is_expanded: false,
             file_count: 1,
         };
         // Label doesn't match, but filename does — TrackFilename mode
-        let result = filter_tag_node(
-            &node,
-            "my_song",
-            TextSearchMode::TrackFilename,
-        );
+        let result =
+            filter_tag_node(&node, "my_song", TextSearchMode::TrackFilename);
         assert!(result.is_some());
     }
 
@@ -1238,12 +1206,9 @@ mod tests {
     fn test_filter_tag_node_all_mode_checks_both_label_and_path() {
         // Label match
         let node_label = tag_leaf("Jazz");
-        assert!(filter_tag_node(
-            &node_label,
-            "jazz",
-            TextSearchMode::All
-        )
-        .is_some());
+        assert!(
+            filter_tag_node(&node_label, "jazz", TextSearchMode::All).is_some()
+        );
 
         // File path match (label doesn't match)
         let node_path = TagTreeNode {
@@ -1253,21 +1218,16 @@ mod tests {
             is_expanded: false,
             file_count: 1,
         };
-        assert!(filter_tag_node(
-            &node_path,
-            "jazz",
-            TextSearchMode::All
-        )
-        .is_some());
+        assert!(
+            filter_tag_node(&node_path, "jazz", TextSearchMode::All).is_some()
+        );
 
         // Neither matches
         let node_neither = tag_leaf("Classical");
-        assert!(filter_tag_node(
-            &node_neither,
-            "jazz",
-            TextSearchMode::All
-        )
-        .is_none());
+        assert!(
+            filter_tag_node(&node_neither, "jazz", TextSearchMode::All)
+                .is_none()
+        );
     }
 
     // ── filter_tag_node recursive mode-awareness tests ───────────────
@@ -1291,8 +1251,7 @@ mod tests {
             file_count: 1,
         };
         // All mode: label doesn't match, but child's file path does
-        let result =
-            filter_tag_node(&parent, "jazz", TextSearchMode::All);
+        let result = filter_tag_node(&parent, "jazz", TextSearchMode::All);
         assert!(result.is_some());
         let filtered = result.unwrap();
         assert_eq!(filtered.children.len(), 1);
