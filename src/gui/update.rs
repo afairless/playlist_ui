@@ -12,7 +12,7 @@
 //!     collect_tag_node_files — gather all file paths under a tag node
 
 use crate::fs::file_tree::{FileNode, NodeType, scan_directory};
-use crate::gui::left_panel::filter_file_node;
+use crate::gui::left_panel::{filter_file_node, filter_tag_node};
 use crate::fs::media_metadata::{
     build_creator_tag_tree, build_genre_tag_tree, extract_media_metadata,
 };
@@ -43,6 +43,19 @@ fn recompute_filtered_nodes(app: &FileTreeApp) -> Vec<Option<FileNode>> {
                     )
                 })
             })
+            .collect()
+    }
+}
+
+fn recompute_filtered_tag_nodes(
+    app: &FileTreeApp,
+) -> Vec<TagTreeNode> {
+    if app.search_query.is_empty() {
+        app.tag_tree_roots.clone()
+    } else {
+        app.tag_tree_roots
+            .iter()
+            .filter_map(|node| filter_tag_node(node, &app.search_query))
             .collect()
     }
 }
@@ -448,6 +461,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::SearchQueryChanged(query) => {
             app.search_query = query;
             app.filtered_root_nodes = recompute_filtered_nodes(app);
+            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
             Task::none()
         },
         Message::ToggleSearchMode => {
@@ -465,6 +479,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 TextSearchMode::Genre => TextSearchMode::All,
             };
             app.filtered_root_nodes = recompute_filtered_nodes(app);
+            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
             Task::none()
         },
         Message::ToggleLeftPanelSelectMode => {

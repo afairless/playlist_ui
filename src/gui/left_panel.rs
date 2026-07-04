@@ -221,24 +221,28 @@ fn create_left_panel_tag_tree_browser(
     + Copy
     + 'static,
 ) -> iced::widget::Column<'_, Message> {
+    let is_searching = !app.search_query.is_empty();
+
+    // Use filtered tag tree roots when search is active
+    let tag_roots = if is_searching {
+        &app.filtered_tag_tree_roots
+    } else {
+        &app.tag_tree_roots
+    };
+
     // Compute max file_count across all tag tree root nodes
-    let max_count =
-        app.tag_tree_roots.iter().map(|n| n.file_count).max().unwrap_or(0);
+    let max_count = tag_roots.iter().map(|n| n.file_count).max().unwrap_or(0);
 
     // Sort root indices according to the current sort mode, then render in
     // that order. We use index-based sorting to avoid borrowing a local copy
     // when the return lifetime is tied to &app.
-    let mut indices: Vec<usize> = (0..app.tag_tree_roots.len()).collect();
-    sort_tag_tree_roots(
-        &mut indices,
-        &app.tag_tree_roots,
-        app.left_panel_sort_mode,
-    );
+    let mut indices: Vec<usize> = (0..tag_roots.len()).collect();
+    sort_tag_tree_roots(&mut indices, tag_roots, app.left_panel_sort_mode);
 
     let mut trees = column![];
     for &i in &indices {
         trees = trees.push(render_tag_node(
-            &app.tag_tree_roots[i],
+            &tag_roots[i],
             0,
             vec![],
             tree_browser_style.directory_row_size,
@@ -450,6 +454,49 @@ pub(crate) fn filter_file_node(
     }
 }
 
+/// Recursively filters a `TagTreeNode` tree, keeping only nodes whose label
+/// matches the search query. When a non-leaf node matches, all its children
+/// are kept. When a node does not match, only children that match are kept
+/// (recursive prune). Returns `None` when no match is found.
+pub(crate) fn filter_tag_node(
+    node: &TagTreeNode,
+    query: &str,
+) -> Option<TagTreeNode> {
+    if query.is_empty() {
+        return Some(node.clone());
+    }
+
+    let label_matches = node
+        .label
+        .to_ascii_lowercase()
+        .contains(&query.to_ascii_lowercase());
+
+    if node.children.is_empty() {
+        // Leaf node (file_paths but no sub-children)
+        return if label_matches { Some(node.clone()) } else { None };
+    }
+
+    // Non-leaf node
+    if label_matches {
+        // Keep node with all children
+        Some(node.clone())
+    } else {
+        // Prune children, keep only matching subtrees
+        let filtered_children: Vec<TagTreeNode> = node
+            .children
+            .iter()
+            .filter_map(|child| filter_tag_node(child, query))
+            .collect();
+        if filtered_children.is_empty() {
+            None
+        } else {
+            let mut cloned = node.clone();
+            cloned.children = filtered_children;
+            Some(cloned)
+        }
+    }
+}
+
 /// Constructs the left panel UI for the application, including the menu row,
 /// file extension filter menu, and either the directory or tag tree browser
 /// depending on the current navigation/selection mode. The panel's appearance
@@ -541,7 +588,7 @@ pub(crate) fn create_left_panel(
 mod tests {
     use super::sort_tag_tree_roots;
     use super::create_search_row;
-    use super::filter_file_node;
+    use super::{filter_file_node, filter_tag_node};
     use crate::fs::file_tree::FileNode;
     use crate::gui::{FileTreeApp, LeftPanelSortMode, TextSearchMode};
     use crate::gui::state::TagTreeNode;
@@ -868,5 +915,145 @@ mod tests {
         );
         assert!(result.is_some());
         assert_eq!(result.unwrap().children.len(), 1);
+    }
+
+    // ── filter_tag_node tests ───────────────────────────────────────────
+
+    /// Helper to build a tag leaf node (with file paths, no children).
+    fn tag_leaf(label: &str) -> TagTreeNode {
+        TagTreeNode {
+            label: label.to_string(),
+            children: vec![],
+            file_paths: vec![PathBuf::from("/music/song.mp3")],
+            is_expanded: false,
+            file_count: 1,
+        }
+    }
+
+    #[test]
+    fn test_filter_tag_empty_query_returns_some() {
+        let node = tag_leaf("Rock");
+        let result = filter_tag_node(&node, "");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().label, "Rock");
+    }
+
+    #[test]
+    fn test_filter_tag_label_match() {
+        let node = tag_leaf("Jazz");
+        let result = filter_tag_node(&node, "jazz");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_filter_tag_label_no_match() {
+        let node = tag_leaf("Jazz");
+        let result = filter_tag_node(&node, "Rock");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_filter_tag_case_insensitive() {
+        let node = tag_leaf("Electronic");
+        let result = filter_tag_node(&node, "ELECTRONIC");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_filter_tag_non_leaf_matching_keeps_all_children() {
+        let child_a = tag_leaf("Artist A");
+        let child_b = tag_leaf("Artist B");
+        let parent = TagTreeNode {
+            label: "Rock".to_string(),
+            children: vec![child_a, child_b],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        };
+        let result = filter_tag_node(&parent, "Rock");
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.children.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_tag_non_leaf_no_match_prunes_children() {
+        let child_a = tag_leaf("Pop Artist");
+        let child_b = tag_leaf("Rock Artist");
+        let parent = TagTreeNode {
+            label: "Mixed".to_string(),
+            children: vec![child_a, child_b],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        };
+        let result = filter_tag_node(&parent, "Rock");
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.children[0].label, "Rock Artist");
+    }
+
+    #[test]
+    fn test_filter_tag_deeply_nested_match() {
+        let leaf = tag_leaf("target_track");
+        let album = TagTreeNode {
+            label: "My Album".to_string(),
+            children: vec![leaf],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        };
+        let artist = TagTreeNode {
+            label: "My Artist".to_string(),
+            children: vec![album],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        };
+        let genre = TagTreeNode {
+            label: "Pop".to_string(),
+            children: vec![artist],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        };
+        let result = filter_tag_node(&genre, "target_track");
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        // Genre kept, but only with the matching chain
+        assert_eq!(filtered.label, "Pop");
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.children[0].label, "My Artist");
+        assert_eq!(filtered.children[0].children.len(), 1);
+        assert_eq!(
+            filtered.children[0].children[0].label,
+            "My Album"
+        );
+        assert_eq!(
+            filtered.children[0].children[0].children[0].label,
+            "target_track"
+        );
+    }
+
+    #[test]
+    fn test_filter_tag_non_leaf_no_matches_in_subtree() {
+        let child = tag_leaf("Some Artist");
+        let parent = TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![child],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        };
+        let result = filter_tag_node(&parent, "nonexistent");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_filter_tag_partial_query_match() {
+        let node = tag_leaf("Progressive Rock");
+        let result = filter_tag_node(&node, "rock");
+        assert!(result.is_some());
     }
 }
