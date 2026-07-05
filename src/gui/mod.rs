@@ -22,6 +22,7 @@ mod left_panel;
 mod render_node;
 mod right_panel;
 mod state;
+mod tantivy_search;
 mod update;
 mod view;
 
