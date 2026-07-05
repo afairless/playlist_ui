@@ -665,6 +665,14 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             };
             Task::none()
         },
+        Message::SearchCleared => {
+            app.search_query = String::new();
+            app.filtered_root_nodes = recompute_filtered_nodes(app);
+            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
+            app.filtered_right_panel_files =
+                recompute_filtered_right_panel_files(app);
+            Task::none()
+        },
         Message::SearchQueryChanged(query) => {
             app.search_query = query;
             app.filtered_root_nodes = recompute_filtered_nodes(app);
@@ -799,6 +807,19 @@ mod tests {
             Message::SearchQueryChanged("test query".to_string()),
         );
         assert_eq!(app.search_query, "test query");
+    }
+
+    #[test]
+    fn test_search_cleared() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = "something".to_string();
+        let _ = update(&mut app, Message::SearchCleared);
+        assert_eq!(app.search_query, "");
     }
 
     #[test]

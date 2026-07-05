@@ -8,6 +8,7 @@
 //! Public API:
 //!     FileTreeApp           — root application model
 //!     Message               — all user-action messages
+//!         SearchCleared      — clear the current search query
 //!     TagTreeNode           — genre/creator/album hierarchy node
 //!     RightPanelFile        — a file entry with metadata
 //!     LeftPanelSelectMode   — directory / genre / creator
@@ -61,6 +62,7 @@ pub enum Message {
     OpenRightPanelFile(PathBuf),
     ClearRightPanel,
     SearchQueryChanged(String),
+    SearchCleared,
     ToggleSearchMode,
 }
 

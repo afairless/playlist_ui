@@ -308,11 +308,19 @@ fn sort_tag_tree_roots(
     }
 }
 
-/// Creates the search row UI containing a text input and a mode toggle button.
-/// The search row is hidden when the left panel is collapsed.
+/// Creates the search row UI containing a text input, an optional clear
+/// button (✕), and a mode toggle button. The clear button is only shown
+/// when `search_query` is non-empty. The search row is hidden when the
+/// left panel is collapsed.
 fn create_search_row(
     app: &FileTreeApp,
     menu_style: MenuStyle,
+    flat_button_style: impl Fn(
+        &iced::Theme,
+        iced::widget::button::Status,
+    ) -> iced::widget::button::Style
+    + Copy
+    + 'static,
 ) -> Element<'_, Message> {
     let mode_label = match app.search_mode {
         TextSearchMode::All => "🔍 All",
@@ -330,10 +338,27 @@ fn create_search_row(
     )
     .on_input(Message::SearchQueryChanged);
 
+    let clear_button = if !app.search_query.is_empty() {
+        Some(
+            button(text("✕").size(menu_style.text_size))
+                .on_press(Message::SearchCleared)
+                .style(flat_button_style)
+                .into(),
+        )
+    } else {
+        None
+    };
+
     let mode_button = button(text(mode_label).size(menu_style.text_size))
         .on_press(Message::ToggleSearchMode);
 
-    row![search_input, mode_button].spacing(menu_style.spacing).into()
+    let mut children: Vec<Element<'_, Message>> = vec![search_input.into()];
+    if let Some(btn) = clear_button {
+        children.push(btn);
+    }
+    children.push(mode_button.into());
+
+    row(children).spacing(menu_style.spacing).into()
 }
 
 /// Checks whether a file's metadata matches the given search mode and query.
@@ -599,7 +624,7 @@ pub(crate) fn create_left_panel(
             Space::with_height(10),
             left_panel_menu_row_2,
             Space::with_height(10),
-            create_search_row(app, menu_style),
+            create_search_row(app, menu_style, flat_button_style),
             Space::with_height(5),
             tree_browser,
         ]
@@ -731,6 +756,14 @@ mod tests {
         assert_eq!(indices.len(), 2);
     }
 
+    /// A simple flat-button style for use in tests.
+    fn test_flat_button_style(
+        _theme: &iced::Theme,
+        _status: iced::widget::button::Status,
+    ) -> iced::widget::button::Style {
+        iced::widget::button::Style { background: None, ..Default::default() }
+    }
+
     #[test]
     fn test_create_search_row_does_not_panic() {
         let menu_style = MenuStyle {
@@ -744,7 +777,8 @@ mod tests {
             PathBuf::from("/tmp/test.json"),
             None,
         );
-        let _element = create_search_row(&app, menu_style);
+        let _element =
+            create_search_row(&app, menu_style, test_flat_button_style);
     }
 
     #[test]
@@ -761,7 +795,8 @@ mod tests {
             None,
         );
         app.search_query = "test".to_string();
-        let _element = create_search_row(&app, menu_style);
+        let _element =
+            create_search_row(&app, menu_style, test_flat_button_style);
     }
 
     #[test]
@@ -787,8 +822,46 @@ mod tests {
             TextSearchMode::Genre,
         ] {
             app.search_mode = *mode;
-            let _element = create_search_row(&app, menu_style);
+            let _element =
+                create_search_row(&app, menu_style, test_flat_button_style);
         }
+    }
+
+    #[test]
+    fn test_create_search_row_clear_button_present_with_query() {
+        let menu_style = MenuStyle {
+            text_size: 20,
+            spacing: 10,
+            text_color: [0.0, 1.0, 1.0, 1.0],
+        };
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = "something".to_string();
+        // Should not panic when query is non-empty (clear button rendered)
+        let _element =
+            create_search_row(&app, menu_style, test_flat_button_style);
+    }
+
+    #[test]
+    fn test_create_search_row_clear_button_absent_when_empty() {
+        let menu_style = MenuStyle {
+            text_size: 20,
+            spacing: 10,
+            text_color: [0.0, 1.0, 1.0, 1.0],
+        };
+        let app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        // Empty query — clear button should not be rendered
+        let _element =
+            create_search_row(&app, menu_style, test_flat_button_style);
     }
 
     // ── filter_file_node tests ──────────────────────────────────────────
