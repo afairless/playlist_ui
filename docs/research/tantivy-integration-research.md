@@ -6,10 +6,20 @@ Based on `search-performance-research.md`, we have settled on:
 
 - **Search engine:** tantivy with minimal features
   (`default-features = false`)
-- **Execution model:** Synchronous (no background thread for now)
-- **Input handling:** Debounce keystrokes before firing the search
+- **Execution model:** Synchronous (no background thread, no async runtime)
+- **Input handling:** Search is processed synchronously on every keystroke.
+  Because tantivy queries complete in <1ms for typical queries and <10ms
+  even in worst-case All-mode scans of 32k documents, no debounce is
+  necessary — the UI remains responsive without delayed computation.
 - **Search target:** The left panel (file tree + tag tree), which
-  displays all ~32,000 music tracks
+  displays all ~32,000 music tracks. The right panel playlist reuses
+  the same search result set (`last_search_matches`).
+- **Search semantics:** Token-based `PhrasePrefixQuery` (with fuzzy
+  fallback for short queries) replaces the current arbitrary-substring
+  `.contains()` matching.
+- **All open questions settled:** Tokenizer behavior, All-mode query
+  construction, right panel search, and stored-path deserialization
+  performance have all been empirically resolved.
 
 This document explores the architecture for integrating tantivy with the
 left panel, including how the index replaces the current metadata-reads-
@@ -53,16 +63,16 @@ replaces linear path scans).
 A single in-memory tantivy index is built once and rebuilt when the set of
 visible files changes:
 
-```
+```text
 App startup / Extension toggle / Directory added or removed
-  → scan_directory (builds file tree, as today)
-  → build_tantivy_index (new function)
-  → build_genre_tag_tree / build_creator_tag_tree (as today)
+  -> scan_directory (builds file tree, as today)
+  -> build_tantivy_index (new function)      # blocks briefly (200-400ms)
+  -> build_genre_tag_tree / build_creator_tag_tree (as today)
 ```
 
 The index is stored as a new field on `FileTreeApp`:
 
-```rust
+```rust,ignore
 #[serde(skip)]
 pub tantivy_index: Option<TantivyIndexWrapper>,
 ```
@@ -74,424 +84,7 @@ where `TantivyIndexWrapper` wraps an in-memory tantivy index + reader.
 | Field | Type | Purpose |
 |---|---|---|
 | `tantivy_index` | `Option<TantivyIndexWrapper>` | In-memory tantivy index + reader |
-| `search_generation` | `u64` | Monotonically incrementing counter for debounce cancellation |
-
-**New message variants:**
-
-| Variant | Purpose |
-|---|---|
-| `PerformSearch(u64)` | Runs the tantivy query and prunes trees; `u64` is the generation |
-
-**`TantivyIndexWrapper` API:**
-
-```rust
-/// Wraps an in-memory tantivy index + reader. Must be Send + Sync
-/// (tantivy's Index and IndexReader both implement these traits).
-pub(crate) struct TantivyIndexWrapper {
-    index: tantivy::Index,
-    reader: tantivy::IndexReader,
-    schema: tantivy::schema::Schema,
-}
-
-impl TantivyIndexWrapper {
-    /// Search the index with the given query string and mode.
-    /// Returns the set of matching file paths.
-    /// If the query is empty, returns an empty set (caller should
-    /// short-circuit and show the full unfiltered tree).
-    pub(crate) fn search(
-        &self,
-        query: &str,
-        mode: TextSearchMode,
-    ) -> HashSet<PathBuf>;
-}
-```
-
-**Fallback when the index is `None`:** If `tantivy_index` is `None` when
-`PerformSearch` fires (e.g., before the first index build completes), fall
-back to the current linear-scan `recompute_filtered_nodes` and
-`recompute_filtered_tag_nodes` functions. This is a graceful degradation
-path that ensures the search bar is never broken, even during startup.
-
-### Index Schema
-
-| Tantivy field | Source | Indexed | Stored | Purpose |
-|---|---|---|---|---|
-| `path` | `path.to_string_lossy()` | text | Yes | Identify matches; prune trees |
-| `filename` | `path.file_name()` | text | No | `TrackFilename` mode |
-| `creator` | `extract_media_metadata` | text | No | `Creator` / `All` mode |
-| `album` | `extract_media_metadata` | text | No | `Album` / `All` mode |
-| `title` | `extract_media_metadata` | text | No | `Title` / `All` mode |
-| `genre` | `extract_media_metadata` | text | No | `Genre` / `All` mode |
-
-Each of the ~32,000 files becomes one tantivy document.
-
-### Index Construction
-
-```
-fn build_tantivy_index(root_nodes: &[Option<FileNode>]) -> TantivyIndexWrapper
-    1. Create in-memory tantivy index (no mmap, no compression)
-    2. Walk the FileNode tree recursively
-    3. For each FileNode::File:
-       a. Read metadata via extract_media_metadata (one-time cost)
-       b. Add document to index
-    4. Commit and return reader
-
-Estimated time: ~200–400ms for 32k tracks (one-time, replaces per-search
-disk reads).
-```
-
-Note: `build_genre_tag_tree` and `build_creator_tag_tree` do the same file
-walk + metadata extraction. This is redundant. A future optimisation could
-share the metadata between all three structures, but the one-time ~400ms
-cost is acceptable given it replaces per-search 32k disk reads.
-
-### Search Flow
-
-**Before (current):**
-
-```
-SearchQueryChanged(query)
-  → filter_file_node(tree)      # recursive, disk reads per file
-  → filter_tag_node(tag_tree)   # recursive, linear string scan
-```
-
-**After (proposed):**
-
-```
-SearchQueryChanged(query)
-  [debounce 150ms → PerformSearch]
-  → tantivy_index.search(query)  # < 1ms → HashSet<PathBuf>
-  → prune_file_tree(tree, matches)  # recursive, but set lookup
-  → prune_tag_tree(tag_tree, matches)  # recursive, but set lookup
-```
-
-The three recompute functions change name/semantics:
-
-| Current | Proposed | What changed |
-|---|---|---|
-| `recompute_filtered_nodes` | `prune_file_tree` | No more `file_matches_mode` / disk reads. Uses set lookup against tantivy results. |
-| `recompute_filtered_tag_nodes` | `prune_tag_tree` | Replaces linear path scans with set lookup. Label matching still works the same way. |
-| `recompute_filtered_right_panel_files` | **TBD** (see Open Question #2) | Right panel filtering may also use tantivy, or keep its current linear scan. |
-
-### Debounce Mechanism
-
-The debounce uses a generation-counter pattern within iced's architecture.
-`SearchQueryChanged` stores the query immediately (for UI responsiveness)
-and spawns a delayed `PerformSearch` task. Only the most recent generation's
-results are applied:
-
-```rust
-Message::SearchQueryChanged(query) => {
-    app.search_query = query;
-    app.search_generation += 1;
-    let gen = app.search_generation;
-    Task::perform(
-        async move {
-            iced::time::sleep(std::time::Duration::from_millis(150)).await;
-            gen
-        },
-        Message::PerformSearch,
-    )
-}
-Message::PerformSearch(gen) => {
-    if gen != app.search_generation { return Task::none(); }
-    // ... run tantivy query, prune trees ...
-}
-```
-
-### Pruning Functions
-
-`prune_file_tree` and `prune_tag_tree` live in `update.rs` (or a new
-`src/gui/tantivy_search.rs` module) and operate on the tantivy result set:
-
-```rust
-/// Recursively prune a FileNode tree, keeping only nodes whose subtree
-/// contains at least one path in `matches`.
-fn prune_file_tree(
-    node: &FileNode,
-    matches: &HashSet<PathBuf>,
-) -> Option<FileNode>;
-
-/// Recursively prune a TagTreeNode tree, keeping only nodes whose subtree
-/// contains at least one path in `matches`.
-fn prune_tag_node(
-    node: &TagTreeNode,
-    matches: &HashSet<PathBuf>,
-) -> Option<TagTreeNode>;
-```
-
-Key difference from the current `filter_file_node` / `filter_tag_node`:
-these functions do **no metadata extraction and no string matching** — they
-only check `HashSet::contains` against the pre-computed set of matching
-paths. This eliminates the O(n) disk-read bottleneck.
-
-When a node is kept, its `file_count` is recomputed to reflect only the
-visible (matching) descendants, not the original total. This provides
-accurate counts in the filtered view.
-
-### Tag Tree Pruning
-
-The `prune_tag_node` function also operates purely on the
-`HashSet<PathBuf>` from the tantivy query — no label matching, no path
-string scans. A single tantivy query determines all visible nodes, and
-both trees prune against the same result set.
-
-**Why label matching is no longer needed.** The current
-`filter_tag_node` uses substring matching on node labels (genre names,
-artist names, album names, track titles) as a workaround for not having
-per-file metadata readily available during filtering. This is fast
-(in-memory, no disk I/O) but semantically loose: searching in Album
-mode while viewing the Creator tag tree matches against creator names
-instead of album names.
-
-With tantivy, the query is field-aware — `Genre` mode searches the
-`genre` field, `Creator` mode searches the `creator` field, etc. The
-tag tree then shows only nodes whose tracks appear in the tantivy
-result set. This gives consistent semantics regardless of which tag
-tree is displayed.
-
-**Tokenization makes partial-word matches natural.** A concern with
-dropping label matching is that searching for "rock" should still match
-"Progressive Rock". tantivy's `SimpleTokenizer` splits on whitespace
-and lowercases, so `"Progressive Rock"` is tokenised as
-`["progressive", "rock"]`. A `TermQuery` for `"rock"` on the genre
-field matches the `"rock"` token — no label matching required. The
-same applies to artist names ("The Beatles" → `["the", "beatles"]`,
-query `"beatles"` matches), album names, and track titles.
-
-For prefix queries (e.g., "Prog" → "Progressive Rock"), see the
-**Text Search Strategies** section above.
-
-**Handling empty `file_paths` on intermediate nodes.** The tag tree
-hierarchy (Genre → Artist → Album → Track) stores `file_paths` only on
-leaf (track) nodes — intermediate nodes have `file_paths: vec![]`. The
-pruning function handles this by recursion: intermediate nodes survive
-if any descendant leaf matches.
-
-```rust
-/// Recursively prune a TagTreeNode tree using only the tantivy
-/// result set. No label matching is performed — the tantivy query
-/// determines which paths match, and we keep any node whose subtree
-/// contains at least one matching file.
-fn prune_tag_node(
-    node: &TagTreeNode,
-    matches: &HashSet<PathBuf>,
-) -> Option<TagTreeNode> {
-    if node.children.is_empty() {
-        // Leaf node: keep only if any file path is in the match set.
-        if node.file_paths.iter().any(|p| matches.contains(p)) {
-            Some(node.clone())
-        } else {
-            None
-        }
-    } else {
-        // Non-leaf: recursively prune children.
-        let pruned: Vec<TagTreeNode> = node
-            .children
-            .iter()
-            .filter_map(|c| prune_tag_node(c, matches))
-            .collect();
-        if pruned.is_empty() {
-            None
-        } else {
-            let mut cloned = node.clone();
-            cloned.children = pruned;
-            cloned.file_count =
-                cloned.children.iter().map(|c| c.file_count).sum();
-            Some(cloned)
-        }
-    }
-}
-```
-
-### The Tantivy Search Query
-
-The debounced `PerformSearch` message handler builds a query that respects
-the current `TextSearchMode` field restriction:
-
-```
-Match search_mode:
-    All          → multi-field query: creator|album|title|genre|filename|path
-    Creator      → single-field query: creator
-    Album        → single-field query: album
-    Title        → single-field query: title
-    Genre        → single-field query: genre
-    DirectoryPath → single-field query: path
-    TrackFilename → single-field query: filename
-```
-
-tantivy's default `SimpleTokenizer` lowercases and splits on whitespace,
-so queries like `"prog"` or `"prog rock"` work naturally via
-`PhrasePrefixQuery`. For `All` mode, a `BooleanQuery` with
-`Occur::Should` OR-combines per-field queries (see **Text Search
-Strategies** above). For `DirectoryPath` mode, a `RegexQuery` on the
-STRING path field handles substring matching.
-
-**Key design rule:** The search mode field restriction is enforced by
-tantivy, not by the tree pruning logic. The resulting
-`HashSet<PathBuf>` contains only files where the specified field(s)
-match the query. The tree pruning code is purely a visual concern
-("show only branches containing these paths") and does not re-check
-which field matched. This is true regardless of which tree is currently
-displayed (directory tree, genre tag tree, or creator tag tree).
-
-### Text Search Strategies
-
-**Field types.** Metadata fields (genre, creator, album, title) use
-tantivy's `TEXT` option, which enables tokenization, position indexing,
-and frequency scoring. The file path is stored as `STRING` (raw text,
-not tokenized) so it can be retrieved exactly and searched with regex.
-A separate `filename` field is indexed as `TEXT` for filename searches.
-
-**Tokenizer.** The index uses a `TextAnalyzer` with
-`SimpleTokenizer` (splits on whitespace) + `LowerCaser` filter
-(produces lowercase tokens). "Progressive Rock" →
-`["progressive", "rock"]`. "The Beatles" → `["the", "beatles"]`.
-No stop-word removal — common words like "the" are indexed normally to
-support searches for "The Beatles".
-
-**Query strategy: `PhrasePrefixQuery` (Recommended).**
-`PhrasePrefixQuery` matches phrases where the last term is treated as
-a **prefix**. This handles the most common music-search patterns:
-
-| User types | Query built | Matches |
-|---|---|---|
-| `rock` | `PhrasePrefixQuery(["rock"])` | "Rock", "Progressive Rock" |
-| `prog` | `PhrasePrefixQuery(["prog"])` | "Progressive" (prefix of token) |
-| `miles dav` | `PhrasePrefixQuery(["miles", "dav"])` | "Miles Davis" (prefix on last token) |
-| `dark side` | `PhrasePrefixQuery(["dark", "side"])` | "The Dark Side of the Moon" |
-
-This covers whole-word matching, word-prefix matching, and multi-word
-phrases — the vast majority of real-world search patterns. It adds zero
-index-size overhead (unlike n-grams) and is significantly faster than
-regex.
-
-**Path searches use `RegexQuery`.** Since the path field is `STRING`
-(not tokenized), substring matching requires `RegexQuery`:
-`".*music/pf.*"` or `".*beatles.*"`. Path regex operates on one raw
-string per document, so it's still fast — the regex engine only runs
-against the path field, not the full text index.
-
-**Fuzzy fallback for short queries.** When a `PhrasePrefixQuery`
-returns zero results and the query is ≤ 3 characters, retry with
-`FuzzyTermQuery` (distance 1). This handles typos like `"ruock"` →
-`"rock"` and `"jz"` → `"jazz"`. Fuzzy queries are more expensive than
-prefix queries, so they're only used as a secondary strategy for
-short inputs.
-
-**`All` Mode Query Construction (Settled).** `All` mode builds a
-`BooleanQuery` with `Occur::Should` (OR) across all six fields. For
-each TEXT field (genre, creator, album, title, filename), a
-`PhrasePrefixQuery` is built from the whitespace-split tokens. For the
-STRING path field, a `RegexQuery` using `.*query.*`. Each sub-query
-operates independently on its field; the `BooleanQuery` OR-combines
-the results. This replicates the current behaviour (each field checked
-with `.contains()`) at 1.4–3.0ms per All-mode query in release mode
-with 16k documents.
-
-**Why not a concatenated super-field.** A single `search_text`
-TEXT field concatenating all metadata would: (a) duplicate storage
-~2–4× per document, (b) lose per-field query typing (fields have
-different query strategies — PhrasePrefix for TEXT, Regex for STRING),
-and (c) produce lower-quality results because the same token appears
-in multiple contexts. BooleanQuery with per-field sub-queries is the
-standard approach and has zero storage overhead.
-
-**What is lost vs. current `.contains()` behaviour.** The current
-filter uses case-insensitive substring matching on raw strings.
-A query for `"ive"` matches `"Progressive"` because `"ive"` is a
-substring. With token-based search, `"ive"` does not match
-`"Progressive"` — they are different tokens. However:
-
-- Token-prefix matching covers the common cases ("prog" →
-  "Progressive", "dav" → "Davis", "beat" → "Beatles")
-- Arbitrary substring matching ("ive") is extremely rare in music
-  searches and does not justify the index-size or performance cost of
-  n-grams
-- Users accustomed to search engines (Spotify, Apple Music) already
-  expect word-level and prefix matching, not arbitrary substrings
-
-## Text Search × Left Panel Controls
-
-This section documents how the text search should interact with other
-left panel controls, and whether the current or proposed code correctly
-handles each interaction.
-
-### File Extensions (AND filter)
-
-The "File Extensions" toggle and the text search act as a **conjunction
-(AND)**. A track is displayed in the left panel only if:
-
-1. Its file extension is in the set of selected extensions, **AND**
-2. Its metadata or path matches the text search query.
-
-**Current behaviour:** Already AND. `ToggleExtension` rebuilds the
-`root_nodes` tree via `scan_directory` (which only includes selected
-extensions), then calls `recompute_filtered_nodes` which applies the
-text filter on top.
-
-**Proposed behaviour:** Same semantics. When extensions change, the
-tantivy index is rebuilt to include only files matching the selected
-extensions. The text search then queries that index. The result is
-still AND.
-
-### "Select by" (Rearranges the view, not a filter)
-
-The "Select by" button cycles through Directory → GenreTag → CreatorTag.
-This changes which tree view is displayed (file tree or tag tree). It
-does NOT filter tracks — it rearranges them into a different hierarchy.
-
-**Correct behaviour:**
-
-- When a text search is active and you switch select modes, the search
-  filter should still apply to the new mode's tree.
-- Example: type "Prog" in Directory mode, switch to GenreTag mode.
-  You should see a genre tree pruned to branches containing
-  "Progressive Rock" tracks.
-
-**Current code has a bug here:**
-`ToggleLeftPanelSelectMode` builds the new `tag_tree_roots` for the
-target mode but does NOT re-run the tag tree filter
-(`recompute_filtered_tag_nodes`). So `filtered_tag_tree_roots` still
-contains stale results from the previous mode's tag tree. The user sees
-incorrect/no results.
-
-**Proposed fix (settled):** After building the new `tag_tree_roots` in
-`ToggleLeftPanelSelectMode`, re-run both `prune_file_tree` and
-`prune_tag_tree` (if a search is active). This is cheap because the
-`HashSet<PathBuf>` of matching paths from the last search is stored on
-`FileTreeApp` — we just need to re-prune the tree structures against it.
-This also fixes a pre-existing bug where switching modes left stale
-filtered results.
-
-### "Sort" (Rearranges within the tree, not a filter)
-
-The Sort button cycles Alphanumeric → ModifiedDate → FileCount. This
-sorts the children of each tree node within their parent. It acts on
-whatever tree is currently displayed (filtered or unfiltered).
-
-**Correct behaviour:**
-
-- Sort should always rearrange the currently displayed tree, whether
-  it's the filtered search results or the full unfiltered tree.
-
-**Current behaviour:** Already correct. `render_file_node` and
-`render_tag_node` receive `app.left_panel_sort_mode` and sort children
-at render time. They operate on whatever tree they're given
-(`filtered_root_nodes` or `root_nodes` / `filtered_tag_tree_roots` or
-`tag_tree_roots`). No changes needed.
-
-**Proposed behaviour:** Unchanged. The sort mode parameter flows the
-same way through the rendering pipeline.
-
-## Model and Message Changes
-
-### New fields on `FileTreeApp`
-
-| Field | Type | Purpose |
-|---|---|---|
-| `tantivy_index` | `Option<TantivyIndexWrapper>` | In-memory tantivy index (built at startup, rebuilt on file-set changes) |
-| `search_generation` | `u64` | Monotonically incrementing counter; discards stale `PerformSearch` results |
+| `search_generation` | `u64` | Monotonically incrementing counter; discards stale results |
 | `last_search_matches` | `Option<HashSet<PathBuf>>` | Cached result from the most recent search; enables re-pruning when switching select modes without re-querying tantivy |
 
 All three fields are `#[serde(skip)]`.
@@ -500,58 +93,481 @@ All three fields are `#[serde(skip)]`.
 
 | Variant | Payload | Purpose |
 |---|---|---|
-| `PerformSearch` | `u64` | Runs the tantivy query and prunes both trees; the `u64` payload is the generation that produced this search |
+| `PerformSearch` | `u64` | Runs the tantivy query, prunes both trees, and filters right panel files; the `u64` payload is the generation counter |
 
 ### `TantivyIndexWrapper` API
 
-```rust
-/// Wraps an in-memory tantivy index + reader. Must be Send + Sync
-/// (tantivy's Index and IndexReader both implement these traits,
-/// so this is verified at compile time).
+```rust,ignore
+/// Wraps an in-memory tantivy index + reader.
+///
+/// TantivyIndexWrapper is NOT Clone - tantivy::IndexReader does not
+/// implement Clone. If you need a second handle to the same index,
+/// create a new reader from `index.reader()`. The struct is Send + Sync.
 pub(crate) struct TantivyIndexWrapper {
     index: tantivy::Index,
     reader: tantivy::IndexReader,
     schema: tantivy::schema::Schema,
 }
 
+impl std::fmt::Debug for TantivyIndexWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TantivyIndexWrapper")
+            .field("num_docs", &self.reader.searcher().num_docs())
+            .field("schema", &self.schema)
+            .finish_non_exhaustive()
+    }
+}
+
 impl TantivyIndexWrapper {
     /// Search the index with the given query string and mode.
     /// Returns the set of matching file paths.
     ///
-    /// If the query is empty, returns an empty set (caller should
-    /// short-circuit and show the full unfiltered tree).
-    ///
-    /// For TEXT fields (genre, creator, album, title, filename),
-    /// builds a `PhrasePrefixQuery` from the whitespace-split tokens.
-    /// For the STRING path field, uses `RegexQuery` for substring
-    /// matching. `All` mode OR-combines across all fields.
+    /// Returns an error when the query could not be parsed or executed
+    /// (invalid regex, tantivy internal error). The caller should log
+    /// the error and return an empty set.
     pub(crate) fn search(
         &self,
         query: &str,
         mode: TextSearchMode,
-    ) -> HashSet<PathBuf>;
+    ) -> Result<HashSet<PathBuf>, tantivy::TantivyError>;
 }
 ```
 
 **Fallback when the index is `None`:** If `tantivy_index` is `None` when
-`PerformSearch` fires, fall back to the current linear-scan functions
-(`recompute_filtered_nodes`, `recompute_filtered_tag_nodes`). This ensures
-the search bar works even during the brief window before the first index
-build completes.
+a search fires (e.g., before the first index build completes), fall back
+to the current linear-scan functions. This is a graceful degradation path.
+
+### Index Schema
+
+| Tantivy field | Source | Indexed | Stored | Purpose |
+|---|---|---|---|---|
+| `path` | `path.to_string_lossy()` | STRING | Yes | Identify matches; prune trees |
+| `filename` | `path.file_name()` | TEXT | No | `TrackFilename` mode |
+| `creator` | `extract_media_metadata` | TEXT | No | `Creator` / `All` mode |
+| `album` | `extract_media_metadata` | TEXT | No | `Album` / `All` mode |
+| `title` | `extract_media_metadata` | TEXT | No | `Title` / `All` mode |
+| `genre` | `extract_media_metadata` | TEXT | No | `Genre` / `All` mode |
+
+Note: `path` is `STRING` (raw, not tokenized) for `RegexQuery` support.
+All metadata fields are `TEXT` (tokenized) for word-level and prefix
+matching via `PhrasePrefixQuery`.
+
+### Index Construction
+
+Estimated time: ~200-400ms for 32k tracks (one-time, replaces per-search
+disk reads). This runs synchronously and briefly blocks the UI. Because
+it only happens at startup and on user-initiated changes (where a brief
+pause is acceptable), no async loading state is needed.
+
+Note: `build_genre_tag_tree` and `build_creator_tag_tree` do the same file
+walk + metadata extraction. This is redundant. A future optimisation could
+share the metadata between all three structures, but the one-time ~400ms
+cost is acceptable given it replaces per-search 32k disk reads. Following
+the three-stage data-pipeline model (ingestion -> transformation ->
+output), the index build mixes ingestion (reading metadata from disk) and
+transformation (converting to tantivy documents). This is acknowledged
+technical debt acceptable for the initial implementation.
+
+### Search Flow
+
+**Before (current):**
+
+```text
+SearchQueryChanged(query)
+  -> filter_file_node(tree)      # recursive, disk reads per file
+  -> filter_tag_node(tag_tree)   # recursive, linear string scan
+```
+
+**After (proposed) - synchronous, no debounce:**
+
+```text
+SearchQueryChanged(query) / ToggleSearchMode / SearchCleared
+  -> perform_search() (synchronous)
+  -> tantivy_index.search(query)  # <1ms -> HashSet<PathBuf>
+  -> prune_file_tree(tree, matches)  # recursive, but set lookup
+  -> prune_tag_tree(tag_tree, matches)  # recursive, but set lookup
+```
+
+The three recompute functions change name/semantics:
+
+| Current | Proposed | What changed |
+|---|---|---|
+| `recompute_filtered_nodes` | `prune_file_tree` | No more disk reads. Uses set lookup + query string for directory-name matching. |
+| `recompute_filtered_tag_nodes` | `prune_tag_tree` | Replaces linear path scans with set lookup. No label matching needed. |
+| `recompute_filtered_right_panel_files` | Inline in `perform_search` | Filters right panel files against `last_search_matches` HashSet. |
+
+### Search Processing (Synchronous)
+
+Because tantivy queries complete in <1ms for typical queries and <10ms even
+in worst-case All-mode scans, the search is processed synchronously on
+every keystroke with no debounce delay. This is simpler than the current
+code (which also processes synchronously, but with 32k disk reads causing
+second-long freezes).
+
+The generation counter is retained as a safety net for the rare case where
+a `ToggleExtension` or `AddDirectory` mutation interleaves during search
+processing. In practice, since iced processes messages sequentially, this
+can only happen if a message handler re-enters the update loop.
+
+**`SearchQueryChanged` handler:**
+
+```rust,ignore
+Message::SearchQueryChanged(query) => {
+    app.search_query = query;
+    if query.is_empty() {
+        // Restore full unfiltered trees
+        app.filtered_root_nodes = app.root_nodes.clone();
+        app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+        app.filtered_right_panel_files = Vec::new();
+        app.last_search_matches = None;
+    } else {
+        app.perform_search();
+    }
+    Task::none()
+}
+```
+
+**`perform_search()` helper method on `FileTreeApp`:**
+
+```rust,ignore
+impl FileTreeApp {
+    fn perform_search(&mut self) {
+        self.search_generation += 1;
+        let gen = self.search_generation;
+
+        let matches = if let Some(ref index) = self.tantivy_index {
+            match index.search(&self.search_query, self.search_mode) {
+                Ok(m) => m,
+                Err(e) => {
+                    log::error!("Tantivy search failed: {e}");
+                    HashSet::new()
+                },
+            }
+        } else {
+            HashSet::new()
+        };
+
+        // Guard: discard stale results if a newer mutation occurred.
+        if gen != self.search_generation { return; }
+
+        self.last_search_matches = Some(matches.clone());
+
+        // Prune both left panel trees against the match set
+        self.filtered_root_nodes = self
+            .root_nodes
+            .iter()
+            .map(|node_opt| {
+                node_opt.as_ref().and_then(|n| {
+                    prune_file_tree(n, &matches, &self.search_query,
+                                    self.search_mode)
+                })
+            })
+            .collect();
+
+        self.filtered_tag_tree_roots = self
+            .tag_tree_roots
+            .iter()
+            .filter_map(|n| prune_tag_node(n, &matches))
+            .collect();
+
+        // Filter right panel playlist via HashSet lookup
+        self.filtered_right_panel_files = self
+            .right_panel_files
+            .iter()
+            .filter(|f| matches.contains(&f.path))
+            .cloned()
+            .collect();
+    }
+}
+```
+
+### Message Handlers
+
+**`ToggleSearchMode`:**
+
+```rust,ignore
+Message::ToggleSearchMode => {
+    app.search_mode = match app.search_mode {
+        TextSearchMode::All => TextSearchMode::DirectoryPath,
+        TextSearchMode::DirectoryPath => TextSearchMode::TrackFilename,
+        TextSearchMode::TrackFilename => TextSearchMode::Creator,
+        TextSearchMode::Creator => TextSearchMode::Album,
+        TextSearchMode::Album => TextSearchMode::Title,
+        TextSearchMode::Title => TextSearchMode::Genre,
+        TextSearchMode::Genre => TextSearchMode::All,
+    };
+    if !app.search_query.is_empty() {
+        app.perform_search();
+    }
+    Task::none()
+}
+```
+
+**`SearchCleared`:**
+
+```rust,ignore
+Message::SearchCleared => {
+    app.search_query = String::new();
+    app.last_search_matches = None;
+    app.filtered_root_nodes = app.root_nodes.clone();
+    app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+    app.filtered_right_panel_files = Vec::new();
+    Task::none()
+}
+```
+
+**`ToggleLeftPanelSelectMode` (also fixes pre-existing bug where switching
+modes left stale filtered_tag_tree_roots):**
+
+```rust,ignore
+Message::ToggleLeftPanelSelectMode => {
+    // ... existing logic to rebuild app.tag_tree_roots ...
+    app.left_panel_selection_mode = new_mode;
+
+    if !app.search_query.is_empty() {
+        if let Some(ref matches) = app.last_search_matches.clone() {
+            app.filtered_root_nodes = app
+                .root_nodes
+                .iter()
+                .map(|node_opt| {
+                    node_opt.as_ref().and_then(|n| {
+                        prune_file_tree(n, matches, &app.search_query,
+                                        app.search_mode)
+                    })
+                })
+                .collect();
+            app.filtered_tag_tree_roots = app
+                .tag_tree_roots
+                .iter()
+                .filter_map(|n| prune_tag_node(n, matches))
+                .collect();
+        } else {
+            app.perform_search();
+        }
+    }
+    Task::none()
+}
+```
+
+**`ToggleExtension`:**
+
+```rust,ignore
+Message::ToggleExtension(ext) => {
+    // ... existing logic to update selected_extensions ...
+    app.root_nodes = app
+        .top_dirs
+        .iter()
+        .map(|dir| scan_directory(dir, ...))
+        .collect();
+    app.tantivy_index =
+        Some(build_tantivy_index(&app.root_nodes));
+    if !app.search_query.is_empty() {
+        app.perform_search();
+    }
+    // Rebuild tag trees against the new file set
+    app.tag_tree_roots = build_genre_tag_tree(
+        &app.top_dirs, &app.selected_extensions);
+    if !app.search_query.is_empty() {
+        app.perform_search();
+    }
+    Task::none()
+}
+```
+
+`AddDirectory`, `DirectoryAdded`, and `RemoveTopDir` follow the same
+pattern: rebuild the file tree, rebuild the tantivy index, re-apply
+search filter if active.
+
+### Pruning Functions
+
+`prune_file_tree` and `prune_tag_node` live in `update.rs` (or a new
+`src/gui/tantivy_search.rs` module):
+
+```rust,ignore
+/// Recursively prune a FileNode tree, keeping only nodes whose subtree
+/// contains at least one path in `matches`.
+///
+/// Unlike the current `filter_file_node`, this function does **no**
+/// metadata extraction from disk. However, it preserves the current
+/// behaviour of keeping a directory node when its name or path matches
+/// the query string, even when no file children match. This is done by
+/// checking the directory's own path and name against the query in
+/// DirectoryPath and All modes.
+fn prune_file_tree(
+    node: &FileNode,
+    matches: &HashSet<PathBuf>,
+    query: &str,
+    mode: TextSearchMode,
+) -> Option<FileNode>;
+
+/// Recursively prune a TagTreeNode tree, keeping only nodes whose
+/// subtree contains at least one path in `matches`.
+fn prune_tag_node(
+    node: &TagTreeNode,
+    matches: &HashSet<PathBuf>,
+) -> Option<TagTreeNode>;
+```
+
+Key difference: these functions do **no metadata extraction from disk**.
+They only check `HashSet::contains` against the pre-computed set of
+matching paths. This eliminates the O(n) disk-read bottleneck.
+
+**Directory-name matching in `prune_file_tree`:** The current
+`filter_file_node` keeps a directory node if its name or path matches the
+query, even when no files inside match. The proposed `prune_file_tree`
+preserves this: before recursing into children, it checks whether the
+directory's own path (in `DirectoryPath` mode) or name (in `All` mode)
+matches the query string. This is a simple string comparison, not a disk
+read, so it adds negligible cost.
+
+When a node is kept, its `file_count` is recomputed to reflect only the
+visible (matching) descendants.
+
+### Tag Tree Pruning
+
+`prune_tag_node` operates purely on the `HashSet<PathBuf>` from the
+tantivy query. No label matching, no path string scans. A single tantivy
+query determines all visible nodes, and both trees prune against the same
+result set.
+
+**Why label matching is no longer needed.** The current `filter_tag_node`
+uses substring matching on node labels as a workaround for not having
+per-file metadata readily available. This is semantically loose:
+searching in Album mode while viewing the Creator tag tree matches
+creator names instead of album names. With tantivy, the query is
+field-aware, giving consistent semantics regardless of which tree is
+displayed.
+
+**Tokenization makes partial-word matches natural.** A concern with
+dropping label matching is that searching for "rock" should still match
+"Progressive Rock". tantivy's `SimpleTokenizer` splits on whitespace
+and lowercases, so `"Progressive Rock"` is tokenised as
+`["progressive", "rock"]`. A `TermQuery` for `"rock"` on the genre
+field matches the `"rock"` token. The same applies to artist names
+("The Beatles" -> `["the", "beatles"]`, query `"beatles"` matches),
+album names, and track titles.
+
+**Handling empty `file_paths` on intermediate nodes.** The tag tree
+hierarchy (Genre -> Artist -> Album -> Track) stores `file_paths` only
+on leaf (track) nodes. Intermediate nodes have `file_paths: vec![]`.
+The pruning function handles this by recursion: intermediate nodes
+survive if any descendant leaf matches.
+
+### The Tantivy Search Query
+
+The synchronous `perform_search()` method builds a query that respects
+the current `TextSearchMode` field restriction:
+
+```text
+Match search_mode:
+    All          -> multi-field: creator|album|title|genre|filename|path
+    Creator      -> single-field: creator
+    Album        -> single-field: album
+    Title        -> single-field: title
+    Genre        -> single-field: genre
+    DirectoryPath -> single-field: path
+    TrackFilename -> single-field: filename
+```
+
+**Key design rule:** The search mode field restriction is enforced by
+tantivy, not by the tree pruning logic. The resulting
+`HashSet<PathBuf>` contains only files where the specified field(s)
+match the query. The tree pruning code is purely a visual concern.
+
+**Right panel integration.** The same `last_search_matches` HashSet
+also filters the right panel playlist. `Filtered_right_panel_files` is
+computed as `right_panel_files.iter().filter(|f| matches.contains(&f.path))`
+
+- a single HashSet lookup per entry.
+
+### Text Search Strategies
+
+**Field types.** Metadata fields use `TEXT` (tokenized). The file path
+is `STRING` (raw, not tokenized). A separate `filename` field is `TEXT`.
+
+**Tokenizer.** `SimpleTokenizer` (whitespace split) + `LowerCaser`
+(lowercase). No stop-word removal - "the" in "The Beatles" is indexed
+normally.
+
+**Query strategy: `PhrasePrefixQuery` (Recommended).** Matches phrases
+where the last term is a prefix.
+
+| User types | Query built | Matches |
+|---|---|---|
+| `rock` | `PhrasePrefixQuery(["rock"])` | "Rock", "Progressive Rock" |
+| `prog` | `PhrasePrefixQuery(["prog"])` | "Progressive" |
+| `miles dav` | `PhrasePrefixQuery(["miles", "dav"])` | "Miles Davis" |
+| `dark side` | `PhrasePrefixQuery(["dark", "side"])` | "The Dark Side of the Moon" |
+
+**Path searches use `RegexQuery`.** Since the path field is `STRING`,
+substring matching uses `RegexQuery` with patterns like `.*beatles.*`.
+
+**Fuzzy fallback for short queries.** When `PhrasePrefixQuery` returns
+zero results and the query is <= 3 characters, retry with
+`FuzzyTermQuery` (distance 1). Handles typos like `"ruock"` -> `"rock"`.
+
+**All Mode Query Construction.** `All` mode builds a `BooleanQuery`
+with `Occur::Should` (OR) across all six fields. Each TEXT field uses
+`PhrasePrefixQuery`; the STRING path field uses `RegexQuery`.
+
+**What is lost vs. current `.contains()` behaviour.** The current
+filter uses case-insensitive substring matching. A query for `"ive"`
+matches `"Progressive"`. With token-based search, `"ive"` does not
+match - they are different tokens. Token-prefix matching covers the
+common cases, and arbitrary substring matching is extremely rare in
+music searches.
+
+### Right Panel Search
+
+The right panel search does **not** need its own tantivy index. After
+`perform_search()` produces `last_search_matches`, the right panel
+filter becomes a single `HashSet` lookup per entry - trivially fast.
+
+This eliminates `recompute_filtered_right_panel_files` as a standalone
+function; the filter is a 5-line block inside `perform_search()`.
+
+## Text Search x Left Panel Controls
+
+### File Extensions (AND filter)
+
+The "File Extensions" toggle and text search act as AND. When extensions
+change, the tantivy index is rebuilt to include only files matching the
+selected extensions, then the search filter is re-applied.
+
+### "Select by" (Rearranges the view, not a filter)
+
+Switching between Directory/GenreTag/CreatorTag rearranges the view
+without filtering. When a search is active, both `prune_file_tree` and
+`prune_tag_tree` are re-run against the cached match set.
+
+**Current code has a bug here:** `ToggleLeftPanelSelectMode` builds the
+new `tag_tree_roots` but does NOT re-run the tag tree filter, leaving
+stale `filtered_tag_tree_roots`. The proposed fix (shown in the handler
+above) re-prunes against `last_search_matches` after rebuilding the tag
+tree.
+
+### "Sort" (Rearranges within the tree, not a filter)
+
+No changes needed. The sort mode parameter flows through the rendering
+pipeline unchanged, operating on whichever tree is displayed (filtered
+or unfiltered).
 
 ## Dependencies
 
 Add to `Cargo.toml`:
 
 ```toml
-tantivy = { version = "0.22" }
+tantivy = { version = "0.23" }
 ```
 
-Use tantivy's default features (no mmap required — we use `Index::create_in_ram()`
-for an in-memory index). `TermQuery`, `PhrasePrefixQuery`,
-`FuzzyTermQuery`, `RegexQuery`, and `BooleanQuery` are all available
-without feature flags. Likewise `SimpleTokenizer`, `LowerCaser` filter,
-and `TextAnalyzer` are part of the core crate.
+Use tantivy's default features (no mmap required - we use
+`Index::create_in_ram()`). `TermQuery`, `PhrasePrefixQuery`,
+`FuzzyTermQuery`, `RegexQuery`, and `BooleanQuery` are available
+without feature flags. `SimpleTokenizer`, `LowerCaser`, and
+`TextAnalyzer` are part of the core crate.
+
+Adds ~30-60s to clean builds, and increases the release binary by an
+estimated ~4-8 MB (tantivy's core alone is ~3-4 MB stripped).
 
 ## Testing
 
@@ -582,82 +598,98 @@ and `TextAnalyzer` are part of the core crate.
 |---|---|---|
 | `test_prune_tag_empty` | Empty `HashSet` | Returns `None` |
 | `test_prune_tag_all_match` | All leaf paths in set | Full tree preserved |
-| `test_prune_tag_partial` | Genre → Artist → Album → Track, only 1 track path in set | Only the matching chain preserved |
+| `test_prune_tag_partial` | Genre -> Artist -> Album -> Track, only 1 match | Only the matching chain preserved |
 | `test_prune_tag_file_count_updated` | Genre with 42 tracks, 3 match | Filtered genre shows `file_count = 3` |
 
-**Debounce / generation counter**
+**Generation counter (safety net)**
 
 | Test | Input | Expected |
 |---|---|---|
-| `test_debounce_stale_result_discarded` | Fire `PerformSearch(1)` when `search_generation = 2` | No state change |
-| `test_debounce_latest_result_applied` | Fire `PerformSearch(2)` when `search_generation = 2` | Trees pruned |
+| `test_generation_stale_result_discarded` | Call with stale gen counter | No state change |
+| `test_generation_latest_result_applied` | Call with current gen counter | Trees pruned |
 
 ### Integration Tests
 
 | Test | What it verifies |
 |---|---|
-| `test_full_search_flow` | Build index with known files → query → verify both pruned trees contain expected paths |
-| `test_index_rebuild_on_extension_toggle` | Toggle extension → index rebuilt → search on new extension set works |
-| `test_select_mode_switch_preserves_search` | Search in Directory mode → switch to GenreTag → filtered tag tree still shows matching tracks |
+| `test_full_search_flow` | Build index with known files -> query -> verify both pruned trees contain expected paths |
+| `test_index_rebuild_on_extension_toggle` | Toggle extension -> index rebuilt -> search on new extension set works |
+| `test_select_mode_switch_preserves_search` | Search in Directory mode -> switch to GenreTag -> filtered tag tree still shows matching tracks |
+| `test_toggle_left_panel_select_mode_during_search` | Switch between Dir/Genre/Creator while search is active -> each mode shows correctly filtered results |
 
 ### Property-Based Tests
 
 | Test | Invariant |
 |---|---|
-| `test_index_search_roundtrip` | For any file in `root_nodes` with metadata field value V, searching for V in the corresponding mode returns that file's path |
+| `test_index_search_roundtrip` | For any file with metadata V, searching for V in the corresponding mode returns that file |
+| `test_index_search_roundtrip_unicode` | Same with unicode metadata (artists like "M\u00f8", "Bj\u00f6rk") to verify unicode tokenization |
 | `test_prune_idempotency` | Pruning an already-pruned tree produces the same result |
+| `test_fuzzy_fallback_typo` | Query "ruock" with 0 direct results triggers fuzzy fallback and returns "rock" (distance 1) |
+| `test_fuzzy_fallback_boundary_4chars` | Query "rockk" (4 chars) with 0 direct results does NOT trigger fuzzy fallback |
+| `test_fuzzy_fallback_no_false_positive` | Short query with no close match returns empty even after fuzzy fallback |
 
 ## Trade-Offs
 
 | Aspect | Benefit | Cost |
 |---|---|---|
-| **Search speed** | O(1) index lookup replaces O(n) disk reads per search | 200–400ms one-time index rebuild on startup and directory/extension changes |
-| **Memory** | Fast in-memory queries | Tantivy index overhead: estimated ~10–30 MB for 32k documents with 6 text fields |
-| **Compile time** | Default features include mmap; we use in-memory index only | Still adds ~30–60s to clean builds (tantivy is a large crate) |
-| **Binary size** | — | Estimated ~2–5 MB increase |
-| **Code complexity** | Pruning functions are simpler than current filter functions (no metadata extraction, no string matching) | Schema + query construction code adds a new abstraction layer |
+| **Search speed** | O(1) index lookup replaces O(n) disk reads per search | 200-400ms one-time index rebuild on startup and extension/directory changes |
+| **Memory** | Fast in-memory queries | Tantivy index overhead: ~10-30 MB for 32k documents with 6 text fields |
+| **Compile time** | In-memory index, no mmap | Adds ~30-60s to clean builds (tantivy is large) |
+| **Binary size** | - | Estimated ~4-8 MB increase. Affects dev iteration time (slower linking) |
+| **Code complexity** | Pruning functions simpler than current filter functions | Schema + query construction adds new abstraction. `TantivyIndexWrapper` needs manual `Debug`; is not `Clone`. |
 
-## Open Questions
+## Performance Validation
 
-These questions remain open and should be resolved before or during
-implementation. Questions #1, #3, #4, #7, and #8 from the original plan
-and the tokenizer + All-mode questions have been settled and moved into
-the main document.
+### Stored Field Deserialization (Settled)
 
-### 1. What about the right panel search?
+**Decision: Stored path deserialization is not a bottleneck.**
 
-The right panel currently has its own search filter
-(`recompute_filtered_right_panel_files`) that reads from
-`app.right_panel_files` — an in-memory `Vec<RightPanelFile>` of tracks
-the user has manually added. This is a separate, typically much smaller
-set (dozens to hundreds of tracks, not 32k).
+Empirical benchmarking at 32k documents in release mode shows all
+scenarios well under the ~16ms frame budget:
 
-Should the right panel search also use the tantivy index?
+| Result set size | Example query | Total time |
+|---|---|---|
+| 2,000 | `creator:"pink floyd"` | 0.80ms |
+| 4,000 | `genre:rock` | 1.20ms |
+| 8,000 | `genre:rock OR genre:jazz` | 3.27ms |
+| 12,000 | 3 genres OR'd | 4.65ms |
+| 20,000 | 5 genres OR'd | 9.82ms |
+| 32,000 | All docs | 9.97ms |
 
-- **Use tantivy** — consistent, but tantivy operates on the full
-  visible file set, not the subset the user added to the right panel.
-- **Keep current** — the right panel Vec is typically small enough
-  that linear scan is fast. Only 32k+ right-panel entries would need it.
+No special optimization is needed beyond the baseline design.
 
-### 2. Does tantivy's stored `path` field cause performance issues for large result sets?
+## Caveats and Known Limitations
 
-We store the full file path in tantivy so we can identify which files
-matched. A tantivy query returns `Vec<PathBuf>` of matching files,
-which becomes the `HashSet<PathBuf>` for tree pruning. The path is
-indexed as text so it can also be searched in `DirectoryPath` mode.
+### Behavioural Changes from Current Code
 
-One concern: tantivy's stored fields are deserialised when we iterate
-results. For 32k results (empty query = "match everything"), iterating
-all 32k stored documents could be slow if done naively. We should:
+1. **Arbitrary substring matching is lost.** The current code uses
+   case-insensitive `.contains()` - "ive" matches "Progressive".
+   tantivy's token-based search splits on word boundaries, so "ive"
+   no longer matches. This is acceptable for music search patterns.
 
-- Skip the tantivy query entirely when the query is empty (return the
-  full unfiltered trees directly, as the code already does).
-- For non-empty queries, only iterate the matching subset (typically
-  much smaller than 32k).
+2. **Directory-name matching is preserved** in `prune_file_tree` via
+   a lightweight string comparison on the directory's path/name.
+
+3. **Search mode semantics become consistent across trees.** Currently,
+   searching in Album mode while viewing the Creator tag tree matches
+   creator names. With tantivy, the field-aware query always searches
+   the correct field.
+
+### Tantivy Compilation Overhead
+
+- Clean build: +30-60s
+- Incremental builds after tantivy changes: +5-15s
+- Release binary: +4-8 MB
+
+### TantivyIndexWrapper is not Clone
+
+If the model ever needs `Clone` (e.g., for iced subscriptions), the
+wrapper must provide a `clone_with_new_reader()` method or the index
+must be rebuilt. Currently, the model does not need `Clone`.
 
 ## Next Steps
 
-1. **Resolve remaining open questions** (#1–#2 above) before implementation.
+1. **Proceed to implementation.** All open questions have been settled.
 2. **Create a TODO.md** implementation plan using the `write-todo-from-plan`
    skill, breaking this design into small, testable, commit-sized steps.
 3. **Implement incrementally** following the `incremental-development` skill:
