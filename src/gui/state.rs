@@ -19,6 +19,9 @@
 
 use crate::db::sled_store::SledStore;
 use crate::fs::file_tree::{FileNode, scan_directory};
+use crate::gui::tantivy_search::{
+    TantivyIndexWrapper, build_tantivy_index, prune_file_tree, prune_tag_node,
+};
 use crate::gui::update::restore_expansion_state;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -171,6 +174,12 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub filtered_right_panel_files: Vec<RightPanelFile>,
     #[serde(skip)]
+    pub tantivy_index: Option<TantivyIndexWrapper>,
+    #[serde(skip)]
+    pub search_generation: u64,
+    #[serde(skip)]
+    pub last_search_matches: Option<HashSet<PathBuf>>,
+    #[serde(skip)]
     pub extensions_menu_expanded: bool,
     #[serde(skip)]
     pub expanded_dirs: HashSet<PathBuf>,
@@ -182,6 +191,7 @@ pub struct FileTreeApp {
     pub right_panel_shuffled: bool,
 }
 
+#[allow(dead_code)]
 impl FileTreeApp {
     /// Creates a new `FileTreeApp` instance with the given top-level
     /// directories, file extensions, audio extensions, and persistence path.
@@ -217,6 +227,7 @@ impl FileTreeApp {
         for root in root_nodes.iter_mut().flatten() {
             restore_expansion_state(root, &expanded_dirs);
         }
+        let tantivy_index = Some(build_tantivy_index(&root_nodes));
         FileTreeApp {
             sled_store,
             left_panel_selection_mode: LeftPanelSelectMode::Directory,
@@ -233,6 +244,9 @@ impl FileTreeApp {
             filtered_root_nodes,
             filtered_tag_tree_roots: Vec::new(),
             filtered_right_panel_files: Vec::new(),
+            tantivy_index,
+            search_generation: 0,
+            last_search_matches: None,
             extensions_menu_expanded: false,
             expanded_dirs,
             right_panel_files: Vec::new(),
@@ -273,6 +287,60 @@ impl FileTreeApp {
         let json = serde_json::to_string(&self.top_dirs)?;
         fs::write(&self.persist_path, json)?;
         Ok(())
+    }
+
+    /// Executes a full-text search against the tantivy index, pruning both
+    /// the file tree and tag tree to only show matching paths. Skips the
+    /// search if the query is empty or the index is unavailable.
+    pub(crate) fn perform_search(&mut self) {
+        self.search_generation += 1;
+        let current_gen = self.search_generation;
+
+        let matches = if let Some(ref index) = self.tantivy_index {
+            match index.search(&self.search_query, self.search_mode) {
+                Ok(m) => m,
+                Err(e) => {
+                    log::error!("Tantivy search failed: {e}");
+                    HashSet::new()
+                },
+            }
+        } else {
+            HashSet::new()
+        };
+
+        if current_gen != self.search_generation {
+            return;
+        }
+
+        self.last_search_matches = Some(matches.clone());
+
+        self.filtered_root_nodes = self
+            .root_nodes
+            .iter()
+            .map(|node_opt| {
+                node_opt.as_ref().and_then(|n| {
+                    prune_file_tree(
+                        n,
+                        &matches,
+                        &self.search_query,
+                        self.search_mode,
+                    )
+                })
+            })
+            .collect();
+
+        self.filtered_tag_tree_roots = self
+            .tag_tree_roots
+            .iter()
+            .filter_map(|n| prune_tag_node(n, &matches))
+            .collect();
+
+        self.filtered_right_panel_files = self
+            .right_panel_files
+            .iter()
+            .filter(|f| matches.contains(&f.path))
+            .cloned()
+            .collect();
     }
 
     /// Returns a sorted vector of files currently in the right panel, using the
@@ -448,5 +516,59 @@ mod tests {
         );
         assert_eq!(app.search_query, "");
         assert_eq!(app.search_mode, TextSearchMode::All);
+    }
+
+    #[test]
+    fn test_new_app_has_index() {
+        let app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        assert!(app.tantivy_index.is_some());
+        assert_eq!(app.search_generation, 0);
+        assert!(app.last_search_matches.is_none());
+    }
+
+    #[test]
+    fn test_perform_search_empty_query() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = String::new();
+        app.perform_search();
+        assert!(app.last_search_matches.is_some());
+    }
+
+    #[test]
+    fn test_generation_stale_result_discarded() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = "test".to_string();
+        app.search_generation = 5;
+        app.perform_search();
+        // Generation should be 6
+        assert_eq!(app.search_generation, 6);
+    }
+
+    #[test]
+    fn test_tantivy_index_serde_skip() {
+        let app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let json = serde_json::to_string(&app).unwrap();
+        let deserialized: FileTreeApp = serde_json::from_str(&json).unwrap();
+        assert!(deserialized.tantivy_index.is_none());
     }
 }
