@@ -827,4 +827,66 @@ mod tests {
         m.insert(PathBuf::from("/match.mp3"));
         assert!(prune_tag_node(&album, &m).is_some());
     }
+
+    // -----------------------------------------------------------------------
+    // Fuzzy fallback tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_fuzzy_fallback_typo() {
+        let w = make_single_doc_wrapper("/music/jazz.mp3", "", "", "", "Jazz");
+        let results = w.search("azz", TextSearchMode::Genre).unwrap();
+        assert!(!results.is_empty(), "Expected fuzzy fallback azz -> Jazz");
+        assert!(results.contains(&PathBuf::from("/music/jazz.mp3")));
+    }
+
+    #[test]
+    fn test_fuzzy_fallback_boundary_4chars() {
+        let w = make_single_doc_wrapper("/music/jazz.mp3", "", "", "", "Jazz");
+        let results = w.search("jzaz", TextSearchMode::Genre).unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_fuzzy_fallback_no_false_positive() {
+        let w = make_single_doc_wrapper("/music/rock.mp3", "", "", "", "Rock");
+        let results = w.search("zzz", TextSearchMode::Genre).unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // prune_idempotency test
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_prune_idempotency() {
+        let child1 =
+            FileNode::new_file("a.mp3".into(), PathBuf::from("/root/a.mp3"));
+        let child2 =
+            FileNode::new_file("b.mp3".into(), PathBuf::from("/root/b.mp3"));
+        let tree = FileNode {
+            name: "root".into(),
+            path: PathBuf::from("/root"),
+            node_type: NodeType::Directory,
+            children: vec![child1, child2],
+            is_expanded: false,
+            file_count: 2,
+        };
+        let mut matches = HashSet::new();
+        matches.insert(PathBuf::from("/root/a.mp3"));
+
+        let pruned = prune_file_tree(&tree, &matches, "", TextSearchMode::All);
+        assert!(pruned.is_some());
+        let pruned = pruned.unwrap();
+        assert_eq!(pruned.file_count, 1);
+        assert_eq!(pruned.children.len(), 1);
+
+        let pruned_again =
+            prune_file_tree(&pruned, &matches, "", TextSearchMode::All);
+        assert!(pruned_again.is_some());
+        let pruned_again = pruned_again.unwrap();
+        assert_eq!(pruned_again.file_count, 1);
+        assert_eq!(pruned_again.children.len(), 1);
+        assert_eq!(pruned_again.children[0].name, "a.mp3");
+    }
 }
