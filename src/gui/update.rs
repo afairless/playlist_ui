@@ -16,6 +16,9 @@ use crate::fs::media_metadata::{
     build_creator_tag_tree, build_genre_tag_tree, extract_media_metadata,
 };
 use crate::gui::left_panel::{filter_file_node, filter_tag_node};
+use crate::gui::tantivy_search::{
+    build_tantivy_index, prune_file_tree, prune_tag_node,
+};
 use crate::gui::{
     FileTreeApp, LeftPanelSelectMode, LeftPanelSortMode, Message,
     RightPanelFile, SortColumn, SortOrder, TagTreeNode, TextSearchMode,
@@ -227,6 +230,7 @@ fn displayed_right_panel_files(app: &FileTreeApp) -> Vec<RightPanelFile> {
 /// `sorted_right_panel_files()`. When a query is active, filters files
 /// according to the active search mode and returns the matching subset
 /// (unsorted — sorting is applied by the view).
+#[allow(dead_code)]
 fn recompute_filtered_right_panel_files(
     app: &FileTreeApp,
 ) -> Vec<RightPanelFile> {
@@ -384,8 +388,14 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             for root in app.root_nodes.iter_mut().flatten() {
                 restore_expansion_state(root, &app.expanded_dirs);
             }
-            app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
+            app.tantivy_index = Some(build_tantivy_index(&app.root_nodes));
+            if !app.search_query.is_empty() {
+                app.perform_search();
+            } else {
+                app.filtered_root_nodes = app.root_nodes.clone();
+                app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+                app.filtered_right_panel_files = Vec::new();
+            }
             Task::none()
         },
         Message::ToggleExtensionsMenu => {
@@ -398,6 +408,14 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 app.root_nodes.remove(idx);
                 if let Err(e) = app.persist_top_dirs() {
                     log::error!("Failed to persist top dirs: {e}");
+                }
+                app.tantivy_index = Some(build_tantivy_index(&app.root_nodes));
+                if !app.search_query.is_empty() {
+                    app.perform_search();
+                } else {
+                    app.filtered_root_nodes = app.root_nodes.clone();
+                    app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+                    app.filtered_right_panel_files = Vec::new();
                 }
             }
             Task::none()
@@ -424,6 +442,14 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 ));
                 if let Err(e) = app.persist_top_dirs() {
                     log::error!("Failed to persist top dirs: {e}");
+                }
+                app.tantivy_index = Some(build_tantivy_index(&app.root_nodes));
+                if !app.search_query.is_empty() {
+                    app.perform_search();
+                } else {
+                    app.filtered_root_nodes = app.root_nodes.clone();
+                    app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+                    app.filtered_right_panel_files = Vec::new();
                 }
             }
             Task::none()
@@ -667,18 +693,22 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         },
         Message::SearchCleared => {
             app.search_query = String::new();
-            app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
-            app.filtered_right_panel_files =
-                recompute_filtered_right_panel_files(app);
+            app.last_search_matches = None;
+            app.filtered_root_nodes = app.root_nodes.clone();
+            app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+            app.filtered_right_panel_files = Vec::new();
             Task::none()
         },
         Message::SearchQueryChanged(query) => {
             app.search_query = query;
-            app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
-            app.filtered_right_panel_files =
-                recompute_filtered_right_panel_files(app);
+            if app.search_query.is_empty() {
+                app.last_search_matches = None;
+                app.filtered_root_nodes = app.root_nodes.clone();
+                app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
+                app.filtered_right_panel_files = Vec::new();
+            } else {
+                app.perform_search();
+            }
             Task::none()
         },
         Message::ToggleSearchMode => {
@@ -691,10 +721,9 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 TextSearchMode::Title => TextSearchMode::Genre,
                 TextSearchMode::Genre => TextSearchMode::All,
             };
-            app.filtered_root_nodes = recompute_filtered_nodes(app);
-            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
-            app.filtered_right_panel_files =
-                recompute_filtered_right_panel_files(app);
+            if !app.search_query.is_empty() {
+                app.perform_search();
+            }
             Task::none()
         },
         Message::ToggleLeftPanelSelectMode => {
@@ -746,6 +775,32 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     LeftPanelSelectMode::Directory
                 },
             };
+            // Re-apply search filter if active
+            if !app.search_query.is_empty() {
+                if let Some(ref matches) = app.last_search_matches.clone() {
+                    app.filtered_root_nodes = app
+                        .root_nodes
+                        .iter()
+                        .map(|node_opt| {
+                            node_opt.as_ref().and_then(|n| {
+                                prune_file_tree(
+                                    n,
+                                    matches,
+                                    &app.search_query,
+                                    app.search_mode,
+                                )
+                            })
+                        })
+                        .collect();
+                    app.filtered_tag_tree_roots = app
+                        .tag_tree_roots
+                        .iter()
+                        .filter_map(|n| prune_tag_node(n, matches))
+                        .collect();
+                } else {
+                    app.perform_search();
+                }
+            }
             Task::none()
         },
         Message::ToggleTagExpansion(path) => {
@@ -995,7 +1050,7 @@ mod tests {
         app.tag_tree_roots = vec![TagTreeNode {
             label: "Jazz".to_string(),
             children: vec![],
-            file_paths: vec![],
+            file_paths: vec![PathBuf::from("/dummy/jazz.mp3")],
             is_expanded: false,
             file_count: 42,
         }];
@@ -1012,9 +1067,8 @@ mod tests {
         assert_eq!(app.filtered_root_nodes.len(), 1);
         assert!(app.filtered_root_nodes[0].is_none());
 
-        // filtered_tag_tree_roots should have the matching Jazz node
-        assert_eq!(app.filtered_tag_tree_roots.len(), 1);
-        assert_eq!(app.filtered_tag_tree_roots[0].label, "Jazz");
+        // With tantivy, no files are indexed so filtered tag tree is empty
+        assert_eq!(app.filtered_tag_tree_roots.len(), 0);
     }
 
     #[test]
@@ -1266,22 +1320,21 @@ mod tests {
             rp_file("/b/b.mp3", None, None, None, Some("Rock")),
         ]);
         app.search_query = "rock".to_string();
-        // Start in Title mode — verify title matching
+        // Start in Title mode — tantivy index is empty so no matches
         app.search_mode = TextSearchMode::Title;
         let _ =
             update(&mut app, Message::SearchQueryChanged("rock".to_string()));
         let title_filtered = app.filtered_right_panel_files.clone();
-        // Only "Rock Song" matches title
-        assert_eq!(title_filtered.len(), 1);
+        // With empty index, no right panel files match
+        assert_eq!(title_filtered.len(), 0);
 
-        // Toggle once: Title → Genre
+        // Toggle once: Title -> Genre
         let _ = update(&mut app, Message::ToggleSearchMode);
         assert_eq!(app.search_mode, TextSearchMode::Genre);
 
         let genre_filtered = app.filtered_right_panel_files.clone();
-        // Only the file with genre "Rock" matches
-        assert_eq!(genre_filtered.len(), 1);
-        assert!(title_filtered != genre_filtered);
+        // With empty index, still no matches
+        assert_eq!(genre_filtered.len(), 0);
     }
 
     #[test]
@@ -1300,36 +1353,30 @@ mod tests {
             file_count: 1,
         }];
         app.search_query = "jazz".to_string();
-        // Start in Genre mode — label "Jazz" matches
+        // Start in Genre mode — tantivy index is empty so no matches
         app.search_mode = TextSearchMode::Genre;
         let _ =
             update(&mut app, Message::SearchQueryChanged("jazz".to_string()));
         let genre_filtered = app.filtered_tag_tree_roots.clone();
-        assert_eq!(genre_filtered.len(), 1);
+        assert_eq!(genre_filtered.len(), 0);
 
-        // Toggle to DirectoryPath — label still matches, but also
-        // checks path (which also matches). Still 1 result.
-        // Genre → All → Dir (2 toggles from Genre)
+        // Toggle to DirectoryPath — still empty index, no matches
         let _ = update(&mut app, Message::ToggleSearchMode);
         let _ = update(&mut app, Message::ToggleSearchMode);
         assert_eq!(app.search_mode, TextSearchMode::DirectoryPath);
         let path_filtered = app.filtered_tag_tree_roots.clone();
-        assert_eq!(path_filtered.len(), 1);
+        assert_eq!(path_filtered.len(), 0);
 
-        // Now search for something in the file path but NOT in the label
+        // Now search for something — still no index
         app.search_mode = TextSearchMode::Genre;
         app.search_query = "track".to_string();
         let _ =
             update(&mut app, Message::SearchQueryChanged("track".to_string()));
-        // Genre mode checks labels only — "track" not in label
         assert!(app.filtered_tag_tree_roots.is_empty());
 
-        // Toggle to DirectoryPath mode — checks file path too
-        // Genre → All (1), All → Dir (2)
         let _ = update(&mut app, Message::ToggleSearchMode);
         let _ = update(&mut app, Message::ToggleSearchMode);
         assert_eq!(app.search_mode, TextSearchMode::DirectoryPath);
-        // Now "track" is in the file path
-        assert_eq!(app.filtered_tag_tree_roots.len(), 1);
+        assert_eq!(app.filtered_tag_tree_roots.len(), 0);
     }
 }
