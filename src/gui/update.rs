@@ -772,6 +772,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             {
                 let mut files = Vec::new();
                 collect_tag_node_files(node, &mut files);
+                // Filter files by active search, if any
+                if let Some(ref matches) = app.last_search_matches {
+                    files.retain(|f| matches.contains(f));
+                }
                 for file in files {
                     if !app.right_panel_files.iter().any(|f| f.path == file) {
                         let meta = extract_media_metadata(&file);
@@ -1200,6 +1204,154 @@ mod tests {
             app.right_panel_files.len(),
             2,
             "all files should be added when no search is active"
+        );
+    }
+
+    // ── AddTagNodeToRightPanel search-filter tests ──────────────────
+
+    /// With an active search, AddTagNodeToRightPanel should only add files
+    /// matching the search results.
+    #[test]
+    fn test_add_tag_node_filtered_by_search() {
+        let track_1 = PathBuf::from("/music/jazz/track_1.mp3");
+        let track_2 = PathBuf::from("/music/jazz/track_2.mp3");
+        let track_3 = PathBuf::from("/music/rock/track_3.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "Jazz".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_1.clone(), track_2.clone()],
+                    is_expanded: false,
+                    file_count: 2,
+                },
+                TagTreeNode {
+                    label: "Rock".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_3.clone()],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 3,
+        }];
+
+        // Activate a search that matches only track_1 and track_2
+        let mut matches = HashSet::new();
+        matches.insert(track_1.clone());
+        matches.insert(track_2.clone());
+        app.last_search_matches = Some(matches);
+
+        let path = vec!["Genre".to_string()];
+        let msg = Message::AddTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(
+            app.right_panel_files.len(),
+            2,
+            "only search-matching tracks should be added"
+        );
+        assert!(app.right_panel_files.iter().any(|f| f.path == track_1));
+        assert!(app.right_panel_files.iter().any(|f| f.path == track_2));
+    }
+
+    /// Without an active search, AddTagNodeToRightPanel should add all
+    /// files (no regression).
+    #[test]
+    fn test_add_tag_node_without_search_adds_all() {
+        let track_1 = PathBuf::from("/music/jazz/track_1.mp3");
+        let track_2 = PathBuf::from("/music/rock/track_2.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "Jazz".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_1.clone()],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "Rock".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_2.clone()],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        }];
+
+        // No search activated
+        app.last_search_matches = None;
+
+        let path = vec!["Genre".to_string()];
+        let msg = Message::AddTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(
+            app.right_panel_files.len(),
+            2,
+            "all tracks should be added when no search is active"
+        );
+    }
+
+    /// With an active search that matches no files, AddTagNodeToRightPanel
+    /// should add zero files (not fall through to adding everything).
+    #[test]
+    fn test_add_tag_node_empty_search_adds_none() {
+        let track = PathBuf::from("/music/jazz/track.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![TagTreeNode {
+                label: "Jazz".to_string(),
+                children: vec![],
+                file_paths: vec![track.clone()],
+                is_expanded: false,
+                file_count: 1,
+            }],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        }];
+
+        // Empty search results — last_search_matches is Some(empty set)
+        app.last_search_matches = Some(HashSet::new());
+
+        let path = vec!["Genre".to_string()];
+        let msg = Message::AddTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(
+            app.right_panel_files.len(),
+            0,
+            "zero files should be added when search matches nothing"
         );
     }
 
