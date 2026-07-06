@@ -468,6 +468,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     duration_ms: meta.duration_ms,
                 });
             }
+            app.refilter_right_panel_files();
             Task::none()
         },
         Message::AddDirectoryToRightPanel(dir_path) => {
@@ -492,10 +493,12 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     }
                 }
             }
+            app.refilter_right_panel_files();
             Task::none()
         },
         Message::RemoveFromRightPanel(path) => {
             app.right_panel_files.retain(|f| f.path != path);
+            app.refilter_right_panel_files();
             Task::none()
         },
         Message::RemoveDirectoryFromRightPanel(dir_path) => {
@@ -503,6 +506,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 // Remove if file is not in dir_path or its subdirectories
                 !file.path.starts_with(&dir_path)
             });
+            app.refilter_right_panel_files();
             Task::none()
         },
         Message::SortRightPanelByDirectory => {
@@ -815,6 +819,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::ClearRightPanel => {
             app.right_panel_files.clear();
             app.right_panel_shuffled = false;
+            app.refilter_right_panel_files();
             Task::none()
         },
         Message::AddTagNodeToRightPanel(path) => {
@@ -838,6 +843,7 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     }
                 }
             }
+            app.refilter_right_panel_files();
             Task::none()
         },
     }
