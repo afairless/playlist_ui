@@ -447,8 +447,7 @@ pub(crate) fn filter_file_node(
     if node_matches || !filtered_children.is_empty() {
         let mut cloned = node.clone();
         cloned.children = filtered_children;
-        cloned.file_count =
-            cloned.children.iter().map(|c| c.file_count).sum();
+        cloned.file_count = cloned.children.iter().map(|c| c.file_count).sum();
         Some(cloned)
     } else {
         None
@@ -1045,11 +1044,8 @@ mod tests {
             test_file("blues_song.mp3", "/music/other/blues_song.mp3"),
         ];
         let dir = test_dir("jazz", "/music/other", children);
-        let result = filter_file_node(
-            &dir,
-            "jazz",
-            TextSearchMode::TrackFilename,
-        );
+        let result =
+            filter_file_node(&dir, "jazz", TextSearchMode::TrackFilename);
         assert!(result.is_some());
         let filtered = result.unwrap();
         // Directory kept (node_matches) but only 1 child survives
@@ -1410,8 +1406,7 @@ mod tests {
             is_expanded: false,
             file_count: 3,
         };
-        let result =
-            filter_tag_node(&parent, "miles", TextSearchMode::All);
+        let result = filter_tag_node(&parent, "miles", TextSearchMode::All);
         assert!(result.is_some());
         let filtered = result.unwrap();
         assert_eq!(filtered.children.len(), 1);
@@ -1465,8 +1460,7 @@ mod tests {
             is_expanded: false,
             file_count: 2,
         };
-        let result =
-            filter_tag_node(&genre, "So What", TextSearchMode::All);
+        let result = filter_tag_node(&genre, "So What", TextSearchMode::All);
         assert!(result.is_some());
         let filtered = result.unwrap();
         assert_eq!(filtered.label, "Jazz");
