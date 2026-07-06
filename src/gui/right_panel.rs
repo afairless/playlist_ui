@@ -375,13 +375,9 @@ pub(crate) fn create_right_panel(
     menu_style: MenuStyle,
     item_list_style: ItemListStyle,
 ) -> Element<'_, Message> {
-    // Use filtered files when a search query is active; otherwise
-    // show all files (sorted).
-    let displayed_files: Vec<RightPanelFile> = if app.search_query.is_empty() {
-        app.sorted_right_panel_files()
-    } else {
-        app.filtered_right_panel_files.clone()
-    };
+    // Show all files in the playlist, sorted. The right panel is the
+    // cumulative playlist and should not be filtered by search.
+    let displayed_files: Vec<RightPanelFile> = app.sorted_right_panel_files();
 
     // Determine which columns to show
     let show_creator = displayed_files
