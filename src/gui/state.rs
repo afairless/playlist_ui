@@ -343,6 +343,23 @@ impl FileTreeApp {
             .collect();
     }
 
+    /// Updates `filtered_right_panel_files` by re-filtering the current
+    /// `right_panel_files` against the cached search matches. This is a
+    /// no-op when no search query is active or no cached matches exist.
+    pub(crate) fn refilter_right_panel_files(&mut self) {
+        if self.search_query.is_empty() {
+            return;
+        }
+        if let Some(ref matches) = self.last_search_matches {
+            self.filtered_right_panel_files = self
+                .right_panel_files
+                .iter()
+                .filter(|f| matches.contains(&f.path))
+                .cloned()
+                .collect();
+        }
+    }
+
     /// Returns a sorted vector of files currently in the right panel, using the
     ///     configured sort column and order, unless the panel is marked as
     ///     shuffled.
