@@ -334,13 +334,6 @@ impl FileTreeApp {
             .iter()
             .filter_map(|n| prune_tag_node(n, &matches))
             .collect();
-
-        self.filtered_right_panel_files = self
-            .right_panel_files
-            .iter()
-            .filter(|f| matches.contains(&f.path))
-            .cloned()
-            .collect();
     }
 
     /// Updates `filtered_right_panel_files` by re-filtering the current
