@@ -343,7 +343,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             } else {
                 app.filtered_root_nodes = app.root_nodes.clone();
                 app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
-                app.filtered_right_panel_files = Vec::new();
             }
             Task::none()
         },
@@ -364,7 +363,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 } else {
                     app.filtered_root_nodes = app.root_nodes.clone();
                     app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
-                    app.filtered_right_panel_files = Vec::new();
                 }
             }
             Task::none()
@@ -398,7 +396,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 } else {
                     app.filtered_root_nodes = app.root_nodes.clone();
                     app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
-                    app.filtered_right_panel_files = Vec::new();
                 }
             }
             Task::none()
@@ -417,7 +414,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     duration_ms: meta.duration_ms,
                 });
             }
-            app.refilter_right_panel_files();
             Task::none()
         },
         Message::AddDirectoryToRightPanel(dir_path) => {
@@ -442,12 +438,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     }
                 }
             }
-            app.refilter_right_panel_files();
             Task::none()
         },
         Message::RemoveFromRightPanel(path) => {
             app.right_panel_files.retain(|f| f.path != path);
-            app.refilter_right_panel_files();
             Task::none()
         },
         Message::RemoveDirectoryFromRightPanel(dir_path) => {
@@ -455,7 +449,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 // Remove if file is not in dir_path or its subdirectories
                 !file.path.starts_with(&dir_path)
             });
-            app.refilter_right_panel_files();
             Task::none()
         },
         Message::SortRightPanelByDirectory => {
@@ -649,7 +642,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             app.last_search_matches = None;
             app.filtered_root_nodes = app.root_nodes.clone();
             app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
-            app.filtered_right_panel_files = Vec::new();
             Task::none()
         },
         Message::SearchQueryChanged(query) => {
@@ -658,7 +650,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 app.last_search_matches = None;
                 app.filtered_root_nodes = app.root_nodes.clone();
                 app.filtered_tag_tree_roots = app.tag_tree_roots.clone();
-                app.filtered_right_panel_files = Vec::new();
             } else {
                 app.perform_search();
             }
@@ -768,7 +759,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
         Message::ClearRightPanel => {
             app.right_panel_files.clear();
             app.right_panel_shuffled = false;
-            app.refilter_right_panel_files();
             Task::none()
         },
         Message::AddTagNodeToRightPanel(path) => {
@@ -792,7 +782,6 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                     }
                 }
             }
-            app.refilter_right_panel_files();
             Task::none()
         },
     }
