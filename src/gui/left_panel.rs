@@ -323,13 +323,13 @@ fn create_search_row(
     + 'static,
 ) -> Element<'_, Message> {
     let mode_label = match app.search_mode {
-        TextSearchMode::All => "🔍 All",
-        TextSearchMode::DirectoryPath => "🔍 Path",
-        TextSearchMode::TrackFilename => "🔍 File",
-        TextSearchMode::Creator => "🔍 Artist",
-        TextSearchMode::Album => "🔍 Album",
-        TextSearchMode::Title => "🔍 Title",
-        TextSearchMode::Genre => "🔍 Genre",
+        TextSearchMode::All => "All",
+        TextSearchMode::DirectoryPath => "Filepath",
+        TextSearchMode::TrackFilename => "Filename",
+        TextSearchMode::Creator => "Creator",
+        TextSearchMode::Album => "Album",
+        TextSearchMode::Title => "Title",
+        TextSearchMode::Genre => "Genre",
     };
 
     let search_input = text_input::<Message, iced::Theme, iced::Renderer>(
@@ -628,7 +628,7 @@ pub(crate) fn create_left_panel(
             left_panel_menu_row_2,
             Space::with_height(10),
             create_search_row(app, menu_style, flat_button_style),
-            Space::with_height(5),
+            Space::with_height(10),
             tree_browser,
         ]
     } else {
