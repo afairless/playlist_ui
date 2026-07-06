@@ -542,6 +542,8 @@ pub(crate) fn filter_tag_node(
         } else {
             let mut cloned = node.clone();
             cloned.children = filtered_children;
+            cloned.file_count =
+                cloned.children.iter().map(|c| c.file_count).sum();
             Some(cloned)
         }
     }
@@ -1328,5 +1330,115 @@ mod tests {
         assert!(result.is_some());
         let filtered = result.unwrap();
         assert_eq!(filtered.children.len(), 1);
+    }
+
+    // ── filter_tag_node file_count recalculation tests ──────────────────
+
+    #[test]
+    fn test_filter_tag_node_recalculates_file_count_on_child_prune() {
+        // Non-leaf with 3 children, search matches only 1 child
+        let child_a = tag_leaf("Miles Davis");
+        let child_b = tag_leaf("John Coltrane");
+        let child_c = tag_leaf("Thelonious Monk");
+        let parent = TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![child_a, child_b, child_c],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 3,
+        };
+        let result =
+            filter_tag_node(&parent, "miles", TextSearchMode::All);
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.file_count, 1);
+    }
+
+    #[test]
+    fn test_filter_tag_node_maintains_file_count_on_label_match() {
+        // Non-leaf whose label matches, all children kept
+        let child_a = tag_leaf("Miles Davis");
+        let child_b = tag_leaf("John Coltrane");
+        let parent = TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![child_a, child_b],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        };
+        let result = filter_tag_node(&parent, "jazz", TextSearchMode::All);
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.children.len(), 2);
+        assert_eq!(filtered.file_count, 2);
+    }
+
+    #[test]
+    fn test_filter_tag_node_nested_file_count_recalculation() {
+        // Two-level tree: genre -> artists -> tracks
+        // Only 1 track matches, so intermediate node and root should have
+        // correct file_count.
+        let track_match = tag_leaf("So What");
+        let track_other = tag_leaf("Blue Train");
+        let artist_miles = TagTreeNode {
+            label: "Miles Davis".to_string(),
+            children: vec![track_match],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        };
+        let artist_coltrane = TagTreeNode {
+            label: "John Coltrane".to_string(),
+            children: vec![track_other],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        };
+        let genre = TagTreeNode {
+            label: "Jazz".to_string(),
+            children: vec![artist_miles, artist_coltrane],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        };
+        let result =
+            filter_tag_node(&genre, "So What", TextSearchMode::All);
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.label, "Jazz");
+        // Only "Miles Davis" artist kept
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.children[0].label, "Miles Davis");
+        // Artist-level file_count recalculated
+        assert_eq!(filtered.children[0].file_count, 1);
+        // Root-level file_count recalculated via sum of children
+        assert_eq!(filtered.file_count, 1);
+    }
+
+    #[test]
+    fn test_filter_tag_node_path_mode_recalculates_file_count() {
+        // Parent non-matching, child matches via DirectoryPath mode
+        let child = TagTreeNode {
+            label: "Track".to_string(),
+            children: vec![],
+            file_paths: vec![PathBuf::from("/music/jazz/so_what.mp3")],
+            is_expanded: false,
+            file_count: 1,
+        };
+        let parent = TagTreeNode {
+            label: "GenreNode".to_string(),
+            children: vec![child],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        };
+        // Label doesn't match, but child's path contains "jazz"
+        let result =
+            filter_tag_node(&parent, "jazz", TextSearchMode::DirectoryPath);
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.file_count, 1);
     }
 }
