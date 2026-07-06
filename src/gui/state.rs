@@ -172,8 +172,6 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub filtered_tag_tree_roots: Vec<TagTreeNode>,
     #[serde(skip)]
-    pub filtered_right_panel_files: Vec<RightPanelFile>,
-    #[serde(skip)]
     pub tantivy_index: Option<TantivyIndexWrapper>,
     #[serde(skip)]
     pub search_generation: u64,
@@ -243,7 +241,6 @@ impl FileTreeApp {
             search_mode: TextSearchMode::All,
             filtered_root_nodes,
             filtered_tag_tree_roots: Vec::new(),
-            filtered_right_panel_files: Vec::new(),
             tantivy_index,
             search_generation: 0,
             last_search_matches: None,
@@ -334,23 +331,6 @@ impl FileTreeApp {
             .iter()
             .filter_map(|n| prune_tag_node(n, &matches))
             .collect();
-    }
-
-    /// Updates `filtered_right_panel_files` by re-filtering the current
-    /// `right_panel_files` against the cached search matches. This is a
-    /// no-op when no search query is active or no cached matches exist.
-    pub(crate) fn refilter_right_panel_files(&mut self) {
-        if self.search_query.is_empty() {
-            return;
-        }
-        if let Some(ref matches) = self.last_search_matches {
-            self.filtered_right_panel_files = self
-                .right_panel_files
-                .iter()
-                .filter(|f| matches.contains(&f.path))
-                .cloned()
-                .collect();
-        }
     }
 
     /// Returns a sorted vector of files currently in the right panel, using the
