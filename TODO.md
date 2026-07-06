@@ -1,70 +1,66 @@
-# Implementation Plan: Fix Filtered Node `file_count` Staleness During Search
+# Implementation Plan: Fix "Add to Right Panel" ignoring active text search filter
 
-Source: `docs/research/fix-filtered-node-file-count-staleness.md`
+Source: `docs/research/search-filter-add-to-playlist-bug.md`
 
-## Summary
+## Overview
 
-When a text search is active, expanding a category node in the left panel
-causes its `file_count` and highlight intensity to revert to unfiltered values.
-The root cause is that `filter_tag_node` and `filter_file_node` in
-`left_panel.rs` clone nodes without recalculating `file_count` after pruning
-children. The fix adds a one-line recalculation in both functions, matching the
-correct pattern already used by `prune_tag_node` and `prune_file_node` in
-`tantivy_search.rs`.
+When a text search term is active in the left panel, right-clicking a category
+(Directory, Genre, Creator) and selecting "Add all files to right panel" adds
+**all** files from that category, ignoring the active search filter. The fix is
+to filter collected files against `app.last_search_matches` in both
+`AddDirectoryToRightPanel` and `AddTagNodeToRightPanel` handlers.
 
-## Plan
+## Branch
+
+Work continues on `agent/fix-file-count-staleness` (with existing formatting
+fixes committed first).
 
 | # | Commit message | Logical unit | Key deliverables | Tests |
 |---|---|---|---|---|
-| 1 | `fix: recalculate file_count in filter_tag_node after child prune` | `filter_tag_node` fix + test | `src/gui/left_panel.rs` | Unit |
-| 2 | `fix: recalculate file_count in filter_file_node after child prune` | `filter_file_node` fix + tests | `src/gui/left_panel.rs` | Unit |
+| 1 | `fix: add search filter to AddDirectoryToRightPanel handler` | AddDirectoryToRightPanel fix | `src/gui/update.rs` — add `files.retain()` filter against `app.last_search_matches` in the `AddDirectoryToRightPanel` handler | Unit (with search, without search) |
+| 2 | `fix: add search filter to AddTagNodeToRightPanel handler` | AddTagNodeToRightPanel fix | `src/gui/update.rs` — add `files.retain()` filter against `app.last_search_matches` in the `AddTagNodeToRightPanel` handler | Unit (with search, without search, empty search results) |
 
-### Step 1 — Fix `filter_tag_node` `file_count` recalculation
+## Details
 
-**Code change**: In `filter_tag_node`, after pruning children on a non-leaf
-node whose label does not match, add `file_count` recalculation:
+### Step 1 — AddDirectoryToRightPanel fix
 
-```rust
-let mut cloned = node.clone();
-cloned.children = filtered_children;
-cloned.file_count =
-    cloned.children.iter().map(|c| c.file_count).sum();
-Some(cloned)
-```
-
-**Tests to add** (in `#[cfg(test)] mod tests` at the bottom of
-`left_panel.rs`):
-
-| Test | What it verifies |
-|------|-----------------|
-| `test_filter_tag_node_recalculates_file_count_on_child_prune` | Non-leaf with 3 children, search matches only 1 child → `file_count == 1` |
-| `test_filter_tag_node_maintains_file_count_on_label_match` | Non-leaf whose label matches → `file_count` preserved (all children kept) |
-| `test_filter_tag_node_nested_file_count_recalculation` | Two-level tree (genre→artists→tracks), only 1 track matches → intermediate node `file_count` correct |
-| `test_filter_tag_node_path_mode_recalculates_file_count` | Parent non-matching, child matches via `DirectoryPath` mode → parent `file_count` correct after recalculation |
-
-**Verify**: `cargo test`, `cargo clippy -- -D warnings`
-
-### Step 2 — Fix `filter_file_node` `file_count` recalculation
-
-**Code change**: In `filter_file_node`, after pruning children on a directory
-node (both `node_matches` and `!node_matches` paths converge here), add
-`file_count` recalculation:
+After `collect_files_recursively(node, &mut files)` in the
+`AddDirectoryToRightPanel` handler, insert:
 
 ```rust
-let mut cloned = node.clone();
-cloned.children = filtered_children;
-cloned.file_count =
-    cloned.children.iter().map(|c| c.file_count).sum();
-Some(cloned)
+// Filter files by active search, if any
+if let Some(ref matches) = app.last_search_matches {
+    files.retain(|f| matches.contains(f));
+}
 ```
 
-**Tests to add** (in `#[cfg(test)] mod tests` at the bottom of
-`left_panel.rs`):
+**Test cases:**
 
-| Test | What it verifies |
-|------|-----------------|
-| `test_filter_file_node_recalculates_file_count_on_child_prune` | Directory with 3 files, search matches only 1 (parent name does NOT match) → `file_count == 1` |
-| `test_filter_file_node_recalculates_file_count_when_parent_matches` | Directory named `"jazz"` with 3 files, only 1 matches in metadata → `file_count == 1` (covers the `node_matches` code path) |
-| `test_filter_file_node_maintains_file_count_when_empty_query` | Directory filtered with empty query → `file_count` equals total child count |
+1. **With search active** — Set up a file tree with 5 files, set a search query
+   matching 2 files. Call `AddDirectoryToRightPanel`. Assert only 2 matching
+   files appear in `right_panel_files`.
+2. **Without search** — Same tree, no search query. Call
+   `AddDirectoryToRightPanel`. Assert all 5 files appear (no regression).
 
-**Verify**: `cargo test`, `cargo clippy -- -D warnings`
+### Step 2 — AddTagNodeToRightPanel fix
+
+After `collect_tag_node_files(node, &mut files)` in the
+`AddTagNodeToRightPanel` handler, insert:
+
+```rust
+// Filter files by active search, if any
+if let Some(ref matches) = app.last_search_matches {
+    files.retain(|f| matches.contains(f));
+}
+```
+
+**Test cases:**
+
+1. **With search active** — Set up a tag tree with 5 tracks across 2 genres,
+   set a search query matching 2 tracks. Call `AddTagNodeToRightPanel`.
+   Assert only 2 matching tracks are added.
+2. **Without search** — Same setup, no search query. Assert all 5 tracks are
+   added (no regression).
+3. **Empty search results** — Search is active but matches zero files
+   (`last_search_matches = Some(HashSet::new())`). Assert zero files added
+   (not fall-through to adding everything).
