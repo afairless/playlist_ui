@@ -447,6 +447,8 @@ pub(crate) fn filter_file_node(
     if node_matches || !filtered_children.is_empty() {
         let mut cloned = node.clone();
         cloned.children = filtered_children;
+        cloned.file_count =
+            cloned.children.iter().map(|c| c.file_count).sum();
         Some(cloned)
     } else {
         None
@@ -1009,6 +1011,67 @@ mod tests {
             filter_file_node(&dir, "target", TextSearchMode::DirectoryPath);
         assert!(result.is_some());
         assert_eq!(result.unwrap().children.len(), 1);
+    }
+
+    // ── filter_file_node file_count recalculation tests ──────────────────
+
+    #[test]
+    fn test_filter_file_node_recalculates_file_count_on_child_prune() {
+        // Directory with 3 files, search matches only 1
+        // (parent path does not match)
+        let children = vec![
+            test_file("miles_track.mp3", "/music/jazz/miles_track.mp3"),
+            test_file("john_track.mp3", "/music/jazz/john_track.mp3"),
+            test_file("thelo_track.mp3", "/music/jazz/thelo_track.mp3"),
+        ];
+        let dir = test_dir("jazz", "/music/jazz", children);
+        let result =
+            filter_file_node(&dir, "miles", TextSearchMode::TrackFilename);
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.file_count, 1);
+    }
+
+    #[test]
+    fn test_filter_file_node_recalculates_file_count_when_parent_matches() {
+        // Directory named "jazz" with 3 files, none of which have "jazz"
+        // in their filename. In TrackFilename mode, the directory name
+        // matches (node_matches = true), but children are filtered by
+        // filename only — so only 1 child matches.
+        let children = vec![
+            test_file("jazz_song.mp3", "/music/other/jazz_song.mp3"),
+            test_file("rock_song.mp3", "/music/other/rock_song.mp3"),
+            test_file("blues_song.mp3", "/music/other/blues_song.mp3"),
+        ];
+        let dir = test_dir("jazz", "/music/other", children);
+        let result = filter_file_node(
+            &dir,
+            "jazz",
+            TextSearchMode::TrackFilename,
+        );
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        // Directory kept (node_matches) but only 1 child survives
+        assert_eq!(filtered.children.len(), 1);
+        assert_eq!(filtered.children[0].name, "jazz_song.mp3");
+        assert_eq!(filtered.file_count, 1);
+    }
+
+    #[test]
+    fn test_filter_file_node_maintains_file_count_when_empty_query() {
+        // Directory filtered with empty query
+        let children = vec![
+            test_file("track_a.mp3", "/music/jazz/track_a.mp3"),
+            test_file("track_b.mp3", "/music/jazz/track_b.mp3"),
+            test_file("track_c.mp3", "/music/jazz/track_c.mp3"),
+        ];
+        let dir = test_dir("jazz", "/music/jazz", children);
+        let result = filter_file_node(&dir, "", TextSearchMode::All);
+        assert!(result.is_some());
+        let filtered = result.unwrap();
+        assert_eq!(filtered.children.len(), 3);
+        assert_eq!(filtered.file_count, 3);
     }
 
     // ── filter_tag_node tests ───────────────────────────────────────────
