@@ -422,6 +422,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
                 if let Some(node) = find_node_by_path(root, &dir_path) {
                     let mut files = Vec::new();
                     collect_files_recursively(node, &mut files);
+                    // Filter files by active search, if any
+                    if let Some(ref matches) = app.last_search_matches {
+                        files.retain(|f| matches.contains(f));
+                    }
                     for file in files {
                         if !app.right_panel_files.iter().any(|f| f.path == file)
                         {
@@ -1112,6 +1116,91 @@ mod tests {
 
         // sorted_right_panel_files() should return the file
         assert_eq!(app.sorted_right_panel_files().len(), 1);
+    }
+
+    // ── AddDirectoryToRightPanel search-filter tests ────────────────
+
+    /// With an active search, AddDirectoryToRightPanel should only add
+    /// files matching the search results.
+    #[test]
+    fn test_add_directory_filtered_by_search() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+        let file_b = PathBuf::from("/music/song_b.mp3");
+        let file_c = PathBuf::from("/music/song_c.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![
+                FileNode::new_file("song_a.mp3".to_string(), file_a.clone()),
+                FileNode::new_file("song_b.mp3".to_string(), file_b.clone()),
+                FileNode::new_file("song_c.mp3".to_string(), file_c.clone()),
+            ],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+
+        // Activate a search that matches only file_a and file_b
+        let mut matches = HashSet::new();
+        matches.insert(file_a.clone());
+        matches.insert(file_b.clone());
+        app.last_search_matches = Some(matches);
+
+        let msg = Message::AddDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(
+            app.right_panel_files.len(),
+            2,
+            "only search-matching files should be added"
+        );
+        assert!(app.right_panel_files.iter().any(|f| f.path == file_a));
+        assert!(app.right_panel_files.iter().any(|f| f.path == file_b));
+    }
+
+    /// Without an active search, AddDirectoryToRightPanel should add all
+    /// files (no regression).
+    #[test]
+    fn test_add_directory_without_search_adds_all() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+        let file_b = PathBuf::from("/music/song_b.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![
+                FileNode::new_file("song_a.mp3".to_string(), file_a.clone()),
+                FileNode::new_file("song_b.mp3".to_string(), file_b.clone()),
+            ],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+
+        // No search activated — last_search_matches is None
+        app.last_search_matches = None;
+
+        let msg = Message::AddDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(
+            app.right_panel_files.len(),
+            2,
+            "all files should be added when no search is active"
+        );
     }
 
     /// displayed_right_panel_files always returns all files regardless of
