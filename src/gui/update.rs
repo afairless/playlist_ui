@@ -1192,4 +1192,156 @@ mod tests {
         assert_eq!(app.search_mode, TextSearchMode::DirectoryPath);
         assert_eq!(app.filtered_tag_tree_roots.len(), 0);
     }
+
+    /// Helper: build an app with search active and a pre-seeded match set.
+    /// The match set is manually seeded because a real tantivy index requires
+    /// actual files on disk; this unit test exercises the refilter logic
+    /// directly without filesystem dependencies.
+    fn app_with_search_and_matches(match_paths: &[&str]) -> FileTreeApp {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = "song".to_string();
+        app.last_search_matches = Some(
+            match_paths.iter().map(PathBuf::from).collect(),
+        );
+        app
+    }
+
+    #[test]
+    fn test_refilter_right_panel_noop_when_no_search() {
+        // Adding/removing files with no search active should not populate
+        // filtered_right_panel_files (it remains the view's signal to use
+        // sorted_right_panel_files instead).
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        // No search query — filtered should stay empty
+        let msg = Message::AddToRightPanel(PathBuf::from("/music/song.mp3"));
+        let _ = update(&mut app, msg);
+        assert_eq!(app.right_panel_files.len(), 1);
+        assert!(
+            app.filtered_right_panel_files.is_empty(),
+            "filtered should be empty when no search is active"
+        );
+    }
+
+    #[test]
+    fn test_refilter_right_panel_noop_when_no_matches() {
+        // If last_search_matches is None (no prior search executed),
+        // the refilter is a no-op.
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.search_query = "song".to_string();
+        // last_search_matches is None — filtered should stay empty
+        let msg = Message::AddToRightPanel(PathBuf::from("/music/song.mp3"));
+        let _ = update(&mut app, msg);
+        assert_eq!(app.right_panel_files.len(), 1);
+        assert!(
+            app.filtered_right_panel_files.is_empty(),
+            "filtered should be empty when last_search_matches is None"
+        );
+    }
+
+    #[test]
+    fn test_add_to_right_panel_updates_filtered_during_search() {
+        let mut app = app_with_search_and_matches(&["/music/song.mp3"]);
+        let msg = Message::AddToRightPanel(PathBuf::from("/music/song.mp3"));
+        let _ = update(&mut app, msg);
+
+        assert_eq!(app.right_panel_files.len(), 1);
+        assert_eq!(
+            app.filtered_right_panel_files.len(),
+            1,
+            "filtered_right_panel_files should reflect the added file"
+        );
+    }
+
+    #[test]
+    fn test_add_file_not_in_matches_excluded_from_filtered() {
+        // If the added file's path is not in last_search_matches, it should
+        // not appear in the filtered list.
+        let mut app = app_with_search_and_matches(&["/music/other.mp3"]);
+        let msg = Message::AddToRightPanel(PathBuf::from("/music/song.mp3"));
+        let _ = update(&mut app, msg);
+
+        assert_eq!(app.right_panel_files.len(), 1);
+        assert!(
+            app.filtered_right_panel_files.is_empty(),
+            "file not in match set should be excluded from filtered"
+        );
+    }
+
+    #[test]
+    fn test_remove_from_right_panel_updates_filtered_during_search() {
+        // Pre-populate right_panel_files and filtered_right_panel_files,
+        // then remove one and verify filtered is updated.
+        let mut app = app_with_search_and_matches(&[
+            "/music/a.mp3",
+            "/music/b.mp3",
+        ]);
+        // Simulate files already added (bypass add handler to set up state)
+        app.right_panel_files.push(RightPanelFile {
+            path: PathBuf::from("/music/a.mp3"),
+            creator: None,
+            album: None,
+            title: None,
+            genre: None,
+            duration_ms: None,
+        });
+        app.right_panel_files.push(RightPanelFile {
+            path: PathBuf::from("/music/b.mp3"),
+            creator: None,
+            album: None,
+            title: None,
+            genre: None,
+            duration_ms: None,
+        });
+        app.filtered_right_panel_files = app.right_panel_files.clone();
+
+        let msg = Message::RemoveFromRightPanel(PathBuf::from(
+            "/music/a.mp3",
+        ));
+        let _ = update(&mut app, msg);
+
+        assert_eq!(app.right_panel_files.len(), 1);
+        assert_eq!(
+            app.filtered_right_panel_files.len(),
+            1,
+            "filtered should reflect removal"
+        );
+    }
+
+    #[test]
+    fn test_clear_right_panel_updates_filtered_during_search() {
+        let mut app = app_with_search_and_matches(&["/music/a.mp3"]);
+        app.right_panel_files.push(RightPanelFile {
+            path: PathBuf::from("/music/a.mp3"),
+            creator: None,
+            album: None,
+            title: None,
+            genre: None,
+            duration_ms: None,
+        });
+        app.filtered_right_panel_files = app.right_panel_files.clone();
+
+        let msg = Message::ClearRightPanel;
+        let _ = update(&mut app, msg);
+
+        assert!(app.right_panel_files.is_empty());
+        assert!(
+            app.filtered_right_panel_files.is_empty(),
+            "filtered should be empty after clear"
+        );
+    }
 }
