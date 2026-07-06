@@ -59,17 +59,11 @@ fn recompute_filtered_tag_nodes(app: &FileTreeApp) -> Vec<TagTreeNode> {
     }
 }
 
-/// Returns the files that should be displayed in the right panel,
-/// sorted according to the current sort settings. When a search query
-/// is active, only matching files are returned; otherwise all files
-/// are returned.
+/// Returns all files in the right panel, sorted according to the
+/// current sort settings. The right panel is the cumulative playlist
+/// and is never filtered by the search query.
 fn displayed_right_panel_files(app: &FileTreeApp) -> Vec<RightPanelFile> {
-    let files = if app.search_query.is_empty() {
-        app.right_panel_files.clone()
-    } else {
-        app.filtered_right_panel_files.clone()
-    };
-    let mut files = files;
+    let mut files = app.right_panel_files.clone();
     if !app.right_panel_shuffled {
         files.sort_by(|a, b| {
             let filename_cmp = || {
