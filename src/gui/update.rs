@@ -1205,9 +1205,8 @@ mod tests {
             None,
         );
         app.search_query = "song".to_string();
-        app.last_search_matches = Some(
-            match_paths.iter().map(PathBuf::from).collect(),
-        );
+        app.last_search_matches =
+            Some(match_paths.iter().map(PathBuf::from).collect());
         app
     }
 
@@ -1286,10 +1285,8 @@ mod tests {
     fn test_remove_from_right_panel_updates_filtered_during_search() {
         // Pre-populate right_panel_files and filtered_right_panel_files,
         // then remove one and verify filtered is updated.
-        let mut app = app_with_search_and_matches(&[
-            "/music/a.mp3",
-            "/music/b.mp3",
-        ]);
+        let mut app =
+            app_with_search_and_matches(&["/music/a.mp3", "/music/b.mp3"]);
         // Simulate files already added (bypass add handler to set up state)
         app.right_panel_files.push(RightPanelFile {
             path: PathBuf::from("/music/a.mp3"),
@@ -1309,9 +1306,7 @@ mod tests {
         });
         app.filtered_right_panel_files = app.right_panel_files.clone();
 
-        let msg = Message::RemoveFromRightPanel(PathBuf::from(
-            "/music/a.mp3",
-        ));
+        let msg = Message::RemoveFromRightPanel(PathBuf::from("/music/a.mp3"));
         let _ = update(&mut app, msg);
 
         assert_eq!(app.right_panel_files.len(), 1);
