@@ -758,12 +758,24 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         },
         Message::ToggleTagExpansion(path) => {
-            if let Some(node) =
+            // Toggle in the unfiltered tree and capture the new state.
+            let new_state = if let Some(node) =
                 find_tag_node_mut(&mut app.tag_tree_roots, &path)
             {
                 node.is_expanded = !node.is_expanded;
+                node.is_expanded
+            } else {
+                return Task::none();
+            };
+            // Apply the same toggle to the already-filtered tree in-place.
+            // The filtered tree shares the same path structure as the
+            // unfiltered tree; nodes pruned by the filter are simply absent.
+            if let Some(node) = find_tag_node_mut(
+                &mut app.filtered_tag_tree_roots,
+                &path,
+            ) {
+                node.is_expanded = new_state;
             }
-            app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(app);
             Task::none()
         },
         Message::ClearRightPanel => {
