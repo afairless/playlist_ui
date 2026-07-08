@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 /// Recomputes `filtered_root_nodes` from `app.root_nodes` using the current
 /// search query and mode. Called whenever the query string or search mode
 /// changes.
+#[allow(dead_code)]
 fn recompute_filtered_nodes(app: &FileTreeApp) -> Vec<Option<FileNode>> {
     if app.search_query.is_empty() {
         app.root_nodes.clone()
@@ -46,6 +47,7 @@ fn recompute_filtered_nodes(app: &FileTreeApp) -> Vec<Option<FileNode>> {
     }
 }
 
+#[allow(dead_code)]
 fn recompute_filtered_tag_nodes(app: &FileTreeApp) -> Vec<TagTreeNode> {
     if app.search_query.is_empty() {
         app.tag_tree_roots.clone()
@@ -770,10 +772,9 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             // Apply the same toggle to the already-filtered tree in-place.
             // The filtered tree shares the same path structure as the
             // unfiltered tree; nodes pruned by the filter are simply absent.
-            if let Some(node) = find_tag_node_mut(
-                &mut app.filtered_tag_tree_roots,
-                &path,
-            ) {
+            if let Some(node) =
+                find_tag_node_mut(&mut app.filtered_tag_tree_roots, &path)
+            {
                 node.is_expanded = new_state;
             }
             Task::none()
@@ -1444,21 +1445,14 @@ mod tests {
         app.filtered_root_nodes = recompute_filtered_nodes(&app);
 
         // Capture the structure before toggle
-        let child_count_before = app.filtered_root_nodes[0]
-            .as_ref()
-            .unwrap()
-            .children
-            .len();
-        let file_count_before = app.filtered_root_nodes[0]
-            .as_ref()
-            .unwrap()
-            .file_count;
+        let child_count_before =
+            app.filtered_root_nodes[0].as_ref().unwrap().children.len();
+        let file_count_before =
+            app.filtered_root_nodes[0].as_ref().unwrap().file_count;
 
         // Toggle expansion
-        let _ = update(
-            &mut app,
-            Message::ToggleExpansion(PathBuf::from("/Music")),
-        );
+        let _ =
+            update(&mut app, Message::ToggleExpansion(PathBuf::from("/Music")));
 
         // Structure must be unchanged — same children, same file count
         let filtered = app.filtered_root_nodes[0].as_ref().unwrap();
@@ -1501,9 +1495,7 @@ mod tests {
         app.search_query = "Rock".to_string();
         app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(&app);
 
-        let child_count_before = app.filtered_tag_tree_roots[0]
-            .children
-            .len();
+        let child_count_before = app.filtered_tag_tree_roots[0].children.len();
         let file_count_before = app.filtered_tag_tree_roots[0].file_count;
 
         let path = vec!["Parent".to_string()];
