@@ -306,10 +306,16 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             } else {
                 app.expanded_dirs.insert(path);
             }
+            // Sync expansion state into the unfiltered tree.
             for root in app.root_nodes.iter_mut().flatten() {
                 restore_expansion_state(root, &app.expanded_dirs);
             }
-            app.filtered_root_nodes = recompute_filtered_nodes(app);
+            // Sync expansion state into the already-filtered tree in-place.
+            // No re-filter is needed — the filter query hasn't changed and
+            // filter_{file,tag}_node do not inspect is_expanded.
+            for filtered in app.filtered_root_nodes.iter_mut().flatten() {
+                restore_expansion_state(filtered, &app.expanded_dirs);
+            }
             Task::none()
         },
         Message::ToggleExtension(ext) => {
