@@ -1416,4 +1416,117 @@ mod tests {
             "displayed files should ignore active search state"
         );
     }
+
+    #[test]
+    fn test_toggle_expansion_preserves_filtered_structure() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let dir = FileNode::new_directory(
+            "Music".to_string(),
+            PathBuf::from("/Music"),
+            vec![
+                FileNode::new_file(
+                    "rock.mp3".to_string(),
+                    PathBuf::from("/Music/rock.mp3"),
+                ),
+                FileNode::new_file(
+                    "jazz.mp3".to_string(),
+                    PathBuf::from("/Music/jazz.mp3"),
+                ),
+            ],
+        );
+        app.root_nodes = vec![Some(dir)];
+        app.search_query = "rock".to_string();
+        app.filtered_root_nodes = recompute_filtered_nodes(&app);
+
+        // Capture the structure before toggle
+        let child_count_before = app.filtered_root_nodes[0]
+            .as_ref()
+            .unwrap()
+            .children
+            .len();
+        let file_count_before = app.filtered_root_nodes[0]
+            .as_ref()
+            .unwrap()
+            .file_count;
+
+        // Toggle expansion
+        let _ = update(
+            &mut app,
+            Message::ToggleExpansion(PathBuf::from("/Music")),
+        );
+
+        // Structure must be unchanged — same children, same file count
+        let filtered = app.filtered_root_nodes[0].as_ref().unwrap();
+        assert_eq!(filtered.children.len(), child_count_before);
+        assert_eq!(filtered.file_count, file_count_before);
+        // Only expansion flag should have changed
+        assert!(filtered.is_expanded);
+    }
+
+    #[test]
+    fn test_toggle_tag_expansion_preserves_filtered_structure() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Parent".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "Rock".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/a.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "Jazz".to_string(),
+                    children: vec![],
+                    file_paths: vec![PathBuf::from("/b.mp3")],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        }];
+        app.search_query = "Rock".to_string();
+        app.filtered_tag_tree_roots = recompute_filtered_tag_nodes(&app);
+
+        let child_count_before = app.filtered_tag_tree_roots[0]
+            .children
+            .len();
+        let file_count_before = app.filtered_tag_tree_roots[0].file_count;
+
+        let path = vec!["Parent".to_string()];
+        let _ = update(&mut app, Message::ToggleTagExpansion(path));
+
+        // Structure must be unchanged
+        assert_eq!(
+            app.filtered_tag_tree_roots[0].children.len(),
+            child_count_before
+        );
+        assert_eq!(
+            app.filtered_tag_tree_roots[0].file_count,
+            file_count_before
+        );
+        assert!(app.filtered_tag_tree_roots[0].is_expanded);
+        // Matching child still present, non-matching child still absent
+        assert_eq!(
+            app.filtered_tag_tree_roots[0]
+                .children
+                .iter()
+                .map(|c| c.label.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Rock"]
+        );
+    }
 }
