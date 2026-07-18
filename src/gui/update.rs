@@ -827,7 +827,42 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         },
         Message::AddRandomTagNodeToRightPanel(_path) => Task::none(),
-        Message::AddRandomDirectoryToRightPanel(_dir_path) => Task::none(),
+        Message::AddRandomDirectoryToRightPanel(dir_path) => {
+            app.right_panel_shuffled = false;
+            for root in app.root_nodes.iter().flatten() {
+                if let Some(node) = find_node_by_path(root, &dir_path) {
+                    let mut files = Vec::new();
+                    collect_files_recursively(node, &mut files);
+                    // Filter by active search, if any
+                    if let Some(ref matches) = app.last_search_matches {
+                        files.retain(|f| matches.contains(f));
+                    }
+                    // Random subset
+                    let n = app.random_count.min(files.len());
+                    if n < files.len() {
+                        use rand::seq::SliceRandom;
+                        let mut rng = rand::rng();
+                        files.partial_shuffle(&mut rng, n);
+                        files.truncate(n);
+                    }
+                    for file in files {
+                        if !app.right_panel_files.iter().any(|f| f.path == file)
+                        {
+                            let meta = extract_media_metadata(&file);
+                            app.right_panel_files.push(RightPanelFile {
+                                path: file,
+                                creator: meta.creator,
+                                album: meta.album,
+                                title: meta.title,
+                                genre: meta.genre,
+                                duration_ms: meta.duration_ms,
+                            });
+                        }
+                    }
+                }
+            }
+            Task::none()
+        },
     }
 }
 
@@ -1241,6 +1276,203 @@ mod tests {
             2,
             "all files should be added when no search is active"
         );
+    }
+
+    // ── AddRandomDirectoryToRightPanel tests ──────────────────────────
+
+    #[test]
+    fn test_add_random_directory_selects_subset() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+        let file_b = PathBuf::from("/music/song_b.mp3");
+        let file_c = PathBuf::from("/music/song_c.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![
+                FileNode::new_file("song_a.mp3".to_string(), file_a.clone()),
+                FileNode::new_file("song_b.mp3".to_string(), file_b.clone()),
+                FileNode::new_file("song_c.mp3".to_string(), file_c.clone()),
+            ],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+        app.random_count = 2;
+
+        let msg = Message::AddRandomDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(app.right_panel_files.len(), 2);
+        assert!(!app.right_panel_shuffled);
+    }
+
+    #[test]
+    fn test_add_random_directory_all_when_n_exceeds() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+        let file_b = PathBuf::from("/music/song_b.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![
+                FileNode::new_file("song_a.mp3".to_string(), file_a.clone()),
+                FileNode::new_file("song_b.mp3".to_string(), file_b.clone()),
+            ],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+        // N exceeds file count — should add all
+        app.random_count = 10;
+
+        let msg = Message::AddRandomDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(app.right_panel_files.len(), 2);
+    }
+
+    #[test]
+    fn test_add_random_directory_respects_search_filter() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+        let file_b = PathBuf::from("/music/song_b.mp3");
+        let file_c = PathBuf::from("/music/song_c.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![
+                FileNode::new_file("song_a.mp3".to_string(), file_a.clone()),
+                FileNode::new_file("song_b.mp3".to_string(), file_b.clone()),
+                FileNode::new_file("song_c.mp3".to_string(), file_c.clone()),
+            ],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+        app.random_count = 5;
+
+        // Only file_a and file_b match the search
+        let mut matches = HashSet::new();
+        matches.insert(file_a.clone());
+        matches.insert(file_b.clone());
+        app.last_search_matches = Some(matches);
+
+        let msg = Message::AddRandomDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        // After filtering, only 2 files remain, and N=5 exceeds 2, so both
+        assert_eq!(app.right_panel_files.len(), 2);
+    }
+
+    #[test]
+    fn test_add_random_directory_no_filter_when_search_inactive() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+        let file_b = PathBuf::from("/music/song_b.mp3");
+        let file_c = PathBuf::from("/music/song_c.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![
+                FileNode::new_file("song_a.mp3".to_string(), file_a.clone()),
+                FileNode::new_file("song_b.mp3".to_string(), file_b.clone()),
+                FileNode::new_file("song_c.mp3".to_string(), file_c.clone()),
+            ],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+        app.random_count = 5;
+        app.last_search_matches = None;
+
+        let msg = Message::AddRandomDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        // No search filter — all 3 files pass through, N=5 exceeds count
+        assert_eq!(app.right_panel_files.len(), 3);
+    }
+
+    #[test]
+    fn test_add_random_directory_no_duplicates() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![FileNode::new_file("song_a.mp3".to_string(), file_a.clone())],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+        app.random_count = 5;
+
+        // Add file_a first via AddToRightPanel
+        let _ = update(&mut app, Message::AddToRightPanel(file_a.clone()));
+        assert_eq!(app.right_panel_files.len(), 1);
+
+        let msg = Message::AddRandomDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        // Should still be 1 — no duplicates added
+        assert_eq!(app.right_panel_files.len(), 1);
+    }
+
+    #[test]
+    fn test_add_random_directory_n_zero_adds_none() {
+        let dir_path = PathBuf::from("/music");
+        let file_a = PathBuf::from("/music/song_a.mp3");
+
+        let dir_node = FileNode::new_directory(
+            "music".to_string(),
+            dir_path.clone(),
+            vec![FileNode::new_file("song_a.mp3".to_string(), file_a.clone())],
+        );
+
+        let mut app = FileTreeApp::new(
+            vec![dir_path.clone()],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.root_nodes[0] = Some(dir_node);
+        app.random_count = 0;
+
+        let msg = Message::AddRandomDirectoryToRightPanel(dir_path);
+        let _ = update(&mut app, msg);
+
+        // n = min(0, 1) = 0, so no files should be added
+        assert_eq!(app.right_panel_files.len(), 0);
     }
 
     // ── AddTagNodeToRightPanel search-filter tests ──────────────────
