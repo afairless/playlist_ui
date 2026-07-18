@@ -1,3 +1,4 @@
 /target
 todo.txt
 tmux*.log
+.pi-subagents/
