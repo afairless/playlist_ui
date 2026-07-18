@@ -811,7 +811,21 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         },
-        Message::RandomCountChanged(_new_text) => Task::none(),
+        Message::RandomCountChanged(new_text) => {
+            if let Ok(n) = new_text.parse::<usize>() {
+                if n > 0 {
+                    app.random_count = n;
+                    app.random_count_input = new_text;
+                } else {
+                    // 0 is not a positive integer — revert
+                    app.random_count_input = app.random_count.to_string();
+                }
+            } else {
+                // Not a valid integer — revert
+                app.random_count_input = app.random_count.to_string();
+            }
+            Task::none()
+        },
         Message::AddRandomTagNodeToRightPanel(_path) => Task::none(),
         Message::AddRandomDirectoryToRightPanel(_dir_path) => Task::none(),
     }
@@ -1523,5 +1537,97 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["Rock"]
         );
+    }
+
+    // ── RandomCountChanged validation tests ───────────────────────────────
+
+    #[test]
+    fn test_random_count_valid_input() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let _ = update(&mut app, Message::RandomCountChanged("12".to_string()));
+        assert_eq!(app.random_count, 12);
+        assert_eq!(app.random_count_input, "12");
+    }
+
+    #[test]
+    fn test_random_count_invalid_text_reverts() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.random_count = 5;
+        app.random_count_input = "5".to_string();
+        let _ =
+            update(&mut app, Message::RandomCountChanged("abc".to_string()));
+        assert_eq!(app.random_count, 5);
+        assert_eq!(app.random_count_input, "5");
+    }
+
+    #[test]
+    fn test_random_count_zero_reverts() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.random_count = 3;
+        app.random_count_input = "3".to_string();
+        let _ = update(&mut app, Message::RandomCountChanged("0".to_string()));
+        assert_eq!(app.random_count, 3);
+        assert_eq!(app.random_count_input, "3");
+    }
+
+    #[test]
+    fn test_random_count_empty_reverts() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.random_count = 7;
+        app.random_count_input = "7".to_string();
+        let _ = update(&mut app, Message::RandomCountChanged("".to_string()));
+        assert_eq!(app.random_count, 7);
+        assert_eq!(app.random_count_input, "7");
+    }
+
+    #[test]
+    fn test_random_count_leading_zeros_accepted() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        let _ = update(&mut app, Message::RandomCountChanged("06".to_string()));
+        assert_eq!(app.random_count, 6);
+        assert_eq!(app.random_count_input, "06");
+    }
+
+    #[test]
+    fn test_random_count_overflow_reverts() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.random_count = 4;
+        app.random_count_input = "4".to_string();
+        let _ = update(
+            &mut app,
+            Message::RandomCountChanged("99999999999999999999".to_string()),
+        );
+        assert_eq!(app.random_count, 4);
+        assert_eq!(app.random_count_input, "4");
     }
 }

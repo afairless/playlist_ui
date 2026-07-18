@@ -67,7 +67,6 @@ pub enum Message {
     SearchQueryChanged(String),
     SearchCleared,
     ToggleSearchMode,
-    #[allow(dead_code)]
     RandomCountChanged(String),
     #[allow(dead_code)]
     AddRandomTagNodeToRightPanel(Vec<String>),
@@ -194,10 +193,8 @@ pub struct FileTreeApp {
     #[serde(skip)]
     pub right_panel_shuffled: bool,
     #[serde(skip)]
-    #[allow(dead_code)]
     pub random_count: usize,
     #[serde(skip)]
-    #[allow(dead_code)]
     pub random_count_input: String,
 }
 
