@@ -811,6 +811,9 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         },
+        Message::RandomCountChanged(_new_text) => Task::none(),
+        Message::AddRandomTagNodeToRightPanel(_path) => Task::none(),
+        Message::AddRandomDirectoryToRightPanel(_dir_path) => Task::none(),
     }
 }
 

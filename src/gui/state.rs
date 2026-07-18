@@ -67,6 +67,12 @@ pub enum Message {
     SearchQueryChanged(String),
     SearchCleared,
     ToggleSearchMode,
+    #[allow(dead_code)]
+    RandomCountChanged(String),
+    #[allow(dead_code)]
+    AddRandomTagNodeToRightPanel(Vec<String>),
+    #[allow(dead_code)]
+    AddRandomDirectoryToRightPanel(PathBuf),
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -187,6 +193,12 @@ pub struct FileTreeApp {
     pub right_panel_sort_order: SortOrder,
     #[serde(skip)]
     pub right_panel_shuffled: bool,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub random_count: usize,
+    #[serde(skip)]
+    #[allow(dead_code)]
+    pub random_count_input: String,
 }
 
 #[allow(dead_code)]
@@ -250,6 +262,8 @@ impl FileTreeApp {
             right_panel_sort_column: SortColumn::Directory,
             right_panel_sort_order: SortOrder::Asc,
             right_panel_shuffled: false,
+            random_count: 6,
+            random_count_input: "6".to_string(),
         }
     }
 
@@ -547,6 +561,18 @@ mod tests {
         app.perform_search();
         // Generation should be 6
         assert_eq!(app.search_generation, 6);
+    }
+
+    #[test]
+    fn test_new_app_random_count_default() {
+        let app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        assert_eq!(app.random_count, 6);
+        assert_eq!(app.random_count_input, "6");
     }
 
     #[test]
