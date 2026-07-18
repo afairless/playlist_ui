@@ -2311,6 +2311,7 @@ mod iced_tests {
                 row_size,
                 row_size,
                 LeftPanelSortMode::Alphanumeric,
+                6,
                 flat_button_style,
                 0,
             );
@@ -2343,6 +2344,7 @@ mod iced_tests {
                 row_size,
                 row_size,
                 LeftPanelSortMode::Alphanumeric,
+                6,
                 flat_button_style,
                 0,
             );

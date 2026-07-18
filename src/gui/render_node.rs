@@ -66,12 +66,14 @@ fn directory_button_style(
 
 ///  Recursively renders a file tree node (directory or file) with indentation
 ///  based on depth, including context menus for directory and file actions.
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 pub(crate) fn render_file_node(
     node: &FileNode,
     depth: usize,
     directory_row_size: u16,
     file_row_size: u16,
     sort_mode: LeftPanelSortMode,
+    random_count: usize,
     flat_button_style: impl Fn(
         &iced::Theme,
         iced::widget::button::Status,
@@ -190,6 +192,7 @@ pub(crate) fn render_file_node(
                         directory_row_size,
                         file_row_size,
                         sort_mode,
+                        random_count,
                         flat_button_style,
                         max_count,
                     ));
@@ -229,12 +232,14 @@ pub(crate) fn render_file_node(
 /// panel, while leaf nodes (tracks) allow adding the individual track. Handles
 /// expansion/collapse of nodes and passes the navigation/selection path for
 /// context menu actions.
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 pub(crate) fn render_tag_node(
     node: &TagTreeNode,
     depth: usize,
     path: Vec<String>,
     directory_row_size: u16,
     sort_mode: LeftPanelSortMode,
+    random_count: usize,
     flat_button_style: impl Fn(
         &iced::Theme,
         iced::widget::button::Status,
@@ -352,6 +357,7 @@ pub(crate) fn render_tag_node(
                 new_path.clone(),
                 directory_row_size,
                 sort_mode,
+                random_count,
                 flat_button_style,
                 max_count,
             ));
@@ -471,6 +477,7 @@ mod tests {
             12,
             12,
             LeftPanelSortMode::FileCount,
+            6,
             flat_button_style,
             10,
         );
@@ -580,6 +587,7 @@ mod tests {
             vec![],
             12,
             LeftPanelSortMode::FileCount,
+            6,
             flat_button_style,
             10,
         );
@@ -591,6 +599,7 @@ mod tests {
             vec![],
             12,
             LeftPanelSortMode::Alphanumeric,
+            6,
             flat_button_style,
             10,
         );
@@ -652,6 +661,7 @@ mod tests {
             vec![],
             12,
             LeftPanelSortMode::Alphanumeric,
+            6,
             flat_button_style,
             10,
         );

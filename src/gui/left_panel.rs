@@ -180,6 +180,7 @@ fn create_left_panel_file_tree_browser(
                 tree_browser_style.directory_row_size,
                 tree_browser_style.file_row_size,
                 app.left_panel_sort_mode,
+                app.random_count,
                 flat_button_style,
                 max_count,
             )
@@ -252,6 +253,7 @@ fn create_left_panel_tag_tree_browser(
             vec![],
             tree_browser_style.directory_row_size,
             app.left_panel_sort_mode,
+            app.random_count,
             flat_button_style,
             max_count,
         ));
