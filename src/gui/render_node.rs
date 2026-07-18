@@ -107,9 +107,19 @@ pub(crate) fn render_file_node(
                     .style(ds)
                     .on_press(Message::ToggleExpansion(node.path.clone())),
                 move || {
-                    column![button("Add all files to right panel").on_press(
-                        Message::AddDirectoryToRightPanel(dir_path.clone())
-                    )]
+                    column![
+                        button("Add all files to right panel").on_press(
+                            Message::AddDirectoryToRightPanel(dir_path.clone())
+                        ),
+                        button(iced::widget::text(format!(
+                            "Add {random_count} random files to right panel"
+                        )))
+                        .on_press(
+                            Message::AddRandomDirectoryToRightPanel(
+                                dir_path.clone()
+                            )
+                        ),
+                    ]
                     .into()
                 },
             );
@@ -297,10 +307,21 @@ pub(crate) fn render_tag_node(
                 .on_press(Message::ToggleTagExpansion(new_path.clone())),
             {
                 let path = new_path.clone();
+                let random_path = new_path.clone();
                 move || {
-                    column![button("Add all files to right panel").on_press(
-                        Message::AddTagNodeToRightPanel(path.clone())
-                    )]
+                    column![
+                        button("Add all files to right panel").on_press(
+                            Message::AddTagNodeToRightPanel(path.clone())
+                        ),
+                        button(iced::widget::text(format!(
+                            "Add {random_count} random files to right panel"
+                        )))
+                        .on_press(
+                            Message::AddRandomTagNodeToRightPanel(
+                                random_path.clone()
+                            )
+                        ),
+                    ]
                     .into()
                 }
             },
