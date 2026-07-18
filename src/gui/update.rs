@@ -826,7 +826,41 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             }
             Task::none()
         },
-        Message::AddRandomTagNodeToRightPanel(_path) => Task::none(),
+        Message::AddRandomTagNodeToRightPanel(path) => {
+            app.right_panel_shuffled = false;
+            if let Some(node) =
+                find_tag_node_mut(&mut app.tag_tree_roots, &path)
+            {
+                let mut files = Vec::new();
+                collect_tag_node_files(node, &mut files);
+                // Filter by active search, if any
+                if let Some(ref matches) = app.last_search_matches {
+                    files.retain(|f| matches.contains(f));
+                }
+                // Random subset
+                let n = app.random_count.min(files.len());
+                if n < files.len() {
+                    use rand::seq::SliceRandom;
+                    let mut rng = rand::rng();
+                    files.partial_shuffle(&mut rng, n);
+                    files.truncate(n);
+                }
+                for file in files {
+                    if !app.right_panel_files.iter().any(|f| f.path == file) {
+                        let meta = extract_media_metadata(&file);
+                        app.right_panel_files.push(RightPanelFile {
+                            path: file,
+                            creator: meta.creator,
+                            album: meta.album,
+                            title: meta.title,
+                            genre: meta.genre,
+                            duration_ms: meta.duration_ms,
+                        });
+                    }
+                }
+            }
+            Task::none()
+        },
         Message::AddRandomDirectoryToRightPanel(dir_path) => {
             app.right_panel_shuffled = false;
             for root in app.root_nodes.iter().flatten() {
@@ -1769,6 +1803,244 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["Rock"]
         );
+    }
+
+    // ── AddRandomTagNodeToRightPanel tests ──────────────────────────────
+
+    #[test]
+    fn test_add_random_tag_node_selects_subset() {
+        let track_1 = PathBuf::from("/music/jazz/track_1.mp3");
+        let track_2 = PathBuf::from("/music/jazz/track_2.mp3");
+        let track_3 = PathBuf::from("/music/jazz/track_3.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![TagTreeNode {
+                label: "Jazz".to_string(),
+                children: vec![],
+                file_paths: vec![
+                    track_1.clone(),
+                    track_2.clone(),
+                    track_3.clone(),
+                ],
+                is_expanded: false,
+                file_count: 3,
+            }],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 3,
+        }];
+        app.random_count = 2;
+
+        let path = vec!["Genre".to_string(), "Jazz".to_string()];
+        let msg = Message::AddRandomTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(app.right_panel_files.len(), 2);
+        assert!(!app.right_panel_shuffled);
+    }
+
+    #[test]
+    fn test_add_random_tag_node_all_when_n_exceeds() {
+        let track_1 = PathBuf::from("/music/jazz/track_1.mp3");
+        let track_2 = PathBuf::from("/music/jazz/track_2.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![TagTreeNode {
+                label: "Jazz".to_string(),
+                children: vec![],
+                file_paths: vec![track_1.clone(), track_2.clone()],
+                is_expanded: false,
+                file_count: 2,
+            }],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        }];
+        app.random_count = 10;
+
+        let path = vec!["Genre".to_string(), "Jazz".to_string()];
+        let msg = Message::AddRandomTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        assert_eq!(app.right_panel_files.len(), 2);
+    }
+
+    #[test]
+    fn test_add_random_tag_node_respects_search_filter() {
+        let track_1 = PathBuf::from("/music/jazz/track_1.mp3");
+        let track_2 = PathBuf::from("/music/jazz/track_2.mp3");
+        let track_3 = PathBuf::from("/music/rock/track_3.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "Jazz".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_1.clone(), track_2.clone()],
+                    is_expanded: false,
+                    file_count: 2,
+                },
+                TagTreeNode {
+                    label: "Rock".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_3.clone()],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 3,
+        }];
+        app.random_count = 5;
+
+        // Only track_1 and track_2 match the search
+        let mut matches = HashSet::new();
+        matches.insert(track_1.clone());
+        matches.insert(track_2.clone());
+        app.last_search_matches = Some(matches);
+
+        let path = vec!["Genre".to_string()];
+        let msg = Message::AddRandomTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        // After filtering, only 2 files remain, N=5 exceeds 2, so both
+        assert_eq!(app.right_panel_files.len(), 2);
+    }
+
+    #[test]
+    fn test_add_random_tag_node_no_filter_when_search_inactive() {
+        let track_1 = PathBuf::from("/music/jazz/track_1.mp3");
+        let track_2 = PathBuf::from("/music/rock/track_2.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![
+                TagTreeNode {
+                    label: "Jazz".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_1.clone()],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+                TagTreeNode {
+                    label: "Rock".to_string(),
+                    children: vec![],
+                    file_paths: vec![track_2.clone()],
+                    is_expanded: false,
+                    file_count: 1,
+                },
+            ],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 2,
+        }];
+        app.random_count = 5;
+        app.last_search_matches = None;
+
+        let path = vec!["Genre".to_string()];
+        let msg = Message::AddRandomTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        // No filter — all 2 files added, N=5 exceeds count
+        assert_eq!(app.right_panel_files.len(), 2);
+    }
+
+    #[test]
+    fn test_add_random_tag_node_no_duplicates() {
+        let track = PathBuf::from("/music/jazz/track.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![TagTreeNode {
+                label: "Jazz".to_string(),
+                children: vec![],
+                file_paths: vec![track.clone()],
+                is_expanded: false,
+                file_count: 1,
+            }],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        }];
+        app.random_count = 5;
+
+        // Add track first via AddToRightPanel
+        let _ = update(&mut app, Message::AddToRightPanel(track.clone()));
+        assert_eq!(app.right_panel_files.len(), 1);
+
+        let path = vec!["Genre".to_string(), "Jazz".to_string()];
+        let msg = Message::AddRandomTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        // Should still be 1 — no duplicates
+        assert_eq!(app.right_panel_files.len(), 1);
+    }
+
+    #[test]
+    fn test_add_random_tag_node_n_zero_adds_none() {
+        let track = PathBuf::from("/music/jazz/track.mp3");
+
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.tag_tree_roots = vec![TagTreeNode {
+            label: "Genre".to_string(),
+            children: vec![TagTreeNode {
+                label: "Jazz".to_string(),
+                children: vec![],
+                file_paths: vec![track.clone()],
+                is_expanded: false,
+                file_count: 1,
+            }],
+            file_paths: vec![],
+            is_expanded: false,
+            file_count: 1,
+        }];
+        app.random_count = 0;
+
+        let path = vec!["Genre".to_string(), "Jazz".to_string()];
+        let msg = Message::AddRandomTagNodeToRightPanel(path);
+        let _ = update(&mut app, msg);
+
+        // n = min(0, 1) = 0, so no files should be added
+        assert_eq!(app.right_panel_files.len(), 0);
     }
 
     // ── RandomCountChanged validation tests ───────────────────────────────

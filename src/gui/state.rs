@@ -68,9 +68,7 @@ pub enum Message {
     SearchCleared,
     ToggleSearchMode,
     RandomCountChanged(String),
-    #[allow(dead_code)]
     AddRandomTagNodeToRightPanel(Vec<String>),
-    #[allow(dead_code)]
     AddRandomDirectoryToRightPanel(PathBuf),
 }
 
