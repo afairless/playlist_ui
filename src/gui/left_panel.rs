@@ -79,10 +79,26 @@ fn create_left_panel_menu_row<'a>(
         )
         .on_press(Message::ToggleLeftPanelSortMode);
 
+    let n_label = iced::widget::text("N:").size(menu_style.text_size).style(
+        move |_theme| iced::widget::text::Style {
+            color: Some(menu_style.text_color.into()),
+        },
+    );
+
+    let n_input = iced::widget::text_input::<
+        Message,
+        iced::Theme,
+        iced::Renderer,
+    >("6", &app.random_count_input)
+    .on_input(Message::RandomCountChanged)
+    .width(50);
+
     iced::widget::row![
         toggle_left_panel_button,
         directory_button,
         sort_mode_button,
+        n_label,
+        n_input,
     ]
     .spacing(menu_style.spacing)
     .into()
