@@ -812,7 +812,10 @@ pub fn update(app: &mut FileTreeApp, message: Message) -> Task<Message> {
             Task::none()
         },
         Message::RandomCountChanged(new_text) => {
-            if let Ok(n) = new_text.parse::<usize>() {
+            if new_text.is_empty() {
+                // Allow empty input so the user can clear and retype
+                app.random_count_input = new_text;
+            } else if let Ok(n) = new_text.parse::<usize>() {
                 if n > 0 {
                     app.random_count = n;
                     app.random_count_input = new_text;
