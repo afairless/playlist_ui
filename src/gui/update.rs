@@ -2092,8 +2092,10 @@ mod tests {
         assert_eq!(app.random_count_input, "3");
     }
 
+    /// When the user erases all digits, the text input shows empty while
+    /// the last valid `random_count` value is preserved.
     #[test]
-    fn test_random_count_empty_reverts() {
+    fn test_random_count_empty_accepted() {
         let mut app = FileTreeApp::new(
             vec![],
             &["mp3"],
@@ -2103,8 +2105,33 @@ mod tests {
         app.random_count = 7;
         app.random_count_input = "7".to_string();
         let _ = update(&mut app, Message::RandomCountChanged("".to_string()));
+        // Text input should show empty, but the numeric value stays unchanged
+        assert_eq!(app.random_count_input, "");
         assert_eq!(app.random_count, 7);
-        assert_eq!(app.random_count_input, "7");
+    }
+
+    /// After the field becomes empty, the previous `random_count` is
+    /// preserved and can be overwritten by typing a new valid number.
+    #[test]
+    fn test_random_count_erase_then_type() {
+        let mut app = FileTreeApp::new(
+            vec![],
+            &["mp3"],
+            PathBuf::from("/tmp/test.json"),
+            None,
+        );
+        app.random_count = 6;
+        app.random_count_input = "6".to_string();
+
+        // Erase to empty
+        let _ = update(&mut app, Message::RandomCountChanged("".to_string()));
+        assert_eq!(app.random_count_input, "");
+        assert_eq!(app.random_count, 6);
+
+        // Type a new valid number
+        let _ = update(&mut app, Message::RandomCountChanged("42".to_string()));
+        assert_eq!(app.random_count_input, "42");
+        assert_eq!(app.random_count, 42);
     }
 
     #[test]
